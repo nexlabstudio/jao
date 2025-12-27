@@ -1,0 +1,8 @@
+builders:
+  dartonic:
+    import: "package:dartonic_generator/dartonic_generator.dart"
+    builder_factories: ["dartonicBuilder"]
+    build_extensions: {".dart": [".dartonic.g.part"]}
+    auto_apply: dependents
+    build_to: cache
+    applies_builders: ["source_gen|combining_builder"]

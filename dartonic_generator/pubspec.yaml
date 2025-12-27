@@ -1,0 +1,22 @@
+name: dartonic_generator
+description: Code generator for dartonic ORM. Generates typed field accessors and model metadata.
+version: 0.0.1
+homepage: https://github.com/example/dartonic
+
+environment:
+  sdk: ^3.10.0
+
+resolution: workspace
+
+dependencies:
+  analyzer: ^6.0.0
+  build: ^2.4.0
+  source_gen: ^1.5.0
+  dartonic:
+    path: ../dartonic
+
+dev_dependencies:
+  build_runner: ^2.4.0
+  build_test: ^2.2.0
+  test: ^1.24.0
+  lints: ^3.0.0

@@ -1,0 +1,21 @@
+name: dartonic
+description: A Django-inspired ORM for Dart. Framework-agnostic, type-safe, with powerful QuerySet API.
+version: 0.0.1
+homepage: https://github.com/example/dartonic
+
+environment:
+  sdk: ^3.10.0
+
+resolution: workspace
+
+dependencies:
+  meta: ^1.9.0
+  collection: ^1.17.0
+  # Database drivers
+  postgres: ^3.1.0
+  mysql1: ^0.20.0
+  sqlite3: ^2.4.0
+
+dev_dependencies:
+  test: ^1.24.0
+  lints: ^3.0.0

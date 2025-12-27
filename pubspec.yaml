@@ -1,0 +1,9 @@
+name: dartonic_workspace
+publish_to: none
+environment:
+  sdk: ^3.10.0
+workspace:
+  - dartonic
+  - dartonic_cli
+  - dartonic_generator
+  - example
