@@ -7,6 +7,7 @@ library;
 import 'dart:async';
 import '../query/queryset.dart';
 import '../query/expressions.dart';
+import '../dartonic.dart';
 
 /// Manager provides the interface for making queries to the database.
 ///
@@ -38,7 +39,9 @@ class Manager<T> {
 
   /// Get the base QuerySet for this manager
   QuerySet<T> _baseQuerySet() {
-    var qs = QuerySet<T>(executor: _executor);
+    // Use explicit executor if provided, otherwise try global Dartonic config
+    final executor = _executor ?? (Dartonic.isInitialized ? Dartonic.instance.executor<T>() : null);
+    var qs = QuerySet<T>(executor: executor);
     for (final filter in _baseFilters) {
       qs = qs.filter(filter);
     }
@@ -150,19 +153,21 @@ class Manager<T> {
 
   /// Create a new object.
   Future<T> create(Map<String, Object?> values) async {
-    if (_executor == null) {
-      throw StateError('Manager has no executor configured');
+    final executor = _executor ?? (Dartonic.isInitialized ? Dartonic.instance.executor<T>() : null);
+    if (executor == null) {
+      throw StateError('Manager has no executor configured. Call Dartonic.initialize() and register your models first.');
     }
     // The executor handles the actual insertion
-    return (_executor as CreateCapable<T>).create(values);
+    return (executor as CreateCapable<T>).create(values);
   }
 
   /// Create multiple objects in bulk.
   Future<List<T>> bulkCreate(List<Map<String, Object?>> objects) async {
-    if (_executor == null) {
-      throw StateError('Manager has no executor configured');
+    final executor = _executor ?? (Dartonic.isInitialized ? Dartonic.instance.executor<T>() : null);
+    if (executor == null) {
+      throw StateError('Manager has no executor configured. Call Dartonic.initialize() and register your models first.');
     }
-    return (_executor as CreateCapable<T>).bulkCreate(objects);
+    return (executor as CreateCapable<T>).bulkCreate(objects);
   }
 
   /// Update all objects matching conditions.
@@ -186,10 +191,11 @@ class Manager<T> {
   ///
   /// Use with caution - not portable across databases.
   Future<List<Map<String, dynamic>>> raw(String sql, [List<Object?>? params]) async {
-    if (_executor == null) {
-      throw StateError('Manager has no executor configured');
+    final executor = _executor ?? (Dartonic.isInitialized ? Dartonic.instance.executor<T>() : null);
+    if (executor == null) {
+      throw StateError('Manager has no executor configured. Call Dartonic.initialize() and register your models first.');
     }
-    return (_executor as RawQueryCapable).rawQuery(sql, params);
+    return (executor as RawQueryCapable).rawQuery(sql, params);
   }
 }
 

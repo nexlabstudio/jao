@@ -33,3 +33,4 @@ doc/api/
 # Landing page config (environment-specific)
 apps/landing/config.js
 !apps/landing/config.example.js
+.dart_frog/

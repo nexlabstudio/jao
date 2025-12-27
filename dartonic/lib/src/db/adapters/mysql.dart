@@ -79,6 +79,12 @@ class MySqlDialect implements SqlDialect {
         .join(', ');
     return 'ON DUPLICATE KEY UPDATE $updateCols';
   }
+
+  @override
+  String caseInsensitiveLike(String column, String param) {
+    // MySQL LIKE is case-insensitive by default with utf8 collation
+    return '$column LIKE $param';
+  }
 }
 
 /// MySQL database connection implementation.

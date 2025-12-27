@@ -1,0 +1,9 @@
+# Dartonic Configuration
+# Database settings
+
+type: sqlite
+database: database.db
+
+# Paths
+migrations_path: lib/migrations
+models_path: lib/models

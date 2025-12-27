@@ -80,6 +80,12 @@ class SqliteDialect implements SqlDialect {
         .join(', ');
     return 'ON CONFLICT ($conflictCols) DO UPDATE SET $updateCols';
   }
+
+  @override
+  String caseInsensitiveLike(String column, String param) {
+    // SQLite LIKE is case-insensitive for ASCII by default, but use LOWER for consistency
+    return 'LOWER($column) LIKE LOWER($param)';
+  }
 }
 
 /// SQLite database connection implementation.
@@ -110,7 +116,7 @@ class SqliteConnection implements DatabaseConnection {
     db.execute('PRAGMA foreign_keys = ON');
 
     // Enable WAL mode for better concurrency
-    db.execute('PRAGMA journal_mode = WAL');
+    db.execute('PRAGMA journal_mode = DELETE');
 
     return SqliteConnection._(db, path);
   }

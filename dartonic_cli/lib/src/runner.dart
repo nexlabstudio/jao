@@ -391,8 +391,15 @@ Options:
         File(fullPath).writeAsStringSync(content);
         output.success('Created: $fullPath');
 
-        print('');
-        output.info('Remember to add this migration to your migrations list!');
+        // Auto-add to migrations.dart
+        final migrationsFile = File('$path/migrations.dart');
+        if (migrationsFile.existsSync()) {
+          _addMigrationToRegistry(migrationsFile, fileName, migrationName);
+          output.success('Added to: $path/migrations.dart');
+        } else {
+          print('');
+          output.info('Remember to add this migration to your migrations list!');
+        }
 
         return 0;
       } finally {
@@ -449,6 +456,13 @@ class $className extends Migration {
 
     File(fullPath).writeAsStringSync(content);
     output.success('Created: $fullPath');
+
+    // Auto-add to migrations.dart
+    final migrationsFile = File('$path/migrations.dart');
+    if (migrationsFile.existsSync()) {
+      _addMigrationToRegistry(migrationsFile, fileName, className);
+      output.success('Added to: $path/migrations.dart');
+    }
 
     return 0;
   }
@@ -885,20 +899,76 @@ class $className extends Migration {
     File(fullPath).writeAsStringSync(content);
     output.success('Created: $fullPath');
 
-    print('');
-    output.info("Don't forget to add your migration to the migrations list!");
-    print('''
-Example in lib/migrations/migrations.dart:
-
-  import '${fileName.replaceAll('.dart', '')}.dart';
-  
-  final allMigrations = <Migration>[
-    // ... existing migrations ...
-    $className(),
-  ];
-''');
+    // Auto-add to migrations.dart
+    final migrationsFile = File('$path/migrations.dart');
+    if (migrationsFile.existsSync()) {
+      _addMigrationToRegistry(migrationsFile, fileName, className);
+      output.success('Added to: $path/migrations.dart');
+    } else {
+      print('');
+      output.info("Don't forget to add your migration to the migrations list!");
+    }
 
     return 0;
+  }
+
+  /// Add a migration to the migrations.dart registry file.
+  void _addMigrationToRegistry(File migrationsFile, String fileName, String className) {
+    var content = migrationsFile.readAsStringSync();
+    final importName = fileName.replaceAll('.dart', '');
+
+    // Add import if not already present
+    final importStatement = "import '$importName.dart';";
+    if (!content.contains(importStatement)) {
+      // Find the last import or the library directive
+      final importPattern = RegExp(r"^import\s+'[^']+\.dart';", multiLine: true);
+      final imports = importPattern.allMatches(content).toList();
+
+      if (imports.isNotEmpty) {
+        // Add after the last import
+        final lastImport = imports.last;
+        content = content.substring(0, lastImport.end) +
+            '\n$importStatement' +
+            content.substring(lastImport.end);
+      } else {
+        // Add after library directive or at the beginning
+        final libraryMatch = RegExp(r'^library[^;]*;', multiLine: true).firstMatch(content);
+        if (libraryMatch != null) {
+          content = content.substring(0, libraryMatch.end) +
+              '\n\n$importStatement' +
+              content.substring(libraryMatch.end);
+        } else {
+          content = "$importStatement\n$content";
+        }
+      }
+    }
+
+    // Add migration class to allMigrations list
+    final migrationInstance = '$className(),';
+    if (!content.contains(migrationInstance)) {
+      // Find the allMigrations list and add to it
+      final listPattern = RegExp(r'final\s+allMigrations\s*=\s*<Migration>\s*\[([^\]]*)\]', dotAll: true);
+      final match = listPattern.firstMatch(content);
+
+      if (match != null) {
+        final listContent = match.group(1) ?? '';
+        final trimmedContent = listContent.trimRight();
+
+        // Build new list content
+        String newListContent;
+        if (trimmedContent.isEmpty || trimmedContent.endsWith(',') || trimmedContent.endsWith('[')) {
+          newListContent = '$listContent  $migrationInstance\n';
+        } else {
+          newListContent = '$listContent,\n  $migrationInstance\n';
+        }
+
+        content = content.substring(0, match.start) +
+            'final allMigrations = <Migration>[$newListContent]' +
+            content.substring(match.end);
+      }
+    }
+
+    migrationsFile.writeAsStringSync(content);
   }
 
   String _pad(int n) => n.toString().padLeft(2, '0');

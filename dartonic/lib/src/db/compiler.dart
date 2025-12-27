@@ -327,7 +327,7 @@ class SqlCompiler {
       ComparisonOp.gt => '$left > $right',
       ComparisonOp.gte => '$left >= $right',
       ComparisonOp.like => '$left LIKE $right',
-      ComparisonOp.ilike => '$left ILIKE $right',
+      ComparisonOp.ilike => dialect.caseInsensitiveLike(left, right),
       ComparisonOp.inList => _compileInList(left, expr.right),
       ComparisonOp.isNull => '$left IS NULL',
       ComparisonOp.isNotNull => '$left IS NOT NULL',

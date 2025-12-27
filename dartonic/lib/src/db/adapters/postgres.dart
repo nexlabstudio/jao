@@ -77,6 +77,12 @@ class PostgresDialect implements SqlDialect {
         .join(', ');
     return 'ON CONFLICT ($conflictCols) DO UPDATE SET $updateCols';
   }
+
+  @override
+  String caseInsensitiveLike(String column, String param) {
+    // PostgreSQL has native ILIKE
+    return '$column ILIKE $param';
+  }
 }
 
 /// PostgreSQL database connection implementation.

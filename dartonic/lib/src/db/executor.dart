@@ -33,6 +33,12 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
   /// Function to convert model instance to row data
   final Map<String, dynamic> Function(T model) toRow;
 
+  /// Column names that should be auto-set to current timestamp on create
+  final List<String> autoNowAddFields;
+
+  /// Column names that should be auto-set to current timestamp on every save
+  final List<String> autoNowFields;
+
   ModelExecutor({
     required this.pool,
     required this.compiler,
@@ -40,7 +46,47 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
     required this.pkField,
     required this.fromRow,
     required this.toRow,
+    this.autoNowAddFields = const [],
+    this.autoNowFields = const [],
   });
+
+  /// Get the current timestamp as an ISO string
+  String _currentTimestamp() => DateTime.now().toUtc().toIso8601String();
+
+  /// Inject autoNowAdd and autoNow fields into values for create
+  Map<String, Object?> _injectCreateTimestamps(Map<String, Object?> values) {
+    final result = Map<String, Object?>.from(values);
+    final now = _currentTimestamp();
+
+    // Inject autoNowAdd fields (set on create)
+    for (final field in autoNowAddFields) {
+      if (!result.containsKey(field)) {
+        result[field] = now;
+      }
+    }
+
+    // Inject autoNow fields (set on create and update)
+    for (final field in autoNowFields) {
+      if (!result.containsKey(field)) {
+        result[field] = now;
+      }
+    }
+
+    return result;
+  }
+
+  /// Inject autoNow fields into values for update
+  Map<String, Object?> _injectUpdateTimestamps(Map<String, Object?> values) {
+    final result = Map<String, Object?>.from(values);
+    final now = _currentTimestamp();
+
+    // Only inject autoNow fields (not autoNowAdd - those are only set on create)
+    for (final field in autoNowFields) {
+      result[field] = now;
+    }
+
+    return result;
+  }
 
   @override
   Future<List<T>> execute(QueryConfig config) async {
@@ -89,7 +135,10 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
 
   @override
   Future<int> update(QueryConfig config, Map<String, Object?> values) async {
-    final query = compiler.compileUpdate(table: tableName, config: config, values: values);
+    // Inject autoNow timestamps
+    final valuesWithTimestamps = _injectUpdateTimestamps(values);
+
+    final query = compiler.compileUpdate(table: tableName, config: config, values: valuesWithTimestamps);
 
     return pool.withConnection((conn) async {
       final result = await conn.execute(query.sql, query.parameters);
@@ -109,9 +158,12 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
 
   @override
   Future<T> create(Map<String, Object?> values) async {
+    // Inject autoNow and autoNowAdd timestamps
+    final valuesWithTimestamps = _injectCreateTimestamps(values);
+
     final query = compiler.compileInsert(
       table: tableName,
-      values: values,
+      values: valuesWithTimestamps,
       returning: compiler.dialect.supportsReturning,
       returningColumn: '*',
     );
@@ -137,7 +189,7 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
       }
 
       // Return a model with the provided values as fallback
-      return fromRow(values.cast<String, dynamic>());
+      return fromRow(valuesWithTimestamps.cast<String, dynamic>());
     });
   }
 
@@ -145,9 +197,12 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
   Future<List<T>> bulkCreate(List<Map<String, Object?>> objects) async {
     if (objects.isEmpty) return [];
 
+    // Inject timestamps for each object
+    final objectsWithTimestamps = objects.map(_injectCreateTimestamps).toList();
+
     final query = compiler.compileBulkInsert(
       table: tableName,
-      rows: objects,
+      rows: objectsWithTimestamps,
       returning: compiler.dialect.supportsReturning,
       returningColumn: '*',
     );
@@ -161,7 +216,7 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
 
       // For databases without RETURNING, we can't efficiently get all inserted rows
       // Return models from the input data
-      return objects.map((obj) => fromRow(obj.cast<String, dynamic>())).toList();
+      return objectsWithTimestamps.map((obj) => fromRow(obj.cast<String, dynamic>())).toList();
     });
   }
 

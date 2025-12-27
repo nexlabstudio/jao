@@ -42,6 +42,12 @@ class ModelFieldSchema {
   final int? scale;
   final ForeignKeyInfo? foreignKey;
 
+  /// Automatically set to current timestamp on creation (like Django's auto_now_add)
+  final bool autoNowAdd;
+
+  /// Automatically set to current timestamp on every save (like Django's auto_now)
+  final bool autoNow;
+
   const ModelFieldSchema({
     required this.name,
     required this.columnName,
@@ -56,6 +62,8 @@ class ModelFieldSchema {
     this.precision,
     this.scale,
     this.foreignKey,
+    this.autoNowAdd = false,
+    this.autoNow = false,
   });
 }
 

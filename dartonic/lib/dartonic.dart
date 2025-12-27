@@ -111,3 +111,6 @@ export 'src/migrations/schema.dart';
 export 'src/migrations/operations.dart';
 export 'src/migrations/migration.dart';
 export 'src/migrations/generator.dart';
+
+// Global configuration
+export 'src/dartonic.dart';

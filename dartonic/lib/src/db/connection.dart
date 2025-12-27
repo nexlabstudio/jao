@@ -241,6 +241,10 @@ abstract class SqlDialect {
 
   /// UPSERT syntax
   String upsert(String table, List<String> columns, List<String> conflictColumns);
+
+  /// Case-insensitive LIKE expression.
+  /// PostgreSQL uses ILIKE, SQLite uses LIKE with LOWER().
+  String caseInsensitiveLike(String column, String param);
 }
 
 /// Represents a database field type for schema operations.

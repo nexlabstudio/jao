@@ -1,6 +1,6 @@
 name: dartonic_example
-description: Example usage of the dartonic ORM.
-version: 0.0.1
+description: Dart Frog API demonstrating dartonic ORM with SQLite.
+version: 0.1.0
 publish_to: none
 
 environment:
@@ -9,6 +9,7 @@ environment:
 resolution: workspace
 
 dependencies:
+  dart_frog: ^1.2.0
   dartonic:
     path: ../dartonic
   dartonic_cli:
