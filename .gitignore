@@ -36,3 +36,4 @@ apps/landing/config.js
 .dart_frog/
 *.g.dart
 **/migrations/
+*.db
