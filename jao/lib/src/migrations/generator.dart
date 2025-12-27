@@ -324,7 +324,7 @@ class SchemaGenerator {
   String generateMigrationFile(String name, List<MigrationOperation> operations) {
     final buffer = StringBuffer();
 
-    buffer.writeln("import 'package:dartonic/dartonic.dart';");
+    buffer.writeln("import 'package:jao/jao.dart';");
     buffer.writeln();
     buffer.writeln('class $name extends Migration {');
     buffer.writeln('  @override');
@@ -425,7 +425,7 @@ class SchemaGenerator {
   }
 }
 
-/// Convert a dartonic field annotation to database FieldType
+/// Convert a jao field annotation to database FieldType
 FieldType fieldDefToDbType(Field field) => switch (field) {
   AutoField() => FieldType.serial,
   BigAutoField() => FieldType.bigSerial,

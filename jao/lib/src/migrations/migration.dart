@@ -229,7 +229,7 @@ class MigrationRunner {
   final ConnectionPool pool;
   final String migrationsTable;
 
-  MigrationRunner({required this.adapter, required this.pool, this.migrationsTable = 'dartonic_migrations'});
+  MigrationRunner({required this.adapter, required this.pool, this.migrationsTable = 'jao_migrations'});
 
   /// Ensure the migrations tracking table exists
   Future<void> _ensureMigrationsTable() async {
