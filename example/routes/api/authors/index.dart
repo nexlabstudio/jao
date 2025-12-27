@@ -3,8 +3,6 @@ import 'dart:io';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:dartonic_example/models/models.dart';
 
-/// GET /api/authors - List authors with filtering and pagination
-/// POST /api/authors - Create a new author
 Future<Response> onRequest(RequestContext context) async {
   return switch (context.request.method) {
     HttpMethod.get => _getAuthors(context),
@@ -13,30 +11,14 @@ Future<Response> onRequest(RequestContext context) async {
   };
 }
 
-/// GET /api/authors
-///
-/// Query parameters:
-/// - page: Page number (default: 1)
-/// - limit: Items per page (default: 10, max: 100)
-/// - name: Filter by name (contains, case-insensitive)
-/// - email: Filter by email (contains)
-/// - is_active: Filter by active status (true/false)
-/// - min_age: Minimum age filter
-/// - max_age: Maximum age filter
-/// - order_by: Field to order by (name, email, age, created_at)
-/// - order: Sort order (asc/desc, default: asc)
 Future<Response> _getAuthors(RequestContext context) async {
   final params = context.request.uri.queryParameters;
 
-  // Pagination
   final page = int.tryParse(params['page'] ?? '1') ?? 1;
   final limit = (int.tryParse(params['limit'] ?? '10') ?? 10).clamp(1, 100);
   final offset = (page - 1) * limit;
 
-  // Build query
   var query = AuthorDartonic.objects.all();
-
-  // Apply filters
   if (params['name'] case final name?) {
     query = query.filter(AuthorDartonic.$.name.iContains(name));
   }
@@ -61,7 +43,6 @@ Future<Response> _getAuthors(RequestContext context) async {
     }
   }
 
-  // Ordering
   final orderBy = params['order_by'] ?? 'id';
   final orderDesc = params['order'] == 'desc';
 
@@ -73,10 +54,7 @@ Future<Response> _getAuthors(RequestContext context) async {
     _ => query.orderBy(orderDesc ? AuthorDartonic.$.id.desc() : AuthorDartonic.$.id.asc()),
   };
 
-  // Get total count for pagination metadata
   final total = await AuthorDartonic.objects.count();
-
-  // Apply pagination
   final authors = await query.offset(offset).limit(limit).toList();
 
   return Response.json(
@@ -87,11 +65,9 @@ Future<Response> _getAuthors(RequestContext context) async {
   );
 }
 
-/// POST /api/authors
 Future<Response> _createAuthor(RequestContext context) async {
   final body = await context.request.json() as Map<String, dynamic>;
 
-  // Validate required fields
   final errors = <String>[];
   if (body['name'] == null) errors.add('name is required');
   if (body['email'] == null) errors.add('email is required');
@@ -101,7 +77,6 @@ Future<Response> _createAuthor(RequestContext context) async {
     return Response.json(statusCode: HttpStatus.badRequest, body: {'errors': errors});
   }
 
-  // autoNowAdd and autoNow fields are automatically set by the ORM
   final author = await AuthorDartonic.objects.create({
     'name': body['name'],
     'email': body['email'],

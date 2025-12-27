@@ -1,7 +1,3 @@
-/// Model Executor - Executes queries for a specific model.
-///
-/// This bridges the QuerySet/Manager API with the database adapter,
-/// handling SQL compilation and result mapping.
 library;
 
 import 'dart:async';
@@ -11,32 +7,14 @@ import '../model/manager.dart';
 import 'connection.dart';
 import 'compiler.dart';
 
-/// Executes queries for a specific model type.
-///
-/// Handles SQL compilation, query execution, and result mapping.
 class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCapable {
-  /// The database connection pool
   final ConnectionPool pool;
-
-  /// The SQL compiler for query generation
   final SqlCompiler compiler;
-
-  /// The table name for this model
   final String tableName;
-
-  /// The primary key field name
   final String pkField;
-
-  /// Function to create model instance from row data
   final T Function(Map<String, dynamic> row) fromRow;
-
-  /// Function to convert model instance to row data
   final Map<String, dynamic> Function(T model) toRow;
-
-  /// Column names that should be auto-set to current timestamp on create
   final List<String> autoNowAddFields;
-
-  /// Column names that should be auto-set to current timestamp on every save
   final List<String> autoNowFields;
 
   ModelExecutor({
@@ -50,41 +28,30 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
     this.autoNowFields = const [],
   });
 
-  /// Get the current timestamp as an ISO string
   String _currentTimestamp() => DateTime.now().toUtc().toIso8601String();
 
-  /// Inject autoNowAdd and autoNow fields into values for create
   Map<String, Object?> _injectCreateTimestamps(Map<String, Object?> values) {
     final result = Map<String, Object?>.from(values);
     final now = _currentTimestamp();
-
-    // Inject autoNowAdd fields (set on create)
     for (final field in autoNowAddFields) {
       if (!result.containsKey(field)) {
         result[field] = now;
       }
     }
-
-    // Inject autoNow fields (set on create and update)
     for (final field in autoNowFields) {
       if (!result.containsKey(field)) {
         result[field] = now;
       }
     }
-
     return result;
   }
 
-  /// Inject autoNow fields into values for update
   Map<String, Object?> _injectUpdateTimestamps(Map<String, Object?> values) {
     final result = Map<String, Object?>.from(values);
     final now = _currentTimestamp();
-
-    // Only inject autoNow fields (not autoNowAdd - those are only set on create)
     for (final field in autoNowFields) {
       result[field] = now;
     }
-
     return result;
   }
 
@@ -135,7 +102,6 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
 
   @override
   Future<int> update(QueryConfig config, Map<String, Object?> values) async {
-    // Inject autoNow timestamps
     final valuesWithTimestamps = _injectUpdateTimestamps(values);
 
     final query = compiler.compileUpdate(table: tableName, config: config, values: valuesWithTimestamps);
@@ -158,7 +124,6 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
 
   @override
   Future<T> create(Map<String, Object?> values) async {
-    // Inject autoNow and autoNowAdd timestamps
     final valuesWithTimestamps = _injectCreateTimestamps(values);
 
     final query = compiler.compileInsert(
@@ -175,7 +140,6 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
         return fromRow(result.rows.first);
       }
 
-      // For databases without RETURNING, fetch the inserted row
       final insertId = result.lastInsertId;
       if (insertId != null) {
         final fetchQuery = compiler.compileSelect(
@@ -188,7 +152,6 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
         }
       }
 
-      // Return a model with the provided values as fallback
       return fromRow(valuesWithTimestamps.cast<String, dynamic>());
     });
   }
@@ -196,8 +159,6 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
   @override
   Future<List<T>> bulkCreate(List<Map<String, Object?>> objects) async {
     if (objects.isEmpty) return [];
-
-    // Inject timestamps for each object
     final objectsWithTimestamps = objects.map(_injectCreateTimestamps).toList();
 
     final query = compiler.compileBulkInsert(
@@ -214,8 +175,6 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
         return result.rows.map(fromRow).toList();
       }
 
-      // For databases without RETURNING, we can't efficiently get all inserted rows
-      // Return models from the input data
       return objectsWithTimestamps.map((obj) => fromRow(obj.cast<String, dynamic>())).toList();
     });
   }
@@ -227,7 +186,6 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
     });
   }
 
-  /// Execute within a transaction
   Future<R> transaction<R>(Future<R> Function(TransactionExecutor<T> tx) fn) async {
     return pool.withTransaction((tx) async {
       final txExecutor = TransactionExecutor<T>(
@@ -243,7 +201,6 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
   }
 }
 
-/// Executor for operations within a transaction.
 class TransactionExecutor<T> implements CreateCapable<T> {
   final Transaction transaction;
   final SqlCompiler compiler;

@@ -3,8 +3,6 @@ import 'dart:io';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:dartonic_example/models/models.dart';
 
-/// GET /api/posts - List posts with filtering and pagination
-/// POST /api/posts - Create a new post
 Future<Response> onRequest(RequestContext context) async {
   return switch (context.request.method) {
     HttpMethod.get => _getPosts(context),
@@ -13,26 +11,14 @@ Future<Response> onRequest(RequestContext context) async {
   };
 }
 
-/// GET /api/posts
-///
-/// Query parameters:
-/// - page, limit: Pagination
-/// - title: Filter by title (contains)
-/// - author_id: Filter by author
-/// - is_published: Filter by published status
-/// - order_by: Field to order by
-/// - order: asc/desc
 Future<Response> _getPosts(RequestContext context) async {
   final params = context.request.uri.queryParameters;
 
-  // Pagination
   final page = int.tryParse(params['page'] ?? '1') ?? 1;
   final limit = (int.tryParse(params['limit'] ?? '10') ?? 10).clamp(1, 100);
   final offset = (page - 1) * limit;
 
   var query = PostDartonic.objects.all();
-
-  // Filters
   if (params['title'] case final title?) {
     query = query.filter(PostDartonic.$.title.iContains(title));
   }
@@ -47,7 +33,6 @@ Future<Response> _getPosts(RequestContext context) async {
     query = query.filter(PostDartonic.$.isPublished.eq(isPublished == 'true'));
   }
 
-  // Ordering
   final orderBy = params['order_by'] ?? 'id';
   final orderDesc = params['order'] == 'desc';
 
@@ -68,7 +53,6 @@ Future<Response> _getPosts(RequestContext context) async {
   );
 }
 
-/// POST /api/posts
 Future<Response> _createPost(RequestContext context) async {
   final body = await context.request.json() as Map<String, dynamic>;
 
@@ -81,7 +65,6 @@ Future<Response> _createPost(RequestContext context) async {
     return Response.json(statusCode: HttpStatus.badRequest, body: {'errors': errors});
   }
 
-  // autoNowAdd field (created_at) is automatically set by the ORM
   final post = await PostDartonic.objects.create({
     'title': body['title'],
     'content': body['content'],

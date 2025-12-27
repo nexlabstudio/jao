@@ -3,8 +3,6 @@ import 'dart:io';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:dartonic_example/models/models.dart';
 
-/// GET /api/tags - List all tags
-/// POST /api/tags - Create a new tag
 Future<Response> onRequest(RequestContext context) async {
   return switch (context.request.method) {
     HttpMethod.get => _getTags(context),
@@ -18,12 +16,10 @@ Future<Response> _getTags(RequestContext context) async {
 
   var query = TagDartonic.objects.all();
 
-  // Filter by name
   if (params['name'] case final name?) {
     query = query.filter(TagDartonic.$.name.iContains(name));
   }
 
-  // Order by name
   query = query.orderBy(TagDartonic.$.name.asc());
 
   final tags = await query.toList();
@@ -38,7 +34,6 @@ Future<Response> _createTag(RequestContext context) async {
     return Response.json(statusCode: HttpStatus.badRequest, body: {'error': 'name is required'});
   }
 
-  // Check for duplicate
   final existing = await TagDartonic.objects.filter(TagDartonic.$.name.eq(body['name'] as String)).first();
 
   if (existing != null) {

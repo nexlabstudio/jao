@@ -1,30 +1,15 @@
-/// Migration Runner - Core functionality for running migrations.
-///
-/// This module provides the actual implementation for migration commands.
 library;
 
 import 'dart:async';
 import 'dart:io';
 import 'package:dartonic/dartonic.dart';
 
-/// Configuration for the migration runner.
 class MigrationRunnerConfig {
-  /// Database configuration
   final DatabaseConfig database;
-
-  /// Database adapter to use
   final DatabaseAdapter adapter;
-
-  /// List of migrations to manage
   final List<Migration> migrations;
-
-  /// Model schemas for auto-detection (used by makemigrations)
   final List<ModelSchema> modelSchemas;
-
-  /// Name of the migrations tracking table
   final String migrationsTable;
-
-  /// Whether to run in verbose mode
   final bool verbose;
 
   const MigrationRunnerConfig({
@@ -36,7 +21,6 @@ class MigrationRunnerConfig {
     this.verbose = false,
   });
 
-  /// Create config from environment variables.
   factory MigrationRunnerConfig.fromEnvironment({
     required List<Migration> migrations,
     List<ModelSchema> modelSchemas = const [],
@@ -92,7 +76,6 @@ class MigrationRunnerConfig {
       return const SqliteAdapter();
     }
 
-    // Default based on port
     if (config.port == 3306) return const MySqlAdapter();
     if (config.database.endsWith('.db') || config.database.endsWith('.sqlite')) {
       return const SqliteAdapter();
@@ -102,14 +85,12 @@ class MigrationRunnerConfig {
   }
 }
 
-/// CLI runner for migrations.
 class DartonicCli {
   final MigrationRunnerConfig config;
   final CliOutput output;
 
   DartonicCli(this.config) : output = CliOutput(verbose: config.verbose);
 
-  /// Run the CLI with command-line arguments.
   Future<int> run(List<String> args) async {
     if (args.isEmpty) {
       _printUsage();
@@ -252,7 +233,6 @@ Options:
     return 0;
   }
 
-  /// Run pending migrations.
   Future<int> _migrate(List<String> args) async {
     final dryRun = args.contains('-n') || args.contains('--dry-run');
     final verbose = args.contains('-v') || args.contains('--verbose');
@@ -264,14 +244,11 @@ Options:
       return _showPendingMigrationsSql();
     }
 
-    // Connect to database
     output.debug('Connecting to ${config.adapter.name}...');
     final pool = await config.adapter.createPool(config.database);
 
     try {
       final runner = MigrationRunner(adapter: config.adapter, pool: pool, migrationsTable: config.migrationsTable);
-
-      // Get current status
       final applied = await runner.getAppliedMigrations();
       final pending = config.migrations.where((m) => !applied.contains(m.name)).toList();
 
@@ -281,8 +258,6 @@ Options:
       }
 
       output.info('Found ${pending.length} pending migration(s)\n');
-
-      // Run migrations
       final result = await runner.migrate(config.migrations);
 
       if (result.isSuccess) {
@@ -310,7 +285,6 @@ Options:
     }
   }
 
-  /// Auto-detect model changes and create migration.
   Future<int> _makeMigrations(List<String> args) async {
     final dryRun = args.contains('--dry-run');
     final empty = args.contains('--empty');
@@ -328,22 +302,16 @@ Options:
     output.header('Making Migrations');
 
     if (empty) {
-      // Just create an empty migration
       return _createEmptyMigration(name, path, dryRun);
     }
 
-    // Auto-detect changes by comparing models to database
     output.info('Detecting model changes...\n');
-
-    // Connect to database to get current schema
     final pool = await config.adapter.createPool(config.database);
 
     try {
       final conn = await pool.acquire();
       try {
         final generator = SchemaGenerator(config.adapter);
-
-        // Get models from config
         final models = config.modelSchemas;
         if (models.isEmpty) {
           output.warning('No model schemas registered.');
@@ -352,7 +320,6 @@ Options:
           return 1;
         }
 
-        // Generate diff operations
         final operations = await generator.generateDiff(conn, models);
 
         if (operations.isEmpty) {
@@ -374,11 +341,8 @@ Options:
           return 0;
         }
 
-        // Generate migration file
         final migrationName = _generateMigrationName(name, operations);
         final content = generator.generateMigrationFile(migrationName, operations);
-
-        // Write file
         final timestamp = _generateTimestamp();
         final fileName = '${timestamp}_${_toSnakeCase(migrationName)}.dart';
         final fullPath = '$path/$fileName';
@@ -391,7 +355,6 @@ Options:
         File(fullPath).writeAsStringSync(content);
         output.success('Created: $fullPath');
 
-        // Auto-add to migrations.dart
         final migrationsFile = File('$path/migrations.dart');
         if (migrationsFile.existsSync()) {
           _addMigrationToRegistry(migrationsFile, fileName, migrationName);
@@ -433,12 +396,12 @@ class $className extends Migration {
 
   @override
   void up(MigrationBuilder builder) {
-    // TODO: Add your schema changes here
+    // TODO(mastersam07): Add schema changes
   }
 
   @override
   void down(MigrationBuilder builder) {
-    // TODO: Add reverse operations here
+    // TODO(mastersam07): Add reverse operations
   }
 }
 ''';
@@ -471,8 +434,6 @@ class $className extends Migration {
     if (customName != null && customName.isNotEmpty) {
       return _toPascalCase(customName);
     }
-
-    // Auto-generate name based on operations
     if (operations.isEmpty) return 'EmptyMigration';
 
     final firstOp = operations.first;
@@ -516,12 +477,9 @@ class $className extends Migration {
     return '${now.year}${_pad(now.month)}${_pad(now.day)}${_pad(now.hour)}${_pad(now.minute)}${_pad(now.second)}';
   }
 
-  /// Rollback migrations.
   Future<int> _rollback(List<String> args) async {
     final dryRun = args.contains('-n') || args.contains('--dry-run');
     final verbose = args.contains('-v') || args.contains('--verbose');
-
-    // Parse step count
     var steps = 1;
     for (final arg in args) {
       if (arg.startsWith('-s=') || arg.startsWith('--step=')) {
@@ -536,7 +494,6 @@ class $className extends Migration {
       return _showRollbackSql(steps);
     }
 
-    // Connect to database
     output.debug('Connecting to ${config.adapter.name}...');
     final pool = await config.adapter.createPool(config.database);
 
@@ -578,11 +535,8 @@ class $className extends Migration {
     }
   }
 
-  /// Show migration status.
   Future<int> _status(List<String> args) async {
     output.header('Migration Status');
-
-    // Connect to database
     output.debug('Connecting to ${config.adapter.name}...');
     final pool = await config.adapter.createPool(config.database);
 
@@ -619,7 +573,6 @@ class $className extends Migration {
     }
   }
 
-  /// Reset all migrations.
   Future<int> _reset(List<String> args) async {
     final dryRun = args.contains('-n') || args.contains('--dry-run');
     final force = args.contains('-f') || args.contains('--force');
@@ -641,7 +594,6 @@ class $className extends Migration {
       return _showRollbackSql(config.migrations.length);
     }
 
-    // Connect to database
     final pool = await config.adapter.createPool(config.database);
 
     try {
@@ -668,7 +620,6 @@ class $className extends Migration {
     }
   }
 
-  /// Refresh migrations (reset + migrate).
   Future<int> _refresh(List<String> args) async {
     final dryRun = args.contains('-n') || args.contains('--dry-run');
     final force = args.contains('-f') || args.contains('--force');
@@ -692,13 +643,11 @@ class $className extends Migration {
       return _showPendingMigrationsSql();
     }
 
-    // Connect to database
     final pool = await config.adapter.createPool(config.database);
 
     try {
       final runner = MigrationRunner(adapter: config.adapter, pool: pool, migrationsTable: config.migrationsTable);
 
-      // Reset
       output.info('Rolling back all migrations...\n');
       final resetResult = await runner.reset(config.migrations);
 
@@ -713,7 +662,6 @@ class $className extends Migration {
         return 1;
       }
 
-      // Migrate
       print('');
       output.info('Running all migrations...\n');
       final migrateResult = await runner.migrate(config.migrations);
@@ -737,7 +685,6 @@ class $className extends Migration {
     }
   }
 
-  /// Show SQL for migrations.
   Future<int> _sql(List<String> args) async {
     final showDown = args.contains('--down');
     String? migrationName;
@@ -753,7 +700,6 @@ class $className extends Migration {
     final direction = showDown ? MigrationDirection.down : MigrationDirection.up;
 
     if (migrationName != null) {
-      // Show SQL for specific migration
       final migration = config.migrations.where((m) => m.name == migrationName).firstOrNull;
 
       if (migration == null) {
@@ -763,7 +709,6 @@ class $className extends Migration {
 
       _printMigrationSql(migration, direction);
     } else {
-      // Show SQL for all pending (or all for down)
       for (final migration in config.migrations) {
         _printMigrationSql(migration, direction);
         print('');
@@ -814,7 +759,6 @@ class $className extends Migration {
     return 0;
   }
 
-  /// Generate a new migration file.
   Future<int> _make(List<String> args) async {
     String? name;
     var path = 'lib/migrations';
@@ -836,8 +780,6 @@ class $className extends Migration {
     }
 
     output.header('Creating Migration');
-
-    // Generate timestamp
     final now = DateTime.now();
     final timestamp =
         '${now.year}${_pad(now.month)}${_pad(now.day)}${_pad(now.hour)}${_pad(now.minute)}${_pad(now.second)}';
@@ -847,59 +789,34 @@ class $className extends Migration {
     final fileName = '$migrationName.dart';
     final fullPath = '$path/$fileName';
 
-    // Ensure directory exists
     final dir = Directory(path);
     if (!dir.existsSync()) {
       dir.createSync(recursive: true);
       output.info('Created directory: $path');
     }
 
-    // Generate content
     final content =
         '''import 'package:dartonic/dartonic.dart';
 
-/// Migration: $migrationName
 class $className extends Migration {
   @override
   String get name => '$migrationName';
 
   @override
   void up(MigrationBuilder builder) {
-    // TODO: Add your schema changes here
-    // 
-    // Example - Create a table:
-    // builder.createTable('users', (table) {
-    //   table.id();
-    //   table.string('name');
-    //   table.string('email').unique();
-    //   table.timestamps();
-    // });
-    //
-    // Example - Add a column:
-    // builder.addColumn('users', 'phone', FieldType.varchar, length: 20);
-    //
-    // Example - Create an index:
-    // builder.createIndex('users', ['email']);
+    // TODO(mastersam07): Add schema changes
   }
 
   @override
   void down(MigrationBuilder builder) {
-    // TODO: Add reverse operations here
-    //
-    // Example - Drop a table:
-    // builder.dropTable('users');
-    //
-    // Example - Drop a column:
-    // builder.dropColumn('users', 'phone');
+    // TODO(mastersam07): Add reverse operations
   }
 }
 ''';
 
-    // Write file
     File(fullPath).writeAsStringSync(content);
     output.success('Created: $fullPath');
 
-    // Auto-add to migrations.dart
     final migrationsFile = File('$path/migrations.dart');
     if (migrationsFile.existsSync()) {
       _addMigrationToRegistry(migrationsFile, fileName, className);
@@ -912,26 +829,21 @@ class $className extends Migration {
     return 0;
   }
 
-  /// Add a migration to the migrations.dart registry file.
   void _addMigrationToRegistry(File migrationsFile, String fileName, String className) {
     var content = migrationsFile.readAsStringSync();
     final importName = fileName.replaceAll('.dart', '');
 
-    // Add import if not already present
     final importStatement = "import '$importName.dart';";
     if (!content.contains(importStatement)) {
-      // Find the last import or the library directive
       final importPattern = RegExp(r"^import\s+'[^']+\.dart';", multiLine: true);
       final imports = importPattern.allMatches(content).toList();
 
       if (imports.isNotEmpty) {
-        // Add after the last import
         final lastImport = imports.last;
         content = content.substring(0, lastImport.end) +
             '\n$importStatement' +
             content.substring(lastImport.end);
       } else {
-        // Add after library directive or at the beginning
         final libraryMatch = RegExp(r'^library[^;]*;', multiLine: true).firstMatch(content);
         if (libraryMatch != null) {
           content = content.substring(0, libraryMatch.end) +
@@ -943,18 +855,14 @@ class $className extends Migration {
       }
     }
 
-    // Add migration class to allMigrations list
     final migrationInstance = '$className(),';
     if (!content.contains(migrationInstance)) {
-      // Find the allMigrations list and add to it
       final listPattern = RegExp(r'final\s+allMigrations\s*=\s*<Migration>\s*\[([^\]]*)\]', dotAll: true);
       final match = listPattern.firstMatch(content);
 
       if (match != null) {
         final listContent = match.group(1) ?? '';
         final trimmedContent = listContent.trimRight();
-
-        // Build new list content
         String newListContent;
         if (trimmedContent.isEmpty || trimmedContent.endsWith(',') || trimmedContent.endsWith('[')) {
           newListContent = '$listContent  $migrationInstance\n';
@@ -972,14 +880,12 @@ class $className extends Migration {
   }
 
   String _pad(int n) => n.toString().padLeft(2, '0');
-
   String _toPascalCase(String input) {
     return input
         .split(RegExp(r'[_\-\s]+'))
         .map((word) => word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1))
         .join('');
   }
-
   String _toSnakeCase(String input) {
     return input
         .replaceAllMapped(RegExp(r'[A-Z]'), (match) => '_${match.group(0)!.toLowerCase()}')
@@ -987,7 +893,6 @@ class $className extends Migration {
   }
 }
 
-/// Output formatting utilities.
 class CliOutput {
   final bool verbose;
 
@@ -1025,8 +930,6 @@ class CliOutput {
 
     final colCount = headers?.length ?? rows.first.length;
     final widths = List.filled(colCount, 0);
-
-    // Strip ANSI codes for width calculation
     String stripAnsi(String s) => s.replaceAll(RegExp(r'\x1B\[[0-9;]*m'), '');
 
     if (headers != null) {

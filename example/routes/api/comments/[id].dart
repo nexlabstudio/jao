@@ -26,7 +26,6 @@ Future<Response> _getComment(int id) async {
   }
 }
 
-/// PATCH - Used primarily for approving/rejecting comments
 Future<Response> _updateComment(RequestContext context, int id) async {
   final body = await context.request.json() as Map<String, dynamic>;
 

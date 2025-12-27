@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:dartonic_example/models/models.dart';
 
-/// Single post operations
 Future<Response> onRequest(RequestContext context, String id) async {
   final postId = int.tryParse(id);
   if (postId == null) {

@@ -1,42 +1,30 @@
-/// SQL Compiler - Converts expression AST to SQL strings.
-///
-/// Each database dialect may have slight variations, so the compiler
-/// is parameterized by the dialect.
 library;
 
 import '../query/expressions.dart';
 import '../query/queryset.dart';
 import 'connection.dart';
 
-/// Compiles query configurations and expressions to SQL.
 class SqlCompiler {
   final SqlDialect dialect;
-
-  /// Collected parameter values (for parameterized queries)
   final List<Object?> _params = [];
 
   SqlCompiler(this.dialect);
 
-  /// Get the collected parameters
   List<Object?> get parameters => List.unmodifiable(_params);
 
-  /// Reset the compiler state
   void reset() {
     _params.clear();
   }
 
-  /// Compile a full SELECT query
   CompiledQuery compileSelect({required String table, required QueryConfig config, List<String>? columns}) {
     reset();
     final buffer = StringBuffer();
 
-    // SELECT
     buffer.write('SELECT ');
     if (config.distinct) {
       buffer.write('DISTINCT ');
     }
 
-    // Columns
     if (columns != null && columns.isNotEmpty) {
       buffer.write(columns.map((c) => dialect.quoteIdentifier(c)).join(', '));
     } else if (config.only.isNotEmpty) {
@@ -45,7 +33,6 @@ class SqlCompiler {
       buffer.write('*');
     }
 
-    // Annotations (calculated fields)
     if (config.annotations.isNotEmpty) {
       for (final entry in config.annotations.entries) {
         buffer.write(', ');
@@ -55,35 +42,29 @@ class SqlCompiler {
       }
     }
 
-    // FROM
     buffer.write(' FROM ');
     buffer.write(dialect.quoteIdentifier(table));
 
-    // JOINs for selectRelated
     for (final relation in config.selectRelated) {
       buffer.write(_compileJoin(table, relation));
     }
 
-    // WHERE
     final whereClause = _compileWhere(config.filters, config.excludes);
     if (whereClause.isNotEmpty) {
       buffer.write(' WHERE ');
       buffer.write(whereClause);
     }
 
-    // ORDER BY
     if (config.ordering.isNotEmpty) {
       buffer.write(' ORDER BY ');
       buffer.write(config.ordering.map(_compileOrderBy).join(', '));
     }
 
-    // LIMIT / OFFSET
     buffer.write(dialect.limitOffset(config.limit, config.offset));
 
     return CompiledQuery(buffer.toString(), parameters);
   }
 
-  /// Compile a COUNT query
   CompiledQuery compileCount({required String table, required QueryConfig config}) {
     reset();
     final buffer = StringBuffer();
@@ -100,7 +81,6 @@ class SqlCompiler {
     return CompiledQuery(buffer.toString(), parameters);
   }
 
-  /// Compile an aggregate query
   CompiledQuery compileAggregate({
     required String table,
     required QueryConfig config,
@@ -129,7 +109,6 @@ class SqlCompiler {
     return CompiledQuery(buffer.toString(), parameters);
   }
 
-  /// Compile an INSERT query
   CompiledQuery compileInsert({
     required String table,
     required Map<String, Object?> values,
@@ -162,7 +141,6 @@ class SqlCompiler {
     return CompiledQuery(buffer.toString(), parameters);
   }
 
-  /// Compile a bulk INSERT query
   CompiledQuery compileBulkInsert({
     required String table,
     required List<Map<String, Object?>> rows,
@@ -202,7 +180,6 @@ class SqlCompiler {
     return CompiledQuery(buffer.toString(), parameters);
   }
 
-  /// Compile an UPDATE query
   CompiledQuery compileUpdate({
     required String table,
     required QueryConfig config,
@@ -232,7 +209,6 @@ class SqlCompiler {
     return CompiledQuery(buffer.toString(), parameters);
   }
 
-  /// Compile a DELETE query
   CompiledQuery compileDelete({required String table, required QueryConfig config}) {
     reset();
     final buffer = StringBuffer();
@@ -249,25 +225,18 @@ class SqlCompiler {
     return CompiledQuery(buffer.toString(), parameters);
   }
 
-  /// Compile WHERE clause from filters and excludes
   String _compileWhere(List<Q> filters, List<Q> excludes) {
     final parts = <String>[];
-
-    // Compile filters (ANDed together)
     for (final filter in filters) {
       parts.add(compileExpression(filter.expression));
     }
-
-    // Compile excludes as NOT conditions
     for (final exclude in excludes) {
       parts.add('NOT (${compileExpression(exclude.expression)})');
     }
-
     if (parts.isEmpty) return '';
     return parts.join(' AND ');
   }
 
-  /// Compile ORDER BY clause
   String _compileOrderBy(OrderBy order) {
     final expr = compileExpression(order.expr);
     final dir = order.ascending ? 'ASC' : 'DESC';
@@ -275,10 +244,8 @@ class SqlCompiler {
     return '$expr $dir$nulls';
   }
 
-  /// Compile a JOIN clause for selectRelated
+  // NOTE(mastersam07): Simplified join - full implementation needs model metadata
   String _compileJoin(String baseTable, String relation) {
-    // This is a simplified version - real implementation would need
-    // model metadata to determine join conditions
     final parts = relation.split('__');
     final joinTable = parts.first;
     return ' LEFT JOIN ${dialect.quoteIdentifier(joinTable)} ON '
@@ -286,7 +253,6 @@ class SqlCompiler {
         '${dialect.quoteIdentifier(joinTable)}.${dialect.quoteIdentifier('id')}';
   }
 
-  /// Compile any expression to SQL
   String compileExpression(Expression expr) {
     return switch (expr) {
       ColumnRef e => _compileColumnRef(e),
@@ -368,24 +334,19 @@ class SqlCompiler {
   }
 
   String _compileF(F expr) {
-    // F expressions reference other fields
-    // Handle nested paths like 'author__name'
     final parts = expr.fieldPath.split('__');
     if (parts.length == 1) {
       return dialect.quoteIdentifier(parts.first);
     }
-    // For nested paths, assume table.column format
     return '${dialect.quoteIdentifier(parts.first)}.${dialect.quoteIdentifier(parts.last)}';
   }
 
-  /// Add a parameter and return its placeholder
   String _addParam(Object? value) {
     _params.add(value);
     return dialect.parameterPlaceholder(_params.length);
   }
 }
 
-/// A compiled SQL query with its parameters.
 class CompiledQuery {
   final String sql;
   final List<Object?> parameters;
@@ -395,7 +356,6 @@ class CompiledQuery {
   @override
   String toString() => 'CompiledQuery($sql, $parameters)';
 
-  /// Get SQL with parameters inlined (for debugging only!)
   String toDebugString() {
     var result = sql;
     for (var i = parameters.length - 1; i >= 0; i--) {
@@ -407,9 +367,8 @@ class CompiledQuery {
         DateTime dt => "'${dt.toIso8601String()}'",
         _ => param.toString(),
       };
-      // Replace placeholders (handle different styles)
-      result = result.replaceAll('\$${i + 1}', value); // PostgreSQL
-      result = result.replaceAll('?', value); // MySQL/SQLite (first occurrence)
+      result = result.replaceAll('\$${i + 1}', value);
+      result = result.replaceAll('?', value);
     }
     return result;
   }

@@ -1,13 +1,9 @@
-/// Example models demonstrating dartonic ORM usage.
-///
-/// Run `dart run build_runner build` to generate the typed field accessors.
 library;
 
 import 'package:dartonic/dartonic.dart';
 
 part 'models.g.dart';
 
-/// An author who can write posts.
 @Model()
 class Author {
   @AutoField()
@@ -35,7 +31,6 @@ class Author {
   late DateTime updatedAt;
 }
 
-/// A blog post written by an author.
 @Model()
 class Post {
   @AutoField()
@@ -60,7 +55,6 @@ class Post {
   late DateTime createdAt;
 }
 
-/// A tag that can be applied to posts.
 @Model()
 class Tag {
   @AutoField()
@@ -73,7 +67,6 @@ class Tag {
   late String color;
 }
 
-/// A comment on a post.
 @Model(tableName: 'post_comments')
 class Comment {
   @AutoField()

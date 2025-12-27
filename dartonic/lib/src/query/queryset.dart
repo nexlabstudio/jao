@@ -1,31 +1,16 @@
-/// QuerySet - Lazy, chainable query builder.
-///
-/// QuerySets don't hit the database until evaluated. You can chain
-/// filters, ordering, and other operations before execution.
 library;
 
 import 'dart:async';
 import 'package:meta/meta.dart';
 import 'expressions.dart';
 
-/// Represents a database query that hasn't been executed yet.
-///
-/// QuerySets are lazy - they don't touch the database until you
-/// iterate over them or call a method that evaluates them.
-///
-/// Each method that modifies the query returns a new QuerySet,
-/// so the original is never mutated.
 @immutable
 class QuerySet<T> {
-  /// The query configuration
   final QueryConfig config;
-
-  /// Function to execute the query
   final QueryExecutor<T>? _executor;
 
   const QuerySet({this.config = const QueryConfig(), QueryExecutor<T>? executor}) : _executor = executor;
 
-  /// Create a copy with modified config
   QuerySet<T> _copyWith({
     List<Q>? filters,
     List<Q>? excludes,
@@ -57,41 +42,14 @@ class QuerySet<T> {
     );
   }
 
-  // === Filtering ===
-
-  /// Filter the queryset by conditions.
-  ///
-  /// Multiple conditions are ANDed together.
-  ///
-  /// ```dart
-  /// // Single condition
-  /// Author.objects.filter(Author.$.age.gte(18));
-  ///
-  /// // Multiple conditions (AND)
-  /// Author.objects.filter(Author.$.age.gte(18) & Author.$.isActive.eq(true));
-  ///
-  /// // OR conditions
-  /// Author.objects.filter(Author.$.age.lt(18) | Author.$.hasGuardian.eq(true));
-  /// ```
   QuerySet<T> filter(Q condition) {
     return _copyWith(filters: [...config.filters, condition]);
   }
 
-  /// Exclude objects matching the conditions.
-  ///
-  /// Opposite of filter - excludes matching objects.
   QuerySet<T> exclude(Q condition) {
     return _copyWith(excludes: [...config.excludes, condition]);
   }
 
-  // === Ordering ===
-
-  /// Order the results.
-  ///
-  /// ```dart
-  /// Author.objects.orderBy(Author.$.name.asc());
-  /// Author.objects.orderBy(Author.$.createdAt.desc());
-  /// ```
   QuerySet<T> orderBy(OrderBy order, [OrderBy? order2, OrderBy? order3]) {
     final newOrdering = [order];
     if (order2 != null) newOrdering.add(order2);
@@ -99,46 +57,18 @@ class QuerySet<T> {
     return _copyWith(ordering: [...config.ordering, ...newOrdering]);
   }
 
-  /// Clear all ordering
-  QuerySet<T> unordered() {
-    return _copyWith(ordering: []);
-  }
+  QuerySet<T> unordered() => _copyWith(ordering: []);
+  QuerySet<T> limit(int count) => _copyWith(limit: count);
+  QuerySet<T> offset(int count) => _copyWith(offset: count);
 
-  // === Limiting ===
-
-  /// Limit the number of results
-  QuerySet<T> limit(int count) {
-    return _copyWith(limit: count);
-  }
-
-  /// Skip the first n results
-  QuerySet<T> offset(int count) {
-    return _copyWith(offset: count);
-  }
-
-  /// Slice the queryset (like Python's [start:end])
   QuerySet<T> slice(int start, [int? end]) {
     final newOffset = (config.offset ?? 0) + start;
     final newLimit = end != null ? end - start : null;
     return _copyWith(offset: newOffset, limit: newLimit);
   }
 
-  /// Shorthand for limit(1).first()
-  QuerySet<T> operator [](int index) {
-    return slice(index, index + 1);
-  }
+  QuerySet<T> operator [](int index) => slice(index, index + 1);
 
-  // === Related Objects ===
-
-  /// Eagerly load related objects in a single query (JOIN).
-  ///
-  /// Use for ForeignKey and OneToOne relationships.
-  ///
-  /// ```dart
-  /// Post.objects.selectRelated('author');
-  /// Post.objects.selectRelated('author', 'category');
-  /// Post.objects.selectRelated('author__company'); // nested
-  /// ```
   QuerySet<T> selectRelated(String relation, [String? r2, String? r3]) {
     final relations = [relation];
     if (r2 != null) relations.add(r2);
@@ -146,14 +76,6 @@ class QuerySet<T> {
     return _copyWith(selectRelated: [...config.selectRelated, ...relations]);
   }
 
-  /// Eagerly load related objects in separate queries.
-  ///
-  /// Use for reverse ForeignKey and ManyToMany relationships.
-  ///
-  /// ```dart
-  /// Author.objects.prefetchRelated('posts');
-  /// Author.objects.prefetchRelated('posts', 'books');
-  /// ```
   QuerySet<T> prefetchRelated(String relation, [String? r2, String? r3]) {
     final relations = [relation];
     if (r2 != null) relations.add(r2);
@@ -161,44 +83,12 @@ class QuerySet<T> {
     return _copyWith(prefetchRelated: [...config.prefetchRelated, ...relations]);
   }
 
-  // === Field Selection ===
-
-  /// Only load specified fields.
-  ///
-  /// Other fields will be deferred (loaded on access).
-  QuerySet<T> only(List<String> fields) {
-    return _copyWith(only: fields);
-  }
-
-  /// Defer loading of specified fields.
-  ///
-  /// Deferred fields are loaded when accessed.
-  QuerySet<T> defer(List<String> fields) {
-    return _copyWith(defer: fields);
-  }
-
-  // === Annotations ===
-
-  /// Add calculated fields to each result.
-  ///
-  /// ```dart
-  /// Author.objects.annotate({
-  ///   'post_count': Count(Post.$.id),
-  /// });
-  /// ```
+  QuerySet<T> only(List<String> fields) => _copyWith(only: fields);
+  QuerySet<T> defer(List<String> fields) => _copyWith(defer: fields);
   QuerySet<T> annotate(Map<String, Expression> annotations) =>
       _copyWith(annotations: {...config.annotations, ...annotations});
+  QuerySet<T> distinct() => _copyWith(distinct: true);
 
-  // === Distinct ===
-
-  /// Return only distinct results
-  QuerySet<T> distinct() {
-    return _copyWith(distinct: true);
-  }
-
-  // === Evaluation Methods ===
-
-  /// Get all results as a list.
   Future<List<T>> toList() async {
     return switch (_executor) {
       final executor? => executor.execute(config),
@@ -206,13 +96,11 @@ class QuerySet<T> {
     };
   }
 
-  /// Get the first result, or null if none.
   Future<T?> first() async {
     final results = await limit(1).toList();
     return results.isEmpty ? null : results.first;
   }
 
-  /// Get the first result, or throw if none.
   Future<T> firstOrThrow() async {
     return switch (await first()) {
       final result? => result,
@@ -220,9 +108,6 @@ class QuerySet<T> {
     };
   }
 
-  /// Get exactly one result.
-  ///
-  /// Throws if zero or more than one result.
   Future<T> single() async {
     return switch (await limit(2).toList()) {
       [] => throw StateError('QuerySet returned no results'),
@@ -231,22 +116,18 @@ class QuerySet<T> {
     };
   }
 
-  /// Get the last result, or null if none.
   Future<T?> last() async {
-    // Reverse ordering and get first
     final reversed = _copyWith(
       ordering: config.ordering.map((o) => OrderBy(o.expr, ascending: !o.ascending, nulls: o.nulls)).toList(),
     );
     return reversed.first();
   }
 
-  /// Check if any results exist.
   Future<bool> exists() async {
     final results = await limit(1).toList();
     return results.isNotEmpty;
   }
 
-  /// Count the number of results.
   Future<int> count() async {
     return switch (_executor) {
       final executor? => executor.count(config),
@@ -254,17 +135,6 @@ class QuerySet<T> {
     };
   }
 
-  // === Aggregation ===
-
-  /// Aggregate values across all results.
-  ///
-  /// ```dart
-  /// final result = await Author.objects.aggregate({
-  ///   'avg_age': Avg(Author.$.age),
-  ///   'max_age': Max(Author.$.age),
-  /// });
-  /// print(result['avg_age']);
-  /// ```
   Future<Map<String, dynamic>> aggregate(Map<String, Expression> aggregates) async {
     return switch (_executor) {
       final executor? => executor.aggregate(config, aggregates),
@@ -272,9 +142,6 @@ class QuerySet<T> {
     };
   }
 
-  // === Iteration ===
-
-  /// Stream results for memory-efficient processing.
   Stream<T> stream() {
     return switch (_executor) {
       final executor? => executor.stream(config),
@@ -282,7 +149,6 @@ class QuerySet<T> {
     };
   }
 
-  /// Iterate in chunks for batch processing.
   Stream<List<T>> chunked(int chunkSize) async* {
     int currentOffset = config.offset ?? 0;
     while (true) {
@@ -296,17 +162,6 @@ class QuerySet<T> {
     }
   }
 
-  // === Mutation Operations ===
-
-  /// Update all matching objects.
-  ///
-  /// Returns the number of updated rows.
-  ///
-  /// ```dart
-  /// await Author.objects
-  ///   .filter(Author.$.isActive.eq(false))
-  ///   .update({'isActive': true});
-  /// ```
   Future<int> update(Map<String, Object?> values) async {
     return switch (_executor) {
       final executor? => executor.update(config, values),
@@ -314,9 +169,6 @@ class QuerySet<T> {
     };
   }
 
-  /// Delete all matching objects.
-  ///
-  /// Returns the number of deleted rows.
   Future<int> delete() async {
     return switch (_executor) {
       final executor? => executor.delete(config),
@@ -328,7 +180,6 @@ class QuerySet<T> {
   String toString() => 'QuerySet<$T>($config)';
 }
 
-/// Configuration for a query
 @immutable
 class QueryConfig {
   final List<Q> filters;
@@ -398,7 +249,6 @@ class QueryConfig {
   }
 }
 
-/// Interface for executing queries
 abstract class QueryExecutor<T> {
   Future<List<T>> execute(QueryConfig config);
   Future<int> count(QueryConfig config);
