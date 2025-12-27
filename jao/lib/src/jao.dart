@@ -25,12 +25,10 @@ class ModelRegistration<T> {
 class Jao {
   static Jao? _instance;
 
-  static Jao get instance {
-    if (_instance == null) {
-      throw StateError('Jao not initialized. Call Jao.configure() first.');
-    }
-    return _instance!;
-  }
+  static Jao get instance => switch (_instance) {
+    final i? => i,
+    null => throw StateError('Jao not initialized. Call Jao.configure() first.'),
+  };
 
   static bool get isInitialized => _instance != null;
 
@@ -42,8 +40,9 @@ class Jao {
   Jao._({required this.pool, required this.compiler});
 
   static Future<Jao> configure({required ConnectionPool pool, required SqlCompiler compiler}) async {
-    _instance = Jao._(pool: pool, compiler: compiler);
-    return _instance!;
+    final instance = Jao._(pool: pool, compiler: compiler);
+    _instance = instance;
+    return instance;
   }
 
   static void reset() {
@@ -56,28 +55,27 @@ class Jao {
   }
 
   ModelExecutor<T>? executor<T>() {
-    if (_executors.containsKey(T)) {
-      return _executors[T] as ModelExecutor<T>;
+    if (_executors[T] case final existing?) {
+      return existing as ModelExecutor<T>;
     }
 
-    final registration = _registrations[T];
-    if (registration == null) {
-      return null;
+    if (_registrations[T] case final registration?) {
+      final reg = registration as ModelRegistration<T>;
+      final executor = ModelExecutor<T>(
+        pool: pool,
+        compiler: compiler,
+        tableName: reg.tableName,
+        pkField: reg.pkField,
+        fromRow: reg.fromRow,
+        toRow: reg.toRow,
+        autoNowAddFields: reg.autoNowAddFields,
+        autoNowFields: reg.autoNowFields,
+      );
+
+      _executors[T] = executor;
+      return executor;
     }
 
-    final reg = registration as ModelRegistration<T>;
-    final executor = ModelExecutor<T>(
-      pool: pool,
-      compiler: compiler,
-      tableName: reg.tableName,
-      pkField: reg.pkField,
-      fromRow: reg.fromRow,
-      toRow: reg.toRow,
-      autoNowAddFields: reg.autoNowAddFields,
-      autoNowFields: reg.autoNowFields,
-    );
-
-    _executors[T] = executor;
-    return executor;
+    return null;
   }
 }
