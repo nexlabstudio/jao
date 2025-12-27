@@ -3,7 +3,7 @@ publish_to: none
 environment:
   sdk: ^3.10.0
 workspace:
-  - jao
-  - jao_cli
-  - jao_generator
-  - example
+  - packages/jao
+  - packages/jao_cli
+  - packages/jao_generator
+  - packages/example

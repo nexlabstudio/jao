@@ -16,7 +16,7 @@ library;
 import 'dart:io';
 import 'package:jao/jao.dart';
 import 'package:jao_cli/jao_cli.dart';
-import 'package:jao_example/models/models.dart';
+import '../lib/models/models.dart';
 
 // Import your migrations
 import '../lib/migrations/migrations.dart';

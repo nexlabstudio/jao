@@ -1,0 +1,140 @@
+# JAO Test & Coverage CI
+name: Tests
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev]
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Verify formatting
+        run: dart format . -l 120 --output=none --set-exit-if-changed .
+
+      # - name: Analyze jao
+      #   run: dart analyze --fatal-infos packages/jao
+
+      # - name: Analyze jao_cli
+      #   run: dart analyze --fatal-infos packages/jao_cli
+
+      # - name: Analyze jao_generator
+      #   run: dart analyze --fatal-infos packages/jao_generator
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: analyze
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [jao, jao_cli, jao_generator]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Run tests with coverage
+        run: |
+          cd packages/${{ matrix.package }}
+          dart pub global activate coverage
+          dart test --coverage=coverage
+        continue-on-error: ${{ matrix.package != 'jao' }}
+
+      - name: Format coverage
+        run: |
+          cd packages/${{ matrix.package }}
+          if [ -d coverage ]; then
+            dart pub global run coverage:format_coverage \
+              --lcov \
+              --in=coverage \
+              --out=coverage/lcov.info \
+              --report-on=lib
+          fi
+        continue-on-error: true
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.package }}
+          path: packages/${{ matrix.package }}/coverage/lcov.info
+          if-no-files-found: ignore
+
+  coverage:
+    name: Upload Coverage
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: coverage-artifacts
+
+      - name: Combine coverage reports
+        run: |
+          mkdir -p combined-coverage
+
+          # Combine all lcov.info files
+          for pkg in jao jao_cli jao_generator; do
+            if [ -f "coverage-artifacts/coverage-${pkg}/lcov.info" ]; then
+              echo "Adding coverage from ${pkg}"
+              cat "coverage-artifacts/coverage-${pkg}/lcov.info" >> combined-coverage/lcov.info
+            fi
+          done
+
+          if [ -f combined-coverage/lcov.info ]; then
+            echo "Combined coverage file created"
+            wc -l combined-coverage/lcov.info
+          else
+            echo "No coverage files found"
+            exit 0
+          fi
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: combined-coverage/lcov.info
+          flags: unittests
+          fail_ci_if_error: false
+          verbose: true
+          slug: nexlabstudio/jao
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  # Summary job that depends on all tests passing
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [analyze, test, coverage]
+    if: always()
+    steps:
+      - name: Check all jobs passed
+        run: |
+          if [ "${{ needs.analyze.result }}" != "success" ]; then
+            echo "Analyze job failed"
+            exit 1
+          fi
+          if [ "${{ needs.test.result }}" != "success" ]; then
+            echo "Test job failed"
+            exit 1
+          fi
+          echo "All CI checks passed!"

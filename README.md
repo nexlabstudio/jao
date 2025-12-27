@@ -1,5 +1,8 @@
 # JAO
 
+[![Tests](https://github.com/nexlabstudio/jao/actions/workflows/test.yml/badge.svg?branch=dev)](https://github.com/nexlabstudio/jao/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/nexlabstudio/jao/branch/dev/graph/badge.svg)](https://codecov.io/gh/nexlabstudio/jao)
+
 **Just Another ORM** - *We know there are many, but this is the one that works the way you expect.*
 
 A Django-inspired ORM for Dart. Framework-agnostic, type-safe, with a powerful QuerySet API.

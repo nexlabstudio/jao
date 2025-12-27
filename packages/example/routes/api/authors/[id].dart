@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:dart_frog/dart_frog.dart';
-import 'package:jao_example/models/models.dart';
+import '../../../lib/models/models.dart';
 
 Future<Response> onRequest(RequestContext context, String id) async {
   final authorId = int.tryParse(id);
