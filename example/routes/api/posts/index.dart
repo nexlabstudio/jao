@@ -18,31 +18,31 @@ Future<Response> _getPosts(RequestContext context) async {
   final limit = (int.tryParse(params['limit'] ?? '10') ?? 10).clamp(1, 100);
   final offset = (page - 1) * limit;
 
-  var query = PostJao.objects.all();
+  var query = Posts.objects.all();
   if (params['title'] case final title?) {
-    query = query.filter(PostJao.$.title.iContains(title));
+    query = query.filter(Posts.$.title.iContains(title));
   }
 
   if (params['author_id'] case final authorId?) {
     if (int.tryParse(authorId) case final id?) {
-      query = query.filter(PostJao.$.authorId.eq(id));
+      query = query.filter(Posts.$.authorId.eq(id));
     }
   }
 
   if (params['is_published'] case final isPublished?) {
-    query = query.filter(PostJao.$.isPublished.eq(isPublished == 'true'));
+    query = query.filter(Posts.$.isPublished.eq(isPublished == 'true'));
   }
 
   final orderBy = params['order_by'] ?? 'id';
   final orderDesc = params['order'] == 'desc';
 
   query = switch (orderBy) {
-    'title' => query.orderBy(orderDesc ? PostJao.$.title.desc() : PostJao.$.title.asc()),
-    'created_at' => query.orderBy(orderDesc ? PostJao.$.createdAt.desc() : PostJao.$.createdAt.asc()),
-    _ => query.orderBy(orderDesc ? PostJao.$.id.desc() : PostJao.$.id.asc()),
+    'title' => query.orderBy(orderDesc ? Posts.$.title.desc() : Posts.$.title.asc()),
+    'created_at' => query.orderBy(orderDesc ? Posts.$.createdAt.desc() : Posts.$.createdAt.asc()),
+    _ => query.orderBy(orderDesc ? Posts.$.id.desc() : Posts.$.id.asc()),
   };
 
-  final total = await PostJao.objects.count();
+  final total = await Posts.objects.count();
   final posts = await query.offset(offset).limit(limit).toList();
 
   return Response.json(
@@ -65,7 +65,7 @@ Future<Response> _createPost(RequestContext context) async {
     return Response.json(statusCode: HttpStatus.badRequest, body: {'errors': errors});
   }
 
-  final post = await PostJao.objects.create({
+  final post = await Posts.objects.create({
     'title': body['title'],
     'content': body['content'],
     'author_id': body['author_id'],

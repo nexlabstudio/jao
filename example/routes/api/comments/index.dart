@@ -18,25 +18,25 @@ Future<Response> _getComments(RequestContext context) async {
   final limit = (int.tryParse(params['limit'] ?? '20') ?? 20).clamp(1, 100);
   final offset = (page - 1) * limit;
 
-  var query = CommentJao.objects.all();
+  var query = Comments.objects.all();
 
   if (params['post_id'] case final postId?) {
     if (int.tryParse(postId) case final id?) {
-      query = query.filter(CommentJao.$.postId.eq(id));
+      query = query.filter(Comments.$.postId.eq(id));
     }
   }
 
   if (params['is_approved'] case final isApproved?) {
-    query = query.filter(CommentJao.$.isApproved.eq(isApproved == 'true'));
+    query = query.filter(Comments.$.isApproved.eq(isApproved == 'true'));
   }
 
   if (params['author_email'] case final email?) {
-    query = query.filter(CommentJao.$.authorEmail.eq(email));
+    query = query.filter(Comments.$.authorEmail.eq(email));
   }
 
-  query = query.orderBy(CommentJao.$.createdAt.desc());
+  query = query.orderBy(Comments.$.createdAt.desc());
 
-  final total = await CommentJao.objects.count();
+  final total = await Comments.objects.count();
   final comments = await query.offset(offset).limit(limit).toList();
 
   return Response.json(
@@ -61,12 +61,12 @@ Future<Response> _createComment(RequestContext context) async {
   }
 
   try {
-    await PostJao.objects.get(body['post_id'] as int);
+    await Posts.objects.get(body['post_id'] as int);
   } on StateError {
     return Response.json(statusCode: HttpStatus.badRequest, body: {'error': 'Post not found'});
   }
 
-  final comment = await CommentJao.objects.create({
+  final comment = await Comments.objects.create({
     'post_id': body['post_id'],
     'author_name': body['author_name'],
     'author_email': body['author_email'],

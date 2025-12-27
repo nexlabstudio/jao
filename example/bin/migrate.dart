@@ -1,4 +1,5 @@
 #!/usr/bin/env dart
+
 /// Project migration CLI.
 ///
 /// Usage:
@@ -15,6 +16,7 @@ library;
 import 'dart:io';
 import 'package:jao/jao.dart';
 import 'package:jao_cli/jao_cli.dart';
+import 'package:jao_example/models/models.dart';
 
 // Import your migrations
 import '../lib/migrations/migrations.dart';
@@ -30,6 +32,7 @@ void main(List<String> args) async {
     adapter: const SqliteAdapter(),
     migrations: allMigrations,
     verbose: args.contains('-v') || args.contains('--verbose'),
+    modelSchemas: [Authors.schema, Posts.schema, Tags.schema, Comments.schema],
   );
 
   final cli = JaoCli(config);

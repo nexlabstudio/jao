@@ -18,28 +18,28 @@ Future<Response> _getAuthors(RequestContext context) async {
   final limit = (int.tryParse(params['limit'] ?? '10') ?? 10).clamp(1, 100);
   final offset = (page - 1) * limit;
 
-  var query = AuthorJao.objects.all();
+  var query = Authors.objects.all();
   if (params['name'] case final name?) {
-    query = query.filter(AuthorJao.$.name.iContains(name));
+    query = query.filter(Authors.$.name.iContains(name));
   }
 
   if (params['email'] case final email?) {
-    query = query.filter(AuthorJao.$.email.contains(email));
+    query = query.filter(Authors.$.email.contains(email));
   }
 
   if (params['is_active'] case final isActive?) {
-    query = query.filter(AuthorJao.$.isActive.eq(isActive == 'true'));
+    query = query.filter(Authors.$.isActive.eq(isActive == 'true'));
   }
 
   if (params['min_age'] case final minAge?) {
     if (int.tryParse(minAge) case final age?) {
-      query = query.filter(AuthorJao.$.age.gte(age));
+      query = query.filter(Authors.$.age.gte(age));
     }
   }
 
   if (params['max_age'] case final maxAge?) {
     if (int.tryParse(maxAge) case final age?) {
-      query = query.filter(AuthorJao.$.age.lte(age));
+      query = query.filter(Authors.$.age.lte(age));
     }
   }
 
@@ -47,14 +47,14 @@ Future<Response> _getAuthors(RequestContext context) async {
   final orderDesc = params['order'] == 'desc';
 
   query = switch (orderBy) {
-    'name' => query.orderBy(orderDesc ? AuthorJao.$.name.desc() : AuthorJao.$.name.asc()),
-    'email' => query.orderBy(orderDesc ? AuthorJao.$.email.desc() : AuthorJao.$.email.asc()),
-    'age' => query.orderBy(orderDesc ? AuthorJao.$.age.desc() : AuthorJao.$.age.asc()),
-    'created_at' => query.orderBy(orderDesc ? AuthorJao.$.createdAt.desc() : AuthorJao.$.createdAt.asc()),
-    _ => query.orderBy(orderDesc ? AuthorJao.$.id.desc() : AuthorJao.$.id.asc()),
+    'name' => query.orderBy(orderDesc ? Authors.$.name.desc() : Authors.$.name.asc()),
+    'email' => query.orderBy(orderDesc ? Authors.$.email.desc() : Authors.$.email.asc()),
+    'age' => query.orderBy(orderDesc ? Authors.$.age.desc() : Authors.$.age.asc()),
+    'created_at' => query.orderBy(orderDesc ? Authors.$.createdAt.desc() : Authors.$.createdAt.asc()),
+    _ => query.orderBy(orderDesc ? Authors.$.id.desc() : Authors.$.id.asc()),
   };
 
-  final total = await AuthorJao.objects.count();
+  final total = await Authors.objects.count();
   final authors = await query.offset(offset).limit(limit).toList();
 
   return Response.json(
@@ -77,7 +77,7 @@ Future<Response> _createAuthor(RequestContext context) async {
     return Response.json(statusCode: HttpStatus.badRequest, body: {'errors': errors});
   }
 
-  final author = await AuthorJao.objects.create({
+  final author = await Authors.objects.create({
     'name': body['name'],
     'email': body['email'],
     'age': body['age'],

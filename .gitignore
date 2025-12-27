@@ -34,3 +34,5 @@ doc/api/
 apps/landing/config.js
 !apps/landing/config.example.js
 .dart_frog/
+*.g.dart
+**/migrations/

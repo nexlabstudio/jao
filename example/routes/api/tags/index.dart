@@ -14,13 +14,13 @@ Future<Response> onRequest(RequestContext context) async {
 Future<Response> _getTags(RequestContext context) async {
   final params = context.request.uri.queryParameters;
 
-  var query = TagJao.objects.all();
+  var query = Tags.objects.all();
 
   if (params['name'] case final name?) {
-    query = query.filter(TagJao.$.name.iContains(name));
+    query = query.filter(Tags.$.name.iContains(name));
   }
 
-  query = query.orderBy(TagJao.$.name.asc());
+  query = query.orderBy(Tags.$.name.asc());
 
   final tags = await query.toList();
 
@@ -34,13 +34,13 @@ Future<Response> _createTag(RequestContext context) async {
     return Response.json(statusCode: HttpStatus.badRequest, body: {'error': 'name is required'});
   }
 
-  final existing = await TagJao.objects.filter(TagJao.$.name.eq(body['name'] as String)).first();
+  final existing = await Tags.objects.filter(Tags.$.name.eq(body['name'] as String)).first();
 
   if (existing != null) {
     return Response.json(statusCode: HttpStatus.conflict, body: {'error': 'Tag already exists'});
   }
 
-  final tag = await TagJao.objects.create({'name': body['name'], 'color': body['color'] ?? '#3B82F6'});
+  final tag = await Tags.objects.create({'name': body['name'], 'color': body['color'] ?? '#3B82F6'});
 
   return Response.json(statusCode: HttpStatus.created, body: _tagToJson(tag));
 }

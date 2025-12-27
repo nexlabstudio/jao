@@ -104,7 +104,34 @@ class Post {
 dart run build_runner build
 ```
 
-### 5. Create & Run Migrations
+### 5. Register Model Schemas
+
+After code generation, register your model schemas in `bin/migrate.dart`:
+
+```dart
+import 'package:jao/jao.dart';
+import 'package:jao_cli/jao_cli.dart';
+import 'package:your_app/models/models.dart';
+import '../lib/migrations/migrations.dart';
+
+void main(List<String> args) async {
+  final config = MigrationRunnerConfig(
+    database: DatabaseConfig.sqlite('database.db'),
+    adapter: const SqliteAdapter(),
+    migrations: allMigrations,
+    modelSchemas: [
+      Authors.schema,
+      Posts.schema,
+      // Add all your model schemas here
+    ],
+  );
+
+  final cli = JaoCli(config);
+  exit(await cli.run(args));
+}
+```
+
+### 6. Create & Run Migrations
 
 ```bash
 jao makemigrations
@@ -112,7 +139,7 @@ jao makemigrations
 jao migrate
 ```
 
-### 6. Initialize Database (once at startup)
+### 7. Initialize Database (once at startup)
 
 ```dart
 import 'package:jao/jao.dart';
@@ -126,7 +153,7 @@ Future<void> initializeDatabase() async {
 }
 ```
 
-### 7. Query Your Data
+### 8. Query Your Data
 
 No middleware needed - just query directly in your handlers:
 
@@ -135,30 +162,30 @@ import 'package:your_app/models/models.dart';
 
 Future<Response> onRequest(RequestContext context) async {
   // Get all authors
-  final authors = await AuthorJao.objects.all().toList();
+  final authors = await Authors.objects.all().toList();
 
   // Filter with type-safe field accessors
-  final activeAdults = await AuthorJao.objects
-    .filter(AuthorJao.$.age.gte(18))
-    .filter(AuthorJao.$.isActive.eq(true))
-    .orderBy(AuthorJao.$.name.asc())
+  final activeAdults = await Authors.objects
+    .filter(Authors.$.age.gte(18))
+    .filter(Authors.$.isActive.eq(true))
+    .orderBy(Authors.$.name.asc())
     .toList();
 
   // Create
-  final author = await AuthorJao.objects.create({
+  final author = await Authors.objects.create({
     'name': 'John Doe',
     'email': 'john@example.com',
     'age': 30,
   });
 
   // Update
-  await AuthorJao.objects
-    .filter(AuthorJao.$.id.eq(1))
+  await Authors.objects
+    .filter(Authors.$.id.eq(1))
     .update({'name': 'Jane Doe'});
 
   // Delete
-  await AuthorJao.objects
-    .filter(AuthorJao.$.isActive.eq(false))
+  await Authors.objects
+    .filter(Authors.$.isActive.eq(false))
     .delete();
 
   return Response.json(body: authors);
@@ -171,76 +198,76 @@ Future<Response> onRequest(RequestContext context) async {
 
 ```dart
 // Exact match
-AuthorJao.objects.filter(AuthorJao.$.name.eq('John'));
+Authors.objects.filter(Authors.$.name.eq('John'));
 
 // Comparisons
-AuthorJao.objects.filter(AuthorJao.$.age.gte(18));
-AuthorJao.objects.filter(AuthorJao.$.age.lt(65));
-AuthorJao.objects.filter(AuthorJao.$.age.between(18, 65));
+Authors.objects.filter(Authors.$.age.gte(18));
+Authors.objects.filter(Authors.$.age.lt(65));
+Authors.objects.filter(Authors.$.age.between(18, 65));
 
 // String lookups
-AuthorJao.objects.filter(AuthorJao.$.name.contains('John'));
-AuthorJao.objects.filter(AuthorJao.$.email.endsWith('@gmail.com'));
-AuthorJao.objects.filter(AuthorJao.$.name.startsWith('Dr.'));
+Authors.objects.filter(Authors.$.name.contains('John'));
+Authors.objects.filter(Authors.$.email.endsWith('@gmail.com'));
+Authors.objects.filter(Authors.$.name.startsWith('Dr.'));
 
 // Case-insensitive
-AuthorJao.objects.filter(AuthorJao.$.name.iContains('john'));
+Authors.objects.filter(Authors.$.name.iContains('john'));
 
 // Null checks
-AuthorJao.objects.filter(AuthorJao.$.bio.isNull());
-AuthorJao.objects.filter(AuthorJao.$.bio.isNotNull());
+Authors.objects.filter(Authors.$.bio.isNull());
+Authors.objects.filter(Authors.$.bio.isNotNull());
 
 // In list
-AuthorJao.objects.filter(AuthorJao.$.status.inList(['active', 'pending']));
+Authors.objects.filter(Authors.$.status.inList(['active', 'pending']));
 ```
 
 ### Boolean Logic
 
 ```dart
 // AND (chained filters)
-AuthorJao.objects
-  .filter(AuthorJao.$.age.gte(18))
-  .filter(AuthorJao.$.isActive.eq(true));
+Authors.objects
+  .filter(Authors.$.age.gte(18))
+  .filter(Authors.$.isActive.eq(true));
 
 // AND (& operator)
-AuthorJao.objects.filter(
-  AuthorJao.$.age.gte(18) & AuthorJao.$.isActive.eq(true)
+Authors.objects.filter(
+  Authors.$.age.gte(18) & Authors.$.isActive.eq(true)
 );
 
 // OR
-AuthorJao.objects.filter(
-  AuthorJao.$.age.lt(18) | AuthorJao.$.age.gte(65)
+Authors.objects.filter(
+  Authors.$.age.lt(18) | Authors.$.age.gte(65)
 );
 
 // NOT
-AuthorJao.objects.filter(~AuthorJao.$.name.eq('Admin'));
+Authors.objects.filter(~Authors.$.name.eq('Admin'));
 ```
 
 ### Ordering & Pagination
 
 ```dart
 // Ascending/Descending
-AuthorJao.objects.orderBy(AuthorJao.$.name.asc());
-AuthorJao.objects.orderBy(AuthorJao.$.createdAt.desc());
+Authors.objects.orderBy(Authors.$.name.asc());
+Authors.objects.orderBy(Authors.$.createdAt.desc());
 
 // Multiple columns
-AuthorJao.objects.orderBy(
-  AuthorJao.$.isActive.desc(),
-  AuthorJao.$.name.asc(),
+Authors.objects.orderBy(
+  Authors.$.isActive.desc(),
+  Authors.$.name.asc(),
 );
 
 // Pagination
-AuthorJao.objects.offset(20).limit(10);
-AuthorJao.objects.slice(20, 30);
+Authors.objects.offset(20).limit(10);
+Authors.objects.slice(20, 30);
 ```
 
 ### Aggregations
 
 ```dart
-final stats = await AuthorJao.objects.aggregate({
+final stats = await Authors.objects.aggregate({
   'count': Count.all(),
-  'avg_age': Avg(AuthorJao.$.age.col),
-  'max_age': Max(AuthorJao.$.age.col),
+  'avg_age': Avg(Authors.$.age.col),
+  'max_age': Max(Authors.$.age.col),
 });
 ```
 
@@ -248,29 +275,29 @@ final stats = await AuthorJao.objects.aggregate({
 
 ```dart
 // Create
-final author = await AuthorJao.objects.create({
+final author = await Authors.objects.create({
   'name': 'John',
   'email': 'john@example.com',
   'age': 30,
 });
 
 // Get by primary key
-final author = await AuthorJao.objects.get(1);
+final author = await Authors.objects.get(1);
 
 // Get or create
-final (author, created) = await AuthorJao.objects.getOrCreate(
-  condition: AuthorJao.$.email.eq('john@example.com'),
+final (author, created) = await Authors.objects.getOrCreate(
+  condition: Authors.$.email.eq('john@example.com'),
   defaults: {'name': 'John', 'age': 30},
 );
 
 // Update
-await AuthorJao.objects
-  .filter(AuthorJao.$.isActive.eq(false))
+await Authors.objects
+  .filter(Authors.$.isActive.eq(false))
   .update({'isActive': true});
 
 // Delete
-await AuthorJao.objects
-  .filter(AuthorJao.$.email.endsWith('@spam.com'))
+await Authors.objects
+  .filter(Authors.$.email.endsWith('@spam.com'))
   .delete();
 ```
 

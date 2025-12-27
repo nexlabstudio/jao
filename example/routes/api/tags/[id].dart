@@ -19,7 +19,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
 
 Future<Response> _getTag(int id) async {
   try {
-    final tag = await TagJao.objects.get(id);
+    final tag = await Tags.objects.get(id);
     return Response.json(body: _tagToJson(tag));
   } on StateError {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Tag not found'});
@@ -37,18 +37,18 @@ Future<Response> _updateTag(RequestContext context, int id) async {
     return Response.json(statusCode: HttpStatus.badRequest, body: {'error': 'No fields to update'});
   }
 
-  final updated = await TagJao.objects.filter(TagJao.$.id.eq(id)).update(updateData);
+  final updated = await Tags.objects.filter(Tags.$.id.eq(id)).update(updateData);
 
   if (updated == 0) {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Tag not found'});
   }
 
-  final tag = await TagJao.objects.get(id);
+  final tag = await Tags.objects.get(id);
   return Response.json(body: _tagToJson(tag));
 }
 
 Future<Response> _deleteTag(int id) async {
-  final deleted = await TagJao.objects.filter(TagJao.$.id.eq(id)).delete();
+  final deleted = await Tags.objects.filter(Tags.$.id.eq(id)).delete();
 
   if (deleted == 0) {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Tag not found'});

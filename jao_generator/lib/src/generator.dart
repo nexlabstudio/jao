@@ -20,7 +20,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     final buffer = StringBuffer();
     buffer.writeln(_generateFieldsClass(className, fields));
     buffer.writeln();
-    buffer.writeln(_generateExtension(className, tableName, fields));
+    buffer.writeln(_generateCompanionClass(className, tableName, fields));
 
     return buffer.toString();
   }
@@ -167,7 +167,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     return buffer.toString();
   }
 
-  String _generateExtension(String className, String tableName, List<_FieldInfo> fields) {
+  String _generateCompanionClass(String className, String tableName, List<_FieldInfo> fields) {
     final buffer = StringBuffer();
 
     final pkField = fields.firstWhere(
@@ -182,7 +182,9 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     final autoNowAddFields = fields.where((f) => f.autoNowAdd).map((f) => _toSnakeCase(f.name)).toList();
     final autoNowFields = fields.where((f) => f.autoNow).map((f) => _toSnakeCase(f.name)).toList();
 
-    buffer.writeln('extension ${className}Jao on $className {');
+    buffer.writeln('class ${className}s {');
+    buffer.writeln('  ${className}s._();');
+    buffer.writeln();
     buffer.writeln('  static const \$ = ${className}\$();');
     buffer.writeln('  static bool _registered = false;');
     buffer.writeln('  static final Manager<$className> _objects = Manager<$className>();');
@@ -194,7 +196,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     buffer.writeln('        tableName: tableName,');
     buffer.writeln('        pkField: pkField,');
     buffer.writeln('        fromRow: fromRow,');
-    buffer.writeln('        toRow: (m) => m.toRow(),');
+    buffer.writeln('        toRow: toRow,');
     if (autoNowAddFields.isNotEmpty) {
       buffer.writeln("        autoNowAddFields: [${autoNowAddFields.map((f) => "'$f'").join(', ')}],");
     }
@@ -224,11 +226,11 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     }
     buffer.writeln('  }');
     buffer.writeln();
-    buffer.writeln('  Map<String, dynamic> toRow() {');
+    buffer.writeln('  static Map<String, dynamic> toRow($className model) {');
     buffer.writeln('    return {');
     for (final field in fields) {
       final columnName = _toSnakeCase(field.name);
-      buffer.writeln('      \'$columnName\': ${_generateToRowField(field)},');
+      buffer.writeln('      \'$columnName\': ${_generateToRowField(field, 'model')},');
     }
     buffer.writeln('    };');
     buffer.writeln('  }');
@@ -294,24 +296,24 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     return "row['$columnName'] as $dartTypeName";
   }
 
-  String _generateToRowField(_FieldInfo field) {
+  String _generateToRowField(_FieldInfo field, String prefix) {
     final dartTypeName = field.dartType.getDisplayString(withNullability: false);
 
     if (dartTypeName == 'DateTime') {
       if (field.nullable) {
-        return '${field.name}?.toIso8601String()';
+        return '$prefix.${field.name}?.toIso8601String()';
       }
-      return '${field.name}.toIso8601String()';
+      return '$prefix.${field.name}.toIso8601String()';
     }
 
     if (dartTypeName == 'Duration') {
       if (field.nullable) {
-        return '${field.name}?.inMicroseconds';
+        return '$prefix.${field.name}?.inMicroseconds';
       }
-      return '${field.name}.inMicroseconds';
+      return '$prefix.${field.name}.inMicroseconds';
     }
 
-    return field.name;
+    return '$prefix.${field.name}';
   }
 }
 
