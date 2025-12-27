@@ -21,7 +21,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
 Future<Response> _getAuthor(int id) async {
   try {
     final author = await Authors.objects.get(id);
-    return Response.json(body: _authorToJson(author));
+    return Response.json(body: Authors.toRow(author));
   } on StateError {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Author not found'});
   }
@@ -52,7 +52,7 @@ Future<Response> _replaceAuthor(RequestContext context, int id) async {
   }
 
   final author = await Authors.objects.get(id);
-  return Response.json(body: _authorToJson(author));
+  return Response.json(body: Authors.toRow(author));
 }
 
 Future<Response> _updateAuthor(RequestContext context, int id) async {
@@ -76,7 +76,7 @@ Future<Response> _updateAuthor(RequestContext context, int id) async {
   }
 
   final author = await Authors.objects.get(id);
-  return Response.json(body: _authorToJson(author));
+  return Response.json(body: Authors.toRow(author));
 }
 
 Future<Response> _deleteAuthor(int id) async {
@@ -88,14 +88,3 @@ Future<Response> _deleteAuthor(int id) async {
 
   return Response(statusCode: HttpStatus.noContent);
 }
-
-Map<String, dynamic> _authorToJson(Author author) => {
-  'id': author.id,
-  'name': author.name,
-  'email': author.email,
-  'age': author.age,
-  'is_active': author.isActive,
-  'bio': author.bio,
-  'created_at': author.createdAt.toIso8601String(),
-  'updated_at': author.updatedAt.toIso8601String(),
-};

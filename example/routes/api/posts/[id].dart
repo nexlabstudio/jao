@@ -21,7 +21,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
 Future<Response> _getPost(int id) async {
   try {
     final post = await Posts.objects.get(id);
-    return Response.json(body: _postToJson(post));
+    return Response.json(body: Posts.toRow(post));
   } on StateError {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Post not found'});
   }
@@ -51,7 +51,7 @@ Future<Response> _replacePost(RequestContext context, int id) async {
   }
 
   final post = await Posts.objects.get(id);
-  return Response.json(body: _postToJson(post));
+  return Response.json(body: Posts.toRow(post));
 }
 
 Future<Response> _updatePost(RequestContext context, int id) async {
@@ -79,7 +79,7 @@ Future<Response> _updatePost(RequestContext context, int id) async {
   }
 
   final post = await Posts.objects.get(id);
-  return Response.json(body: _postToJson(post));
+  return Response.json(body: Posts.toRow(post));
 }
 
 Future<Response> _deletePost(int id) async {
@@ -91,13 +91,3 @@ Future<Response> _deletePost(int id) async {
 
   return Response(statusCode: HttpStatus.noContent);
 }
-
-Map<String, dynamic> _postToJson(Post post) => {
-  'id': post.id,
-  'title': post.title,
-  'content': post.content,
-  'author_id': post.authorId,
-  'is_published': post.isPublished,
-  'published_at': post.publishedAt?.toIso8601String(),
-  'created_at': post.createdAt.toIso8601String(),
-};

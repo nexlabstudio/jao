@@ -87,9 +87,23 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
         case 'PositiveIntegerField':
           return _FieldAnnotationInfo('int', 'IntFieldRef', 'integer', annotation.toSource());
         case 'AutoField':
-          return _FieldAnnotationInfo('int', 'IntFieldRef', 'serial', annotation.toSource(), primaryKey: true, autoIncrement: true);
+          return _FieldAnnotationInfo(
+            'int',
+            'IntFieldRef',
+            'serial',
+            annotation.toSource(),
+            primaryKey: true,
+            autoIncrement: true,
+          );
         case 'BigAutoField':
-          return _FieldAnnotationInfo('int', 'IntFieldRef', 'bigSerial', annotation.toSource(), primaryKey: true, autoIncrement: true);
+          return _FieldAnnotationInfo(
+            'int',
+            'IntFieldRef',
+            'bigSerial',
+            annotation.toSource(),
+            primaryKey: true,
+            autoIncrement: true,
+          );
         case 'FloatField':
           return _FieldAnnotationInfo('double', 'DoubleFieldRef', 'real', annotation.toSource());
         case 'DecimalField':
@@ -134,18 +148,56 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
 
     switch (typeName) {
       case 'String':
-        return _FieldInfo(name: field.name, dartType: type, fieldType: 'StringFieldRef', dbType: 'varchar', nullable: nullable);
+        return _FieldInfo(
+          name: field.name,
+          dartType: type,
+          fieldType: 'StringFieldRef',
+          dbType: 'varchar',
+          nullable: nullable,
+        );
       case 'int':
         final isPk = field.name == 'id';
-        return _FieldInfo(name: field.name, dartType: type, fieldType: 'IntFieldRef', dbType: isPk ? 'serial' : 'integer', nullable: nullable, primaryKey: isPk, autoIncrement: isPk);
+        return _FieldInfo(
+          name: field.name,
+          dartType: type,
+          fieldType: 'IntFieldRef',
+          dbType: isPk ? 'serial' : 'integer',
+          nullable: nullable,
+          primaryKey: isPk,
+          autoIncrement: isPk,
+        );
       case 'double':
-        return _FieldInfo(name: field.name, dartType: type, fieldType: 'DoubleFieldRef', dbType: 'doublePrecision', nullable: nullable);
+        return _FieldInfo(
+          name: field.name,
+          dartType: type,
+          fieldType: 'DoubleFieldRef',
+          dbType: 'doublePrecision',
+          nullable: nullable,
+        );
       case 'bool':
-        return _FieldInfo(name: field.name, dartType: type, fieldType: 'BoolFieldRef', dbType: 'boolean', nullable: nullable);
+        return _FieldInfo(
+          name: field.name,
+          dartType: type,
+          fieldType: 'BoolFieldRef',
+          dbType: 'boolean',
+          nullable: nullable,
+        );
       case 'DateTime':
-        return _FieldInfo(name: field.name, dartType: type, fieldType: 'DateTimeFieldRef', dbType: 'timestampTz', nullable: nullable);
+        return _FieldInfo(
+          name: field.name,
+          dartType: type,
+          fieldType: 'DateTimeFieldRef',
+          dbType: 'timestampTz',
+          nullable: nullable,
+        );
       case 'Duration':
-        return _FieldInfo(name: field.name, dartType: type, fieldType: 'DurationFieldRef', dbType: 'interval', nullable: nullable);
+        return _FieldInfo(
+          name: field.name,
+          dartType: type,
+          fieldType: 'DurationFieldRef',
+          dbType: 'interval',
+          nullable: nullable,
+        );
       default:
         return null;
     }

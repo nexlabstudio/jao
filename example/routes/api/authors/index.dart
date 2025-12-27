@@ -59,7 +59,7 @@ Future<Response> _getAuthors(RequestContext context) async {
 
   return Response.json(
     body: {
-      'data': authors.map(_authorToJson).toList(),
+      'data': authors.map(Authors.toRow).toList(),
       'meta': {'page': page, 'limit': limit, 'total': total, 'total_pages': (total / limit).ceil()},
     },
   );
@@ -85,16 +85,5 @@ Future<Response> _createAuthor(RequestContext context) async {
     'bio': body['bio'],
   });
 
-  return Response.json(statusCode: HttpStatus.created, body: _authorToJson(author));
+  return Response.json(statusCode: HttpStatus.created, body: Authors.toRow(author));
 }
-
-Map<String, dynamic> _authorToJson(Author author) => {
-  'id': author.id,
-  'name': author.name,
-  'email': author.email,
-  'age': author.age,
-  'is_active': author.isActive,
-  'bio': author.bio,
-  'created_at': author.createdAt.toIso8601String(),
-  'updated_at': author.updatedAt.toIso8601String(),
-};

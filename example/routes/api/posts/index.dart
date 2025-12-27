@@ -47,7 +47,7 @@ Future<Response> _getPosts(RequestContext context) async {
 
   return Response.json(
     body: {
-      'data': posts.map(_postToJson).toList(),
+      'data': posts.map(Posts.toRow).toList(),
       'meta': {'page': page, 'limit': limit, 'total': total, 'total_pages': (total / limit).ceil()},
     },
   );
@@ -73,15 +73,5 @@ Future<Response> _createPost(RequestContext context) async {
     'published_at': body['is_published'] == true ? DateTime.now().toIso8601String() : null,
   });
 
-  return Response.json(statusCode: HttpStatus.created, body: _postToJson(post));
+  return Response.json(statusCode: HttpStatus.created, body: Posts.toRow(post));
 }
-
-Map<String, dynamic> _postToJson(Post post) => {
-  'id': post.id,
-  'title': post.title,
-  'content': post.content,
-  'author_id': post.authorId,
-  'is_published': post.isPublished,
-  'published_at': post.publishedAt?.toIso8601String(),
-  'created_at': post.createdAt.toIso8601String(),
-};

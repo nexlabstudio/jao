@@ -24,7 +24,7 @@ Future<Response> _getTags(RequestContext context) async {
 
   final tags = await query.toList();
 
-  return Response.json(body: {'data': tags.map(_tagToJson).toList(), 'count': tags.length});
+  return Response.json(body: {'data': tags.map(Tags.toRow).toList(), 'count': tags.length});
 }
 
 Future<Response> _createTag(RequestContext context) async {
@@ -42,7 +42,5 @@ Future<Response> _createTag(RequestContext context) async {
 
   final tag = await Tags.objects.create({'name': body['name'], 'color': body['color'] ?? '#3B82F6'});
 
-  return Response.json(statusCode: HttpStatus.created, body: _tagToJson(tag));
+  return Response.json(statusCode: HttpStatus.created, body: Tags.toRow(tag));
 }
-
-Map<String, dynamic> _tagToJson(Tag tag) => {'id': tag.id, 'name': tag.name, 'color': tag.color};

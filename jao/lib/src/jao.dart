@@ -27,9 +27,7 @@ class Jao {
 
   static Jao get instance {
     if (_instance == null) {
-      throw StateError(
-        'Jao not initialized. Call Jao.configure() first.',
-      );
+      throw StateError('Jao not initialized. Call Jao.configure() first.');
     }
     return _instance!;
   }
@@ -43,10 +41,7 @@ class Jao {
 
   Jao._({required this.pool, required this.compiler});
 
-  static Future<Jao> configure({
-    required ConnectionPool pool,
-    required SqlCompiler compiler,
-  }) async {
+  static Future<Jao> configure({required ConnectionPool pool, required SqlCompiler compiler}) async {
     _instance = Jao._(pool: pool, compiler: compiler);
     return _instance!;
   }

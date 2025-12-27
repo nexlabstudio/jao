@@ -841,15 +841,12 @@ class $className extends Migration {
 
       if (imports.isNotEmpty) {
         final lastImport = imports.last;
-        content = content.substring(0, lastImport.end) +
-            '\n$importStatement' +
-            content.substring(lastImport.end);
+        content = content.substring(0, lastImport.end) + '\n$importStatement' + content.substring(lastImport.end);
       } else {
         final libraryMatch = RegExp(r'^library[^;]*;', multiLine: true).firstMatch(content);
         if (libraryMatch != null) {
-          content = content.substring(0, libraryMatch.end) +
-              '\n\n$importStatement' +
-              content.substring(libraryMatch.end);
+          content =
+              content.substring(0, libraryMatch.end) + '\n\n$importStatement' + content.substring(libraryMatch.end);
         } else {
           content = "$importStatement\n$content";
         }
@@ -871,7 +868,8 @@ class $className extends Migration {
           newListContent = '$listContent,\n  $migrationInstance\n';
         }
 
-        content = content.substring(0, match.start) +
+        content =
+            content.substring(0, match.start) +
             'final allMigrations = <Migration>[$newListContent]' +
             content.substring(match.end);
       }
@@ -887,6 +885,7 @@ class $className extends Migration {
         .map((word) => word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1))
         .join('');
   }
+
   String _toSnakeCase(String input) {
     return input
         .replaceAllMapped(RegExp(r'[A-Z]'), (match) => '_${match.group(0)!.toLowerCase()}')

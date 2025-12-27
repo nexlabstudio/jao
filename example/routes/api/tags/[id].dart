@@ -20,7 +20,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
 Future<Response> _getTag(int id) async {
   try {
     final tag = await Tags.objects.get(id);
-    return Response.json(body: _tagToJson(tag));
+    return Response.json(body: Tags.toRow(tag));
   } on StateError {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Tag not found'});
   }
@@ -44,7 +44,7 @@ Future<Response> _updateTag(RequestContext context, int id) async {
   }
 
   final tag = await Tags.objects.get(id);
-  return Response.json(body: _tagToJson(tag));
+  return Response.json(body: Tags.toRow(tag));
 }
 
 Future<Response> _deleteTag(int id) async {
@@ -56,5 +56,3 @@ Future<Response> _deleteTag(int id) async {
 
   return Response(statusCode: HttpStatus.noContent);
 }
-
-Map<String, dynamic> _tagToJson(Tag tag) => {'id': tag.id, 'name': tag.name, 'color': tag.color};

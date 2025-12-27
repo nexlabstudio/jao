@@ -20,7 +20,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
 Future<Response> _getComment(int id) async {
   try {
     final comment = await Comments.objects.get(id);
-    return Response.json(body: _commentToJson(comment));
+    return Response.json(body: Comments.toRow(comment));
   } on StateError {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Comment not found'});
   }
@@ -44,7 +44,7 @@ Future<Response> _updateComment(RequestContext context, int id) async {
   }
 
   final comment = await Comments.objects.get(id);
-  return Response.json(body: _commentToJson(comment));
+  return Response.json(body: Comments.toRow(comment));
 }
 
 Future<Response> _deleteComment(int id) async {
@@ -56,13 +56,3 @@ Future<Response> _deleteComment(int id) async {
 
   return Response(statusCode: HttpStatus.noContent);
 }
-
-Map<String, dynamic> _commentToJson(Comment comment) => {
-  'id': comment.id,
-  'post_id': comment.postId,
-  'author_name': comment.authorName,
-  'author_email': comment.authorEmail,
-  'content': comment.content,
-  'is_approved': comment.isApproved,
-  'created_at': comment.createdAt.toIso8601String(),
-};

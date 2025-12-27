@@ -41,7 +41,7 @@ Future<Response> _getComments(RequestContext context) async {
 
   return Response.json(
     body: {
-      'data': comments.map(_commentToJson).toList(),
+      'data': comments.map(Comments.toRow).toList(),
       'meta': {'page': page, 'limit': limit, 'total': total, 'total_pages': (total / limit).ceil()},
     },
   );
@@ -74,15 +74,5 @@ Future<Response> _createComment(RequestContext context) async {
     'is_approved': false,
   });
 
-  return Response.json(statusCode: HttpStatus.created, body: _commentToJson(comment));
+  return Response.json(statusCode: HttpStatus.created, body: Comments.toRow(comment));
 }
-
-Map<String, dynamic> _commentToJson(Comment comment) => {
-  'id': comment.id,
-  'post_id': comment.postId,
-  'author_name': comment.authorName,
-  'author_email': comment.authorEmail,
-  'content': comment.content,
-  'is_approved': comment.isApproved,
-  'created_at': comment.createdAt.toIso8601String(),
-};
