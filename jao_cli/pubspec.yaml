@@ -13,6 +13,7 @@ dependencies:
     path: ../jao
 
 dev_dependencies:
+  coverage: ^1.15.0
   test: ^1.24.0
   lints: ^3.0.0
 
