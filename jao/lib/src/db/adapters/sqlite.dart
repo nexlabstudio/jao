@@ -368,12 +368,13 @@ class SqliteConnectionPool implements ConnectionPool {
         throw StateError('SQLite connection already in use');
       }
 
-      if (_connection == null || !_connection!.isOpen) {
-        _connection = await SqliteConnection.connect(_config);
-      }
+      final conn = switch (_connection) {
+        final c? when c.isOpen => c,
+        _ => _connection = await SqliteConnection.connect(_config),
+      };
 
       _inUse = true;
-      return _connection!;
+      return conn;
     });
   }
 
@@ -418,8 +419,8 @@ class SqliteConnectionPool implements ConnectionPool {
   @override
   Future<void> close() async {
     _closed = true;
-    if (_connection != null) {
-      await _connection!.close();
+    if (_connection case final conn?) {
+      await conn.close();
       _connection = null;
     }
   }

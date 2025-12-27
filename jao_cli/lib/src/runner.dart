@@ -888,7 +888,10 @@ class $className extends Migration {
 
   String _toSnakeCase(String input) {
     return input
-        .replaceAllMapped(RegExp(r'[A-Z]'), (match) => '_${match.group(0)!.toLowerCase()}')
+        .replaceAllMapped(RegExp(r'[A-Z]'), (match) {
+          if (match.group(0) case final g?) return '_${g.toLowerCase()}';
+          return '';
+        })
         .replaceFirst(RegExp(r'^_'), '');
   }
 }

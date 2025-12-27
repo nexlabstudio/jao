@@ -150,7 +150,10 @@ class OrderBy {
   @override
   String toString() {
     final dir = ascending ? 'ASC' : 'DESC';
-    final nullsStr = nulls == null ? '' : ' NULLS ${nulls!.name.toUpperCase()}';
+    final nullsStr = switch (nulls) {
+      final n? => ' NULLS ${n.name.toUpperCase()}',
+      null => '',
+    };
     return '$expr $dir$nullsStr';
   }
 }

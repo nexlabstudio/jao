@@ -601,10 +601,10 @@ class PostgresAdapter implements DatabaseAdapter {
       final columnName = row['column_name'] as String;
       final isUnique = row['is_unique'] as bool;
 
-      if (indexMap.containsKey(indexName)) {
+      if (indexMap[indexName] case final existing?) {
         indexMap[indexName] = IndexSchema(
           name: indexName,
-          columns: [...indexMap[indexName]!.columns, columnName],
+          columns: [...existing.columns, columnName],
           unique: isUnique,
         );
       } else {

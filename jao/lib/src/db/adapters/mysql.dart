@@ -541,10 +541,10 @@ class MySqlAdapter implements DatabaseAdapter {
       final columnName = row['COLUMN_NAME'] as String;
       final isUnique = row['NON_UNIQUE'] == 0;
 
-      if (indexMap.containsKey(indexName)) {
+      if (indexMap[indexName] case final existing?) {
         indexMap[indexName] = IndexSchema(
           name: indexName,
-          columns: [...indexMap[indexName]!.columns, columnName],
+          columns: [...existing.columns, columnName],
           unique: isUnique,
         );
       } else {
