@@ -3,11 +3,7 @@ library;
 import 'package:jao/jao.dart';
 
 Future<void> initializeDatabase() async {
-  const adapter = SqliteAdapter();
-  final config = DatabaseConfig.sqlite('database.db');
-  final pool = await adapter.createPool(config);
-
-  await Jao.configure(pool: pool, compiler: SqlCompiler(adapter.dialect));
+  await Jao.configure(adapter: SqliteAdapter(), config: DatabaseConfig.sqlite('database.db'));
 }
 
 Future<void> closeDatabase() async {

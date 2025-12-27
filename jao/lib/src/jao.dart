@@ -39,8 +39,10 @@ class Jao {
 
   Jao._({required this.pool, required this.compiler});
 
-  static Future<Jao> configure({required ConnectionPool pool, required SqlCompiler compiler}) async {
-    final instance = Jao._(pool: pool, compiler: compiler);
+  static Future<Jao> configure({required DatabaseAdapter adapter, required DatabaseConfig config}) async {
+    if (_instance case final existing?) return existing;
+    final pool = await adapter.createPool(config);
+    final instance = Jao._(pool: pool, compiler: SqlCompiler(adapter.dialect));
     _instance = instance;
     return instance;
   }

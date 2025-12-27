@@ -145,11 +145,10 @@ jao migrate
 import 'package:jao/jao.dart';
 
 Future<void> initializeDatabase() async {
-  const adapter = SqliteAdapter();
-  final config = DatabaseConfig.sqlite('database.db');
-  final pool = await adapter.createPool(config);
-
-  await Jao.configure(pool: pool, compiler: SqlCompiler(adapter.dialect));
+  await Jao.configure(
+    adapter: SqliteAdapter(),
+    config: DatabaseConfig.sqlite('database.db'),
+  );
 }
 ```
 
@@ -368,6 +367,223 @@ port: 3306
 database: myapp
 username: user
 password: pass
+```
+
+## Framework Integration
+
+JAO is framework-agnostic and works with any Dart backend. Initialize once at startup.
+
+### dart_frog
+
+Option 1: Initialize in `main.dart`
+
+```dart
+// main.dart
+import 'dart:io';
+import 'package:dart_frog/dart_frog.dart';
+import 'package:jao/jao.dart';
+
+Future<HttpServer> run(Handler handler, InternetAddress ip, int port) async {
+  await Jao.configure(
+    adapter: SqliteAdapter(),
+    config: DatabaseConfig.sqlite('database.db'),
+  );
+  return serve(handler, ip, port);
+}
+```
+
+Option 2: Initialize in middleware
+
+```dart
+// lib/_middleware.dart
+import 'package:dart_frog/dart_frog.dart';
+import 'package:jao/jao.dart';
+
+Handler middleware(Handler handler) {
+  return (context) async {
+    await Jao.configure(
+      adapter: SqliteAdapter(),
+      config: DatabaseConfig.sqlite('database.db'),
+    );
+    return handler(context);
+  };
+}
+```
+
+### shelf
+
+```dart
+import 'dart:io';
+import 'package:shelf/shelf.dart';
+import 'package:shelf/shelf_io.dart' as io;
+import 'package:jao/jao.dart';
+import 'package:your_app/models/models.dart';
+
+void main() async {
+  // Initialize ORM
+  await Jao.configure(
+    adapter: SqliteAdapter(),
+    config: DatabaseConfig.sqlite('database.db'),
+  );
+
+  // Define routes
+  final handler = const Pipeline()
+      .addMiddleware(logRequests())
+      .addHandler(_router);
+
+  await io.serve(handler, InternetAddress.anyIPv4, 8080);
+}
+
+Response _router(Request request) => switch (request.url.path) {
+  'authors' => _getAuthors(request),
+  _ => Response.notFound('Not found'),
+};
+
+Future<Response> _getAuthors(Request request) async {
+  final authors = await Authors.objects.all().toList();
+  return Response.ok(jsonEncode(authors.map(Authors.toRow).toList()));
+}
+```
+
+### serinus
+
+```dart
+import 'package:serinus/serinus.dart';
+import 'package:jao/jao.dart';
+import 'package:your_app/models/models.dart';
+
+void main() async {
+  // Initialize ORM before app starts
+  await Jao.configure(
+    adapter: SqliteAdapter(),
+    config: DatabaseConfig.sqlite('database.db'),
+  );
+
+  final app = await serinus.createApplication(entrypoint: AppModule());
+  await app.serve();
+}
+
+class AppController extends Controller {
+  AppController({super.path = '/authors'}) {
+    on(Route.get('/'), _getAuthors);
+  }
+
+  Future<Response> _getAuthors(RequestContext context) async {
+    final authors = await Authors.objects.all().toList();
+    return Response.json(authors.map(Authors.toRow).toList());
+  }
+}
+```
+
+### alfred
+
+```dart
+import 'package:alfred/alfred.dart';
+import 'package:jao/jao.dart';
+import 'package:your_app/models/models.dart';
+
+void main() async {
+  // Initialize ORM
+  await Jao.configure(
+    adapter: SqliteAdapter(),
+    config: DatabaseConfig.sqlite('database.db'),
+  );
+
+  final app = Alfred();
+
+  app.get('/authors', (req, res) async {
+    final authors = await Authors.objects.all().toList();
+    return authors.map(Authors.toRow).toList();
+  });
+
+  app.get('/authors/:id', (req, res) async {
+    final id = int.parse(req.params['id']);
+    final author = await Authors.objects.getOrNull(id);
+    if (author == null) return res.statusCode = 404;
+    return Authors.toRow(author);
+  });
+
+  await app.listen(8080);
+}
+```
+
+### conduit
+
+```dart
+import 'package:conduit/conduit.dart';
+import 'package:jao/jao.dart';
+import 'package:your_app/models/models.dart';
+
+class AppChannel extends ApplicationChannel {
+  @override
+  Future prepare() async {
+    // Initialize ORM
+    await Jao.configure(
+      adapter: PostgresAdapter(),
+      config: DatabaseConfig.postgres(
+        host: 'localhost',
+        database: 'myapp',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+  }
+
+  @override
+  Controller get entryPoint {
+    final router = Router();
+    router.route('/authors/[:id]').link(() => AuthorController());
+    return router;
+  }
+}
+
+class AuthorController extends ResourceController {
+  @Operation.get()
+  Future<Response> getAll() async {
+    final authors = await Authors.objects.all().toList();
+    return Response.ok(authors.map(Authors.toRow).toList());
+  }
+
+  @Operation.get('id')
+  Future<Response> getOne(@Bind.path('id') int id) async {
+    final author = await Authors.objects.getOrNull(id);
+    if (author == null) return Response.notFound();
+    return Response.ok(Authors.toRow(author));
+  }
+}
+```
+
+### serverpod
+
+```dart
+import 'package:serverpod/serverpod.dart';
+import 'package:jao/jao.dart';
+import 'package:your_app/models/models.dart';
+
+void run(List<String> args) async {
+  final pod = Serverpod(args, /* ... */);
+
+  // Initialize ORM in onStart
+  await pod.start(onStart: () async {
+    await Jao.configure(
+      adapter: PostgresAdapter(),
+      config: DatabaseConfig.postgres(
+        host: 'localhost',
+        database: 'myapp',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+  });
+}
+
+// In your endpoint
+class AuthorEndpoint extends Endpoint {
+  Future<List<Map<String, dynamic>>> getAuthors(Session session) async {
+    final authors = await Authors.objects.all().toList();
+    return authors.map(Authors.toRow).toList();
+  }
+}
 ```
 
 ## License
