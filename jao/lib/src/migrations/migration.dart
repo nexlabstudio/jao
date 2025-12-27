@@ -34,6 +34,30 @@ import 'schema.dart';
 ///   }
 /// }
 /// ```
+///
+/// For simple migrations, you can use [autoReverse] to auto-generate the
+/// rollback SQL from the `up()` operations:
+///
+/// ```dart
+/// class Migration001CreateUsers extends Migration {
+///   @override
+///   String get name => '001_create_users';
+///
+///   @override
+///   bool get autoReverse => true; // Auto-generate down() from up()
+///
+///   @override
+///   void up(MigrationBuilder builder) {
+///     builder.createTable('users', (table) {
+///       table.id();
+///       table.string('name');
+///     });
+///   }
+///
+///   @override
+///   void down(MigrationBuilder builder) {} // Not used when autoReverse=true
+/// }
+/// ```
 abstract class Migration {
   /// Unique name for this migration (typically includes timestamp)
   String get name;
@@ -42,10 +66,26 @@ abstract class Migration {
   void up(MigrationBuilder builder);
 
   /// Define the backward migration (revert changes)
+  ///
+  /// When [autoReverse] is true, this method is ignored and the rollback
+  /// SQL is auto-generated from the `up()` operations using [toReverseSql].
   void down(MigrationBuilder builder);
 
   /// Dependencies - migrations that must run before this one
   List<String> get dependencies => [];
+
+  /// When true, automatically generate rollback SQL from up() operations.
+  ///
+  /// This uses [MigrationOperation.toReverseSql] to generate the reverse SQL.
+  /// Not all operations support auto-reverse (e.g., DropTable, DropColumn).
+  /// Operations that can't be reversed will be skipped during rollback.
+  ///
+  /// Supported auto-reverse operations:
+  /// - CreateTable → DROP TABLE
+  /// - AddColumn → DROP COLUMN (where supported)
+  /// - CreateIndex → DROP INDEX
+  /// - AddForeignKey → DROP CONSTRAINT
+  bool get autoReverse => false;
 }
 
 /// Builder for defining migration operations.
@@ -292,10 +332,7 @@ class MigrationRunner {
 
     return MigrationResult(
       applied: appliedNow,
-      skipped: migrations
-          .where((m) => !appliedNow.contains(m.name) && !applied.contains(m.name))
-          .map((m) => m.name)
-          .toList(),
+      skipped: migrations.where((m) => applied.contains(m.name)).map((m) => m.name).toList(),
       errors: errors,
     );
   }
@@ -344,15 +381,21 @@ class MigrationRunner {
   /// Run a single migration in the specified direction
   Future<void> _runMigration(Migration migration, MigrationDirection direction) async {
     final builder = MigrationBuilder();
+    final useAutoReverse = direction == MigrationDirection.down && migration.autoReverse;
 
-    if (direction == MigrationDirection.up) {
+    if (direction == MigrationDirection.up || useAutoReverse) {
       migration.up(builder);
     } else {
       migration.down(builder);
     }
 
+    final operations = switch (useAutoReverse) {
+      true => builder.operations.reversed.toList(),
+      false => builder.operations,
+    };
+
     await pool.withTransaction((tx) async {
-      for (final operation in builder.operations) {
+      for (final operation in operations) {
         if (operation is RunDart) {
           // Handle Dart operations specially
           final conn = await pool.acquire();
@@ -366,11 +409,12 @@ class MigrationRunner {
             await pool.release(conn);
           }
         } else {
-          final sql = direction == MigrationDirection.up
-              ? operation.toSql(adapter.dialect)
-              : operation.toReverseSql(adapter.dialect);
+          final sql = switch (useAutoReverse) {
+            true => operation.toReverseSql(adapter.dialect),
+            false => operation.toSql(adapter.dialect),
+          };
 
-          if (sql != null && sql.isNotEmpty) {
+          if (sql case final sql? when sql.isNotEmpty) {
             // Handle multi-statement SQL
             for (final statement in sql.split(';\n')) {
               if (statement.trim().isNotEmpty) {
@@ -399,19 +443,26 @@ class MigrationRunner {
   /// Generate SQL for a migration without running it
   String generateSql(Migration migration, MigrationDirection direction) {
     final builder = MigrationBuilder();
+    final useAutoReverse = direction == MigrationDirection.down && migration.autoReverse;
 
-    if (direction == MigrationDirection.up) {
+    if (direction == MigrationDirection.up || useAutoReverse) {
       migration.up(builder);
     } else {
       migration.down(builder);
     }
 
+    final operations = switch (useAutoReverse) {
+      true => builder.operations.reversed.toList(),
+      false => builder.operations,
+    };
+
     final statements = <String>[];
-    for (final operation in builder.operations) {
-      final sql = direction == MigrationDirection.up
-          ? operation.toSql(adapter.dialect)
-          : operation.toReverseSql(adapter.dialect);
-      if (sql != null && sql.isNotEmpty) {
+    for (final operation in operations) {
+      final sql = switch (useAutoReverse) {
+        true => operation.toReverseSql(adapter.dialect),
+        false => operation.toSql(adapter.dialect),
+      };
+      if (sql case final sql? when sql.isNotEmpty) {
         statements.add(sql);
       }
     }
