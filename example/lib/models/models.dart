@@ -1,6 +1,6 @@
 library;
 
-import 'package:dartonic/dartonic.dart';
+import 'package:jao/jao.dart';
 
 part 'models.g.dart';
 

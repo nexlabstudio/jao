@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:dart_frog/dart_frog.dart';
-import 'package:dartonic_example/models/models.dart';
+import 'package:jao_example/models/models.dart';
 
 Future<Response> onRequest(RequestContext context, String id) async {
   final postId = int.tryParse(id);
@@ -20,7 +20,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
 
 Future<Response> _getPost(int id) async {
   try {
-    final post = await PostDartonic.objects.get(id);
+    final post = await PostJao.objects.get(id);
     return Response.json(body: _postToJson(post));
   } on StateError {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Post not found'});
@@ -39,7 +39,7 @@ Future<Response> _replacePost(RequestContext context, int id) async {
     return Response.json(statusCode: HttpStatus.badRequest, body: {'errors': errors});
   }
 
-  final updated = await PostDartonic.objects.filter(PostDartonic.$.id.eq(id)).update({
+  final updated = await PostJao.objects.filter(PostJao.$.id.eq(id)).update({
     'title': body['title'],
     'content': body['content'],
     'author_id': body['author_id'],
@@ -50,7 +50,7 @@ Future<Response> _replacePost(RequestContext context, int id) async {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Post not found'});
   }
 
-  final post = await PostDartonic.objects.get(id);
+  final post = await PostJao.objects.get(id);
   return Response.json(body: _postToJson(post));
 }
 
@@ -72,18 +72,18 @@ Future<Response> _updatePost(RequestContext context, int id) async {
     }
   }
 
-  final updated = await PostDartonic.objects.filter(PostDartonic.$.id.eq(id)).update(updateData);
+  final updated = await PostJao.objects.filter(PostJao.$.id.eq(id)).update(updateData);
 
   if (updated == 0) {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Post not found'});
   }
 
-  final post = await PostDartonic.objects.get(id);
+  final post = await PostJao.objects.get(id);
   return Response.json(body: _postToJson(post));
 }
 
 Future<Response> _deletePost(int id) async {
-  final deleted = await PostDartonic.objects.filter(PostDartonic.$.id.eq(id)).delete();
+  final deleted = await PostJao.objects.filter(PostJao.$.id.eq(id)).delete();
 
   if (deleted == 0) {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Post not found'});

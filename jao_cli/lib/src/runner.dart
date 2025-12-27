@@ -2,7 +2,7 @@ library;
 
 import 'dart:async';
 import 'dart:io';
-import 'package:dartonic/dartonic.dart';
+import 'package:jao/jao.dart';
 
 class MigrationRunnerConfig {
   final DatabaseConfig database;
@@ -17,7 +17,7 @@ class MigrationRunnerConfig {
     required this.adapter,
     required this.migrations,
     this.modelSchemas = const [],
-    this.migrationsTable = 'dartonic_migrations',
+    this.migrationsTable = 'jao_migrations',
     this.verbose = false,
   });
 
@@ -25,7 +25,7 @@ class MigrationRunnerConfig {
     required List<Migration> migrations,
     List<ModelSchema> modelSchemas = const [],
     DatabaseAdapter? adapter,
-    String migrationsTable = 'dartonic_migrations',
+    String migrationsTable = 'jao_migrations',
     bool verbose = false,
   }) {
     final dbConfig = _loadDatabaseConfig();
@@ -49,7 +49,7 @@ class MigrationRunnerConfig {
 
     final host = Platform.environment['DATABASE_HOST'] ?? 'localhost';
     final port = int.tryParse(Platform.environment['DATABASE_PORT'] ?? '') ?? 5432;
-    final database = Platform.environment['DATABASE_NAME'] ?? 'dartonic';
+    final database = Platform.environment['DATABASE_NAME'] ?? 'jao';
     final username = Platform.environment['DATABASE_USER'];
     final password = Platform.environment['DATABASE_PASSWORD'];
     final ssl = Platform.environment['DATABASE_SSL']?.toLowerCase() == 'true';
@@ -85,11 +85,11 @@ class MigrationRunnerConfig {
   }
 }
 
-class DartonicCli {
+class JaoCli {
   final MigrationRunnerConfig config;
   final CliOutput output;
 
-  DartonicCli(this.config) : output = CliOutput(verbose: config.verbose);
+  JaoCli(this.config) : output = CliOutput(verbose: config.verbose);
 
   Future<int> run(List<String> args) async {
     if (args.isEmpty) {
@@ -124,9 +124,10 @@ class DartonicCli {
 
   void _printUsage() {
     print('''
-Dartonic Migration CLI
+JAO Migration CLI
+Because you didn't have enough options already.
 
-Usage: dartonic <command> [options]
+Usage: jao <command> [options]
 
 Commands:
   makemigrations  Auto-detect model changes and create migration
@@ -139,13 +140,13 @@ Commands:
   make            Generate an empty migration file
   help            Show help for a command
 
-Run 'dartonic help <command>' for more information.
+Run 'jao help <command>' for more information.
 ''');
   }
 
   Future<int> _unknownCommand(String command) async {
     output.error("Unknown command: '$command'");
-    print("Run 'dartonic help' for usage information.");
+    print("Run 'jao help' for usage information.");
     return 1;
   }
 
@@ -159,9 +160,9 @@ Run 'dartonic help <command>' for more information.
     switch (command) {
       case 'makemigrations':
         print('''
-dartonic makemigrations - Auto-detect model changes and create migration
+jao makemigrations - Auto-detect model changes and create migration
 
-Usage: dartonic makemigrations [options]
+Usage: jao makemigrations [options]
 
 Options:
   -n, --name=NAME     Name for the migration (auto-generated if not provided)
@@ -174,15 +175,15 @@ schema (or previous migrations) and generates a new migration file with
 the necessary changes.
 
 Examples:
-  dartonic makemigrations                    # Auto-detect and generate
-  dartonic makemigrations -n add_users       # With custom name
-  dartonic makemigrations --empty -n initial # Empty migration
+  jao makemigrations                    # Auto-detect and generate
+  jao makemigrations -n add_users       # With custom name
+  jao makemigrations --empty -n initial # Empty migration
 ''');
       case 'migrate':
         print('''
-dartonic migrate - Run pending migrations
+jao migrate - Run pending migrations
 
-Usage: dartonic migrate [options]
+Usage: jao migrate [options]
 
 Options:
   -n, --dry-run    Show SQL without executing
@@ -190,9 +191,9 @@ Options:
 ''');
       case 'rollback':
         print('''
-dartonic rollback - Rollback migrations
+jao rollback - Rollback migrations
 
-Usage: dartonic rollback [options]
+Usage: jao rollback [options]
 
 Options:
   -s, --step=N     Number of migrations to rollback (default: 1)
@@ -201,15 +202,15 @@ Options:
 ''');
       case 'status':
         print('''
-dartonic status - Show migration status
+jao status - Show migration status
 
-Usage: dartonic status
+Usage: jao status
 ''');
       case 'sql':
         print('''
-dartonic sql - Show SQL for migrations
+jao sql - Show SQL for migrations
 
-Usage: dartonic sql [options]
+Usage: jao sql [options]
 
 Options:
   -m, --migration=NAME    Show SQL for specific migration
@@ -218,9 +219,9 @@ Options:
 ''');
       case 'make':
         print('''
-dartonic make - Generate a new migration file
+jao make - Generate a new migration file
 
-Usage: dartonic make -n <name>
+Usage: jao make -n <name>
 
 Options:
   -n, --name=NAME    Name for the migration (required)
@@ -376,7 +377,7 @@ Options:
   Future<int> _createEmptyMigration(String? name, String path, bool dryRun) async {
     if (name == null || name.isEmpty) {
       output.error('Migration name is required for empty migrations.');
-      print('Usage: dartonic makemigrations --empty -n=<name>');
+      print('Usage: jao makemigrations --empty -n=<name>');
       return 1;
     }
 
@@ -387,7 +388,7 @@ Options:
     final fullPath = '$path/$fileName';
 
     final content =
-        '''import 'package:dartonic/dartonic.dart';
+        '''import 'package:jao/jao.dart';
 
 /// Migration: $migrationName
 class $className extends Migration {
@@ -396,12 +397,12 @@ class $className extends Migration {
 
   @override
   void up(MigrationBuilder builder) {
-    // TODO(mastersam07): Add schema changes
+    // TODO: Add schema changes
   }
 
   @override
   void down(MigrationBuilder builder) {
-    // TODO(mastersam07): Add reverse operations
+    // TODO: Add reverse operations
   }
 }
 ''';
@@ -775,7 +776,7 @@ class $className extends Migration {
 
     if (name == null || name.isEmpty) {
       output.error('Migration name is required.');
-      print("Usage: dartonic make -n=<name> [-p=<path>]");
+      print("Usage: jao make -n=<name> [-p=<path>]");
       return 1;
     }
 
@@ -796,7 +797,7 @@ class $className extends Migration {
     }
 
     final content =
-        '''import 'package:dartonic/dartonic.dart';
+        '''import 'package:jao/jao.dart';
 
 class $className extends Migration {
   @override
@@ -804,12 +805,12 @@ class $className extends Migration {
 
   @override
   void up(MigrationBuilder builder) {
-    // TODO(mastersam07): Add schema changes
+    // TODO: Add schema changes
   }
 
   @override
   void down(MigrationBuilder builder) {
-    // TODO(mastersam07): Add reverse operations
+    // TODO: Add reverse operations
   }
 }
 ''';

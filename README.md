@@ -1,4 +1,6 @@
-# Dartonic
+# JAO
+
+**Just Another ORM** - *We know there are many, but this is the one that works the way you expect.*
 
 A Django-inspired ORM for Dart. Framework-agnostic, type-safe, with a powerful QuerySet API.
 
@@ -10,27 +12,27 @@ A Django-inspired ORM for Dart. Framework-agnostic, type-safe, with a powerful Q
 - **Chainable API**: Build complex queries fluently
 - **Database agnostic**: PostgreSQL, MySQL, SQLite adapters
 - **No middleware required**: Works directly in your routes/handlers
-- **Django-style CLI**: `dartonic makemigrations`, `dartonic migrate`
+- **Django-style CLI**: `jao makemigrations`, `jao migrate`
 
 ## Quick Start
 
 ### 1. Install
 
 ```bash
-dart pub add dartonic
+dart pub add jao
 
-dart pub add --dev build_runner dartonic_generator
+dart pub add --dev build_runner jao_generator
 
-dart pub global activate dartonic_cli
+dart pub global activate jao_cli
 ```
 
 ### 2. Initialize Project
 
 ```bash
-dartonic init
+jao init
 ```
 
-This creates a `dartonic.yaml` configuration file:
+This creates a `jao.yaml` configuration file:
 
 ```yaml
 type: sqlite
@@ -43,7 +45,7 @@ models_path: lib/models
 ### 3. Define Models
 
 ```dart
-import 'package:dartonic/dartonic.dart';
+import 'package:jao/jao.dart';
 
 part 'models.g.dart';
 
@@ -105,22 +107,22 @@ dart run build_runner build
 ### 5. Create & Run Migrations
 
 ```bash
-dartonic makemigrations
+jao makemigrations
 
-dartonic migrate
+jao migrate
 ```
 
 ### 6. Initialize Database (once at startup)
 
 ```dart
-import 'package:dartonic/dartonic.dart';
+import 'package:jao/jao.dart';
 
 Future<void> initializeDatabase() async {
   const adapter = SqliteAdapter();
   final config = DatabaseConfig.sqlite('database.db');
   final pool = await adapter.createPool(config);
 
-  await Dartonic.configure(pool: pool, compiler: SqlCompiler(adapter.dialect));
+  await Jao.configure(pool: pool, compiler: SqlCompiler(adapter.dialect));
 }
 ```
 
@@ -133,30 +135,30 @@ import 'package:your_app/models/models.dart';
 
 Future<Response> onRequest(RequestContext context) async {
   // Get all authors
-  final authors = await AuthorDartonic.objects.all().toList();
+  final authors = await AuthorJao.objects.all().toList();
 
   // Filter with type-safe field accessors
-  final activeAdults = await AuthorDartonic.objects
-    .filter(AuthorDartonic.$.age.gte(18))
-    .filter(AuthorDartonic.$.isActive.eq(true))
-    .orderBy(AuthorDartonic.$.name.asc())
+  final activeAdults = await AuthorJao.objects
+    .filter(AuthorJao.$.age.gte(18))
+    .filter(AuthorJao.$.isActive.eq(true))
+    .orderBy(AuthorJao.$.name.asc())
     .toList();
 
   // Create
-  final author = await AuthorDartonic.objects.create({
+  final author = await AuthorJao.objects.create({
     'name': 'John Doe',
     'email': 'john@example.com',
     'age': 30,
   });
 
   // Update
-  await AuthorDartonic.objects
-    .filter(AuthorDartonic.$.id.eq(1))
+  await AuthorJao.objects
+    .filter(AuthorJao.$.id.eq(1))
     .update({'name': 'Jane Doe'});
 
   // Delete
-  await AuthorDartonic.objects
-    .filter(AuthorDartonic.$.isActive.eq(false))
+  await AuthorJao.objects
+    .filter(AuthorJao.$.isActive.eq(false))
     .delete();
 
   return Response.json(body: authors);
@@ -169,76 +171,76 @@ Future<Response> onRequest(RequestContext context) async {
 
 ```dart
 // Exact match
-AuthorDartonic.objects.filter(AuthorDartonic.$.name.eq('John'));
+AuthorJao.objects.filter(AuthorJao.$.name.eq('John'));
 
 // Comparisons
-AuthorDartonic.objects.filter(AuthorDartonic.$.age.gte(18));
-AuthorDartonic.objects.filter(AuthorDartonic.$.age.lt(65));
-AuthorDartonic.objects.filter(AuthorDartonic.$.age.between(18, 65));
+AuthorJao.objects.filter(AuthorJao.$.age.gte(18));
+AuthorJao.objects.filter(AuthorJao.$.age.lt(65));
+AuthorJao.objects.filter(AuthorJao.$.age.between(18, 65));
 
 // String lookups
-AuthorDartonic.objects.filter(AuthorDartonic.$.name.contains('John'));
-AuthorDartonic.objects.filter(AuthorDartonic.$.email.endsWith('@gmail.com'));
-AuthorDartonic.objects.filter(AuthorDartonic.$.name.startsWith('Dr.'));
+AuthorJao.objects.filter(AuthorJao.$.name.contains('John'));
+AuthorJao.objects.filter(AuthorJao.$.email.endsWith('@gmail.com'));
+AuthorJao.objects.filter(AuthorJao.$.name.startsWith('Dr.'));
 
 // Case-insensitive
-AuthorDartonic.objects.filter(AuthorDartonic.$.name.iContains('john'));
+AuthorJao.objects.filter(AuthorJao.$.name.iContains('john'));
 
 // Null checks
-AuthorDartonic.objects.filter(AuthorDartonic.$.bio.isNull());
-AuthorDartonic.objects.filter(AuthorDartonic.$.bio.isNotNull());
+AuthorJao.objects.filter(AuthorJao.$.bio.isNull());
+AuthorJao.objects.filter(AuthorJao.$.bio.isNotNull());
 
 // In list
-AuthorDartonic.objects.filter(AuthorDartonic.$.status.inList(['active', 'pending']));
+AuthorJao.objects.filter(AuthorJao.$.status.inList(['active', 'pending']));
 ```
 
 ### Boolean Logic
 
 ```dart
 // AND (chained filters)
-AuthorDartonic.objects
-  .filter(AuthorDartonic.$.age.gte(18))
-  .filter(AuthorDartonic.$.isActive.eq(true));
+AuthorJao.objects
+  .filter(AuthorJao.$.age.gte(18))
+  .filter(AuthorJao.$.isActive.eq(true));
 
 // AND (& operator)
-AuthorDartonic.objects.filter(
-  AuthorDartonic.$.age.gte(18) & AuthorDartonic.$.isActive.eq(true)
+AuthorJao.objects.filter(
+  AuthorJao.$.age.gte(18) & AuthorJao.$.isActive.eq(true)
 );
 
 // OR
-AuthorDartonic.objects.filter(
-  AuthorDartonic.$.age.lt(18) | AuthorDartonic.$.age.gte(65)
+AuthorJao.objects.filter(
+  AuthorJao.$.age.lt(18) | AuthorJao.$.age.gte(65)
 );
 
 // NOT
-AuthorDartonic.objects.filter(~AuthorDartonic.$.name.eq('Admin'));
+AuthorJao.objects.filter(~AuthorJao.$.name.eq('Admin'));
 ```
 
 ### Ordering & Pagination
 
 ```dart
 // Ascending/Descending
-AuthorDartonic.objects.orderBy(AuthorDartonic.$.name.asc());
-AuthorDartonic.objects.orderBy(AuthorDartonic.$.createdAt.desc());
+AuthorJao.objects.orderBy(AuthorJao.$.name.asc());
+AuthorJao.objects.orderBy(AuthorJao.$.createdAt.desc());
 
 // Multiple columns
-AuthorDartonic.objects.orderBy(
-  AuthorDartonic.$.isActive.desc(),
-  AuthorDartonic.$.name.asc(),
+AuthorJao.objects.orderBy(
+  AuthorJao.$.isActive.desc(),
+  AuthorJao.$.name.asc(),
 );
 
 // Pagination
-AuthorDartonic.objects.offset(20).limit(10);
-AuthorDartonic.objects.slice(20, 30);
+AuthorJao.objects.offset(20).limit(10);
+AuthorJao.objects.slice(20, 30);
 ```
 
 ### Aggregations
 
 ```dart
-final stats = await AuthorDartonic.objects.aggregate({
+final stats = await AuthorJao.objects.aggregate({
   'count': Count.all(),
-  'avg_age': Avg(AuthorDartonic.$.age.col),
-  'max_age': Max(AuthorDartonic.$.age.col),
+  'avg_age': Avg(AuthorJao.$.age.col),
+  'max_age': Max(AuthorJao.$.age.col),
 });
 ```
 
@@ -246,29 +248,29 @@ final stats = await AuthorDartonic.objects.aggregate({
 
 ```dart
 // Create
-final author = await AuthorDartonic.objects.create({
+final author = await AuthorJao.objects.create({
   'name': 'John',
   'email': 'john@example.com',
   'age': 30,
 });
 
 // Get by primary key
-final author = await AuthorDartonic.objects.get(1);
+final author = await AuthorJao.objects.get(1);
 
 // Get or create
-final (author, created) = await AuthorDartonic.objects.getOrCreate(
-  condition: AuthorDartonic.$.email.eq('john@example.com'),
+final (author, created) = await AuthorJao.objects.getOrCreate(
+  condition: AuthorJao.$.email.eq('john@example.com'),
   defaults: {'name': 'John', 'age': 30},
 );
 
 // Update
-await AuthorDartonic.objects
-  .filter(AuthorDartonic.$.isActive.eq(false))
+await AuthorJao.objects
+  .filter(AuthorJao.$.isActive.eq(false))
   .update({'isActive': true});
 
 // Delete
-await AuthorDartonic.objects
-  .filter(AuthorDartonic.$.email.endsWith('@spam.com'))
+await AuthorJao.objects
+  .filter(AuthorJao.$.email.endsWith('@spam.com'))
   .delete();
 ```
 
@@ -298,13 +300,13 @@ await AuthorDartonic.objects
 ## CLI Commands
 
 ```bash
-dartonic init            # Initialize project with dartonic.yaml
-dartonic makemigrations  # Auto-detect model changes and create migration
-dartonic migrate         # Run pending migrations
-dartonic status          # Show migration status
-dartonic rollback        # Rollback last migration
-dartonic reset           # Rollback all migrations
-dartonic refresh         # Reset and re-run all migrations
+jao init            # Initialize project with jao.yaml
+jao makemigrations  # Auto-detect model changes and create migration
+jao migrate         # Run pending migrations
+jao status          # Show migration status
+jao rollback        # Rollback last migration
+jao reset           # Rollback all migrations
+jao refresh         # Reset and re-run all migrations
 ```
 
 ## Database Configuration
@@ -312,7 +314,7 @@ dartonic refresh         # Reset and re-run all migrations
 ### SQLite
 
 ```yaml
-# dartonic.yaml
+# jao.yaml
 type: sqlite
 database: database.db
 ```
@@ -320,7 +322,7 @@ database: database.db
 ### PostgreSQL
 
 ```yaml
-# dartonic.yaml
+# jao.yaml
 type: postgres
 host: localhost
 port: 5432
@@ -332,7 +334,7 @@ password: pass
 ### MySQL
 
 ```yaml
-# dartonic.yaml
+# jao.yaml
 type: mysql
 host: localhost
 port: 3306

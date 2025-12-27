@@ -2,10 +2,10 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:build/build.dart';
+import 'package:jao/jao.dart';
 import 'package:source_gen/source_gen.dart';
-import 'package:dartonic/dartonic.dart';
 
-class DartonicGenerator extends GeneratorForAnnotation<Model> {
+class JaoGenerator extends GeneratorForAnnotation<Model> {
   @override
   String generateForAnnotatedElement(Element element, ConstantReader annotation, BuildStep buildStep) {
     if (element is! ClassElement) {
@@ -182,7 +182,7 @@ class DartonicGenerator extends GeneratorForAnnotation<Model> {
     final autoNowAddFields = fields.where((f) => f.autoNowAdd).map((f) => _toSnakeCase(f.name)).toList();
     final autoNowFields = fields.where((f) => f.autoNow).map((f) => _toSnakeCase(f.name)).toList();
 
-    buffer.writeln('extension ${className}Dartonic on $className {');
+    buffer.writeln('extension ${className}Jao on $className {');
     buffer.writeln('  static const \$ = ${className}\$();');
     buffer.writeln('  static bool _registered = false;');
     buffer.writeln('  static final Manager<$className> _objects = Manager<$className>();');
@@ -190,7 +190,7 @@ class DartonicGenerator extends GeneratorForAnnotation<Model> {
     buffer.writeln('  static Manager<$className> get objects {');
     buffer.writeln('    if (!_registered) {');
     buffer.writeln('      _registered = true;');
-    buffer.writeln('      Dartonic.registerModel<$className>(ModelRegistration(');
+    buffer.writeln('      Jao.registerModel<$className>(ModelRegistration(');
     buffer.writeln('        tableName: tableName,');
     buffer.writeln('        pkField: pkField,');
     buffer.writeln('        fromRow: fromRow,');

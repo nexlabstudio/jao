@@ -22,13 +22,13 @@ class ModelRegistration<T> {
   });
 }
 
-class Dartonic {
-  static Dartonic? _instance;
+class Jao {
+  static Jao? _instance;
 
-  static Dartonic get instance {
+  static Jao get instance {
     if (_instance == null) {
       throw StateError(
-        'Dartonic not initialized. Call Dartonic.configure() first.',
+        'Jao not initialized. Call Jao.configure() first.',
       );
     }
     return _instance!;
@@ -41,13 +41,13 @@ class Dartonic {
   final Map<Type, ModelExecutor> _executors = {};
   static final Map<Type, ModelRegistration> _registrations = {};
 
-  Dartonic._({required this.pool, required this.compiler});
+  Jao._({required this.pool, required this.compiler});
 
-  static Future<Dartonic> configure({
+  static Future<Jao> configure({
     required ConnectionPool pool,
     required SqlCompiler compiler,
   }) async {
-    _instance = Dartonic._(pool: pool, compiler: compiler);
+    _instance = Jao._(pool: pool, compiler: compiler);
     return _instance!;
   }
 

@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:dart_frog/dart_frog.dart';
-import 'package:dartonic_example/models/models.dart';
+import 'package:jao_example/models/models.dart';
 
 Future<Response> onRequest(RequestContext context, String id) async {
   final tagId = int.tryParse(id);
@@ -19,7 +19,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
 
 Future<Response> _getTag(int id) async {
   try {
-    final tag = await TagDartonic.objects.get(id);
+    final tag = await TagJao.objects.get(id);
     return Response.json(body: _tagToJson(tag));
   } on StateError {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Tag not found'});
@@ -37,18 +37,18 @@ Future<Response> _updateTag(RequestContext context, int id) async {
     return Response.json(statusCode: HttpStatus.badRequest, body: {'error': 'No fields to update'});
   }
 
-  final updated = await TagDartonic.objects.filter(TagDartonic.$.id.eq(id)).update(updateData);
+  final updated = await TagJao.objects.filter(TagJao.$.id.eq(id)).update(updateData);
 
   if (updated == 0) {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Tag not found'});
   }
 
-  final tag = await TagDartonic.objects.get(id);
+  final tag = await TagJao.objects.get(id);
   return Response.json(body: _tagToJson(tag));
 }
 
 Future<Response> _deleteTag(int id) async {
-  final deleted = await TagDartonic.objects.filter(TagDartonic.$.id.eq(id)).delete();
+  final deleted = await TagJao.objects.filter(TagJao.$.id.eq(id)).delete();
 
   if (deleted == 0) {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Tag not found'});

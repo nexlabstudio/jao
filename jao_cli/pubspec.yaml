@@ -1,0 +1,20 @@
+name: jao_cli
+description: Command-line interface for jao ORM. Run migrations, generate schemas, and manage your database.
+version: 0.0.1
+homepage: https://github.com/example/jao
+
+environment:
+  sdk: ^3.10.0
+
+resolution: workspace
+
+dependencies:
+  jao:
+    path: ../jao
+
+dev_dependencies:
+  test: ^1.24.0
+  lints: ^3.0.0
+
+executables:
+  jao: jao

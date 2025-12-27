@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:dart_frog/dart_frog.dart';
-import 'package:dartonic_example/models/models.dart';
+import 'package:jao_example/models/models.dart';
 
 Future<Response> onRequest(RequestContext context, String id) async {
   final authorId = int.tryParse(id);
@@ -20,7 +20,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
 
 Future<Response> _getAuthor(int id) async {
   try {
-    final author = await AuthorDartonic.objects.get(id);
+    final author = await AuthorJao.objects.get(id);
     return Response.json(body: _authorToJson(author));
   } on StateError {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Author not found'});
@@ -39,7 +39,7 @@ Future<Response> _replaceAuthor(RequestContext context, int id) async {
     return Response.json(statusCode: HttpStatus.badRequest, body: {'errors': errors});
   }
 
-  final updated = await AuthorDartonic.objects.filter(AuthorDartonic.$.id.eq(id)).update({
+  final updated = await AuthorJao.objects.filter(AuthorJao.$.id.eq(id)).update({
     'name': body['name'],
     'email': body['email'],
     'age': body['age'],
@@ -51,7 +51,7 @@ Future<Response> _replaceAuthor(RequestContext context, int id) async {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Author not found'});
   }
 
-  final author = await AuthorDartonic.objects.get(id);
+  final author = await AuthorJao.objects.get(id);
   return Response.json(body: _authorToJson(author));
 }
 
@@ -69,18 +69,18 @@ Future<Response> _updateAuthor(RequestContext context, int id) async {
   if (body.containsKey('is_active')) updateData['is_active'] = body['is_active'];
   if (body.containsKey('bio')) updateData['bio'] = body['bio'];
 
-  final updated = await AuthorDartonic.objects.filter(AuthorDartonic.$.id.eq(id)).update(updateData);
+  final updated = await AuthorJao.objects.filter(AuthorJao.$.id.eq(id)).update(updateData);
 
   if (updated == 0) {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Author not found'});
   }
 
-  final author = await AuthorDartonic.objects.get(id);
+  final author = await AuthorJao.objects.get(id);
   return Response.json(body: _authorToJson(author));
 }
 
 Future<Response> _deleteAuthor(int id) async {
-  final deleted = await AuthorDartonic.objects.filter(AuthorDartonic.$.id.eq(id)).delete();
+  final deleted = await AuthorJao.objects.filter(AuthorJao.$.id.eq(id)).delete();
 
   if (deleted == 0) {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Author not found'});

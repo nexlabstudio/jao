@@ -3,56 +3,31 @@
 part of 'models.dart';
 
 // **************************************************************************
-// DartonicGenerator
+// JaoGenerator
 // **************************************************************************
 
-/// Typed field accessors for [Author].
-///
-/// Use these for type-safe queries:
-/// ```dart
-/// Author.objects.filter(Author.$.fieldName.eq(value));
-/// ```
 class Author$ implements ModelFields<Author> {
   const Author$();
 
-  /// Field accessor for [id]
   final id = const IntFieldRef('id');
-
-  /// Field accessor for [name]
   final name = const StringFieldRef('name');
-
-  /// Field accessor for [email]
   final email = const StringFieldRef('email');
-
-  /// Field accessor for [age]
   final age = const IntFieldRef('age');
-
-  /// Field accessor for [isActive]
   final isActive = const BoolFieldRef('is_active');
-
-  /// Field accessor for [bio]
   final bio = const StringFieldRef('bio');
-
-  /// Field accessor for [createdAt]
   final createdAt = const DateTimeFieldRef('created_at');
-
-  /// Field accessor for [updatedAt]
   final updatedAt = const DateTimeFieldRef('updated_at');
 }
 
-/// Extension providing static accessors for [Author].
-extension AuthorDartonic on Author {
-  /// Typed field accessors for queries.
+extension AuthorJao on Author {
   static const $ = Author$();
-
   static bool _registered = false;
   static final Manager<Author> _objects = Manager<Author>();
 
-  /// Default manager for database operations.
   static Manager<Author> get objects {
     if (!_registered) {
       _registered = true;
-      Dartonic.registerModel<Author>(ModelRegistration(
+      Jao.registerModel<Author>(ModelRegistration(
         tableName: tableName,
         pkField: pkField,
         fromRow: fromRow,
@@ -64,13 +39,8 @@ extension AuthorDartonic on Author {
     return _objects;
   }
 
-  /// Database table name.
   static const tableName = 'author';
-
-  /// Primary key field name.
   static const pkField = 'id';
-
-  /// List of all field names.
   static const fieldNames = [
     'id',
     'name',
@@ -82,7 +52,6 @@ extension AuthorDartonic on Author {
     'updatedAt',
   ];
 
-  /// Create instance from database row.
   static Author fromRow(Map<String, dynamic> row) {
     return Author()
       ..id = row['id'] as int
@@ -95,7 +64,6 @@ extension AuthorDartonic on Author {
       ..updatedAt = DateTime.parse(row['updated_at'] as String);
   }
 
-  /// Convert instance to database row.
   Map<String, dynamic> toRow() {
     return {
       'id': id,
@@ -109,7 +77,6 @@ extension AuthorDartonic on Author {
     };
   }
 
-  /// Model schema for migrations.
   static final schema = ModelSchema(
     className: 'Author',
     tableName: 'author',
@@ -198,50 +165,27 @@ extension AuthorDartonic on Author {
   );
 }
 
-/// Typed field accessors for [Post].
-///
-/// Use these for type-safe queries:
-/// ```dart
-/// Post.objects.filter(Post.$.fieldName.eq(value));
-/// ```
 class Post$ implements ModelFields<Post> {
   const Post$();
 
-  /// Field accessor for [id]
   final id = const IntFieldRef('id');
-
-  /// Field accessor for [title]
   final title = const StringFieldRef('title');
-
-  /// Field accessor for [content]
   final content = const StringFieldRef('content');
-
-  /// Field accessor for [authorId]
   final authorId = const IntFieldRef('author_id');
-
-  /// Field accessor for [isPublished]
   final isPublished = const BoolFieldRef('is_published');
-
-  /// Field accessor for [publishedAt]
   final publishedAt = const DateTimeFieldRef('published_at');
-
-  /// Field accessor for [createdAt]
   final createdAt = const DateTimeFieldRef('created_at');
 }
 
-/// Extension providing static accessors for [Post].
-extension PostDartonic on Post {
-  /// Typed field accessors for queries.
+extension PostJao on Post {
   static const $ = Post$();
-
   static bool _registered = false;
   static final Manager<Post> _objects = Manager<Post>();
 
-  /// Default manager for database operations.
   static Manager<Post> get objects {
     if (!_registered) {
       _registered = true;
-      Dartonic.registerModel<Post>(ModelRegistration(
+      Jao.registerModel<Post>(ModelRegistration(
         tableName: tableName,
         pkField: pkField,
         fromRow: fromRow,
@@ -252,13 +196,8 @@ extension PostDartonic on Post {
     return _objects;
   }
 
-  /// Database table name.
   static const tableName = 'post';
-
-  /// Primary key field name.
   static const pkField = 'id';
-
-  /// List of all field names.
   static const fieldNames = [
     'id',
     'title',
@@ -269,7 +208,6 @@ extension PostDartonic on Post {
     'createdAt',
   ];
 
-  /// Create instance from database row.
   static Post fromRow(Map<String, dynamic> row) {
     return Post()
       ..id = row['id'] as int
@@ -283,7 +221,6 @@ extension PostDartonic on Post {
       ..createdAt = DateTime.parse(row['created_at'] as String);
   }
 
-  /// Convert instance to database row.
   Map<String, dynamic> toRow() {
     return {
       'id': id,
@@ -296,7 +233,6 @@ extension PostDartonic on Post {
     };
   }
 
-  /// Model schema for migrations.
   static final schema = ModelSchema(
     className: 'Post',
     tableName: 'post',
@@ -375,38 +311,23 @@ extension PostDartonic on Post {
   );
 }
 
-/// Typed field accessors for [Tag].
-///
-/// Use these for type-safe queries:
-/// ```dart
-/// Tag.objects.filter(Tag.$.fieldName.eq(value));
-/// ```
 class Tag$ implements ModelFields<Tag> {
   const Tag$();
 
-  /// Field accessor for [id]
   final id = const IntFieldRef('id');
-
-  /// Field accessor for [name]
   final name = const StringFieldRef('name');
-
-  /// Field accessor for [color]
   final color = const StringFieldRef('color');
 }
 
-/// Extension providing static accessors for [Tag].
-extension TagDartonic on Tag {
-  /// Typed field accessors for queries.
+extension TagJao on Tag {
   static const $ = Tag$();
-
   static bool _registered = false;
   static final Manager<Tag> _objects = Manager<Tag>();
 
-  /// Default manager for database operations.
   static Manager<Tag> get objects {
     if (!_registered) {
       _registered = true;
-      Dartonic.registerModel<Tag>(ModelRegistration(
+      Jao.registerModel<Tag>(ModelRegistration(
         tableName: tableName,
         pkField: pkField,
         fromRow: fromRow,
@@ -416,20 +337,14 @@ extension TagDartonic on Tag {
     return _objects;
   }
 
-  /// Database table name.
   static const tableName = 'tag';
-
-  /// Primary key field name.
   static const pkField = 'id';
-
-  /// List of all field names.
   static const fieldNames = [
     'id',
     'name',
     'color',
   ];
 
-  /// Create instance from database row.
   static Tag fromRow(Map<String, dynamic> row) {
     return Tag()
       ..id = row['id'] as int
@@ -437,7 +352,6 @@ extension TagDartonic on Tag {
       ..color = row['color'] as String;
   }
 
-  /// Convert instance to database row.
   Map<String, dynamic> toRow() {
     return {
       'id': id,
@@ -446,7 +360,6 @@ extension TagDartonic on Tag {
     };
   }
 
-  /// Model schema for migrations.
   static final schema = ModelSchema(
     className: 'Tag',
     tableName: 'tag',
@@ -485,50 +398,27 @@ extension TagDartonic on Tag {
   );
 }
 
-/// Typed field accessors for [Comment].
-///
-/// Use these for type-safe queries:
-/// ```dart
-/// Comment.objects.filter(Comment.$.fieldName.eq(value));
-/// ```
 class Comment$ implements ModelFields<Comment> {
   const Comment$();
 
-  /// Field accessor for [id]
   final id = const IntFieldRef('id');
-
-  /// Field accessor for [postId]
   final postId = const IntFieldRef('post_id');
-
-  /// Field accessor for [authorName]
   final authorName = const StringFieldRef('author_name');
-
-  /// Field accessor for [authorEmail]
   final authorEmail = const StringFieldRef('author_email');
-
-  /// Field accessor for [content]
   final content = const StringFieldRef('content');
-
-  /// Field accessor for [createdAt]
   final createdAt = const DateTimeFieldRef('created_at');
-
-  /// Field accessor for [isApproved]
   final isApproved = const BoolFieldRef('is_approved');
 }
 
-/// Extension providing static accessors for [Comment].
-extension CommentDartonic on Comment {
-  /// Typed field accessors for queries.
+extension CommentJao on Comment {
   static const $ = Comment$();
-
   static bool _registered = false;
   static final Manager<Comment> _objects = Manager<Comment>();
 
-  /// Default manager for database operations.
   static Manager<Comment> get objects {
     if (!_registered) {
       _registered = true;
-      Dartonic.registerModel<Comment>(ModelRegistration(
+      Jao.registerModel<Comment>(ModelRegistration(
         tableName: tableName,
         pkField: pkField,
         fromRow: fromRow,
@@ -539,13 +429,8 @@ extension CommentDartonic on Comment {
     return _objects;
   }
 
-  /// Database table name.
   static const tableName = 'post_comments';
-
-  /// Primary key field name.
   static const pkField = 'id';
-
-  /// List of all field names.
   static const fieldNames = [
     'id',
     'postId',
@@ -556,7 +441,6 @@ extension CommentDartonic on Comment {
     'isApproved',
   ];
 
-  /// Create instance from database row.
   static Comment fromRow(Map<String, dynamic> row) {
     return Comment()
       ..id = row['id'] as int
@@ -568,7 +452,6 @@ extension CommentDartonic on Comment {
       ..isApproved = row['is_approved'] == 1 || row['is_approved'] == true;
   }
 
-  /// Convert instance to database row.
   Map<String, dynamic> toRow() {
     return {
       'id': id,
@@ -581,7 +464,6 @@ extension CommentDartonic on Comment {
     };
   }
 
-  /// Model schema for migrations.
   static final schema = ModelSchema(
     className: 'Comment',
     tableName: 'post_comments',

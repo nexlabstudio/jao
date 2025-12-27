@@ -3,7 +3,7 @@ library;
 import 'dart:async';
 import '../query/queryset.dart';
 import '../query/expressions.dart';
-import '../dartonic.dart';
+import '../jao.dart';
 
 class Manager<T> {
   final QueryExecutor<T>? _executor;
@@ -14,7 +14,7 @@ class Manager<T> {
       _baseFilters = baseFilters;
 
   QuerySet<T> _baseQuerySet() {
-    final executor = _executor ?? (Dartonic.isInitialized ? Dartonic.instance.executor<T>() : null);
+    final executor = _executor ?? (Jao.isInitialized ? Jao.instance.executor<T>() : null);
     var qs = QuerySet<T>(executor: executor);
     for (final filter in _baseFilters) {
       qs = qs.filter(filter);
@@ -77,17 +77,17 @@ class Manager<T> {
   }
 
   Future<T> create(Map<String, Object?> values) async {
-    final executor = _executor ?? (Dartonic.isInitialized ? Dartonic.instance.executor<T>() : null);
+    final executor = _executor ?? (Jao.isInitialized ? Jao.instance.executor<T>() : null);
     if (executor == null) {
-      throw StateError('Manager has no executor configured. Call Dartonic.initialize() and register your models first.');
+      throw StateError('Manager has no executor configured. Call Jao.initialize() and register your models first.');
     }
     return (executor as CreateCapable<T>).create(values);
   }
 
   Future<List<T>> bulkCreate(List<Map<String, Object?>> objects) async {
-    final executor = _executor ?? (Dartonic.isInitialized ? Dartonic.instance.executor<T>() : null);
+    final executor = _executor ?? (Jao.isInitialized ? Jao.instance.executor<T>() : null);
     if (executor == null) {
-      throw StateError('Manager has no executor configured. Call Dartonic.initialize() and register your models first.');
+      throw StateError('Manager has no executor configured. Call Jao.initialize() and register your models first.');
     }
     return (executor as CreateCapable<T>).bulkCreate(objects);
   }
@@ -103,9 +103,9 @@ class Manager<T> {
   Future<Map<String, dynamic>> aggregate(Map<String, Expression> aggregates) => _baseQuerySet().aggregate(aggregates);
 
   Future<List<Map<String, dynamic>>> raw(String sql, [List<Object?>? params]) async {
-    final executor = _executor ?? (Dartonic.isInitialized ? Dartonic.instance.executor<T>() : null);
+    final executor = _executor ?? (Jao.isInitialized ? Jao.instance.executor<T>() : null);
     if (executor == null) {
-      throw StateError('Manager has no executor configured. Call Dartonic.initialize() and register your models first.');
+      throw StateError('Manager has no executor configured. Call Jao.initialize() and register your models first.');
     }
     return (executor as RawQueryCapable).rawQuery(sql, params);
   }

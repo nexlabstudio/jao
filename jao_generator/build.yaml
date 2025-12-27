@@ -1,0 +1,8 @@
+builders:
+  jao:
+    import: "package:jao_generator/jao_generator.dart"
+    builder_factories: ["jaoBuilder"]
+    build_extensions: {".dart": [".jao.g.part"]}
+    auto_apply: dependents
+    build_to: cache
+    applies_builders: ["source_gen|combining_builder"]

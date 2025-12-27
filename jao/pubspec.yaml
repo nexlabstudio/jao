@@ -1,7 +1,7 @@
-name: dartonic
-description: A Django-inspired ORM for Dart. Framework-agnostic, type-safe, with powerful QuerySet API.
+name: jao
+description: Just Another ORM for Dart. Because you didn't have enough options already.
 version: 0.0.1
-homepage: https://github.com/example/dartonic
+homepage: https://github.com/example/jao
 
 environment:
   sdk: ^3.10.0

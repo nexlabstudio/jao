@@ -1,9 +1,9 @@
-name: dartonic_workspace
+name: jao_workspace
 publish_to: none
 environment:
   sdk: ^3.10.0
 workspace:
-  - dartonic
-  - dartonic_cli
-  - dartonic_generator
+  - jao
+  - jao_cli
+  - jao_generator
   - example

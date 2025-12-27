@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:dart_frog/dart_frog.dart';
-import 'package:dartonic_example/models/models.dart';
+import 'package:jao_example/models/models.dart';
 
 Future<Response> onRequest(RequestContext context, String id) async {
   final commentId = int.tryParse(id);
@@ -19,7 +19,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
 
 Future<Response> _getComment(int id) async {
   try {
-    final comment = await CommentDartonic.objects.get(id);
+    final comment = await CommentJao.objects.get(id);
     return Response.json(body: _commentToJson(comment));
   } on StateError {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Comment not found'});
@@ -37,18 +37,18 @@ Future<Response> _updateComment(RequestContext context, int id) async {
     return Response.json(statusCode: HttpStatus.badRequest, body: {'error': 'No fields to update'});
   }
 
-  final updated = await CommentDartonic.objects.filter(CommentDartonic.$.id.eq(id)).update(updateData);
+  final updated = await CommentJao.objects.filter(CommentJao.$.id.eq(id)).update(updateData);
 
   if (updated == 0) {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Comment not found'});
   }
 
-  final comment = await CommentDartonic.objects.get(id);
+  final comment = await CommentJao.objects.get(id);
   return Response.json(body: _commentToJson(comment));
 }
 
 Future<Response> _deleteComment(int id) async {
-  final deleted = await CommentDartonic.objects.filter(CommentDartonic.$.id.eq(id)).delete();
+  final deleted = await CommentJao.objects.filter(CommentJao.$.id.eq(id)).delete();
 
   if (deleted == 0) {
     return Response.json(statusCode: HttpStatus.notFound, body: {'error': 'Comment not found'});

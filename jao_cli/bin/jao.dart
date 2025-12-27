@@ -1,18 +1,19 @@
 #!/usr/bin/env dart
 
-/// Dartonic CLI - Django-style migration management.
+/// JAO CLI - Just Another ORM migration management.
+/// We know there are many, but this is the one that works the way you expect.
 ///
 /// Install globally:
-///   dart pub global activate dartonic_cli
+///   dart pub global activate jao_cli
 ///
 /// Or from local path:
-///   dart pub global activate --source path ./dartonic_cli
+///   dart pub global activate --source path ./jao_cli
 ///
-/// Then run from any dartonic project:
-///   dartonic makemigrations
-///   dartonic migrate
-///   dartonic status
-///   dartonic rollback
+/// Then run from any jao project:
+///   jao makemigrations
+///   jao migrate
+///   jao status
+///   jao rollback
 ///
 /// Commands:
 ///   makemigrations  Auto-detect model changes and create migration
@@ -23,16 +24,16 @@
 ///   refresh         Reset and re-run all migrations
 ///   sql             Show SQL for migrations
 ///   make            Generate an empty migration file
-///   init            Initialize dartonic in current project
+///   init            Initialize jao in current project
 ///   help            Show help
 ///
 /// Configuration:
 ///   The CLI looks for bin/migrate.dart in the current directory and runs it,
-///   or uses dartonic.yaml / environment variables for database configuration.
+///   or uses jao.yaml / environment variables for database configuration.
 library;
 
 import 'dart:io';
-import 'package:dartonic/dartonic.dart';
+import 'package:jao/jao.dart';
 
 Future<void> main(List<String> args) async {
   // Handle init command specially (doesn't need config)
@@ -65,12 +66,12 @@ Future<void> main(List<String> args) async {
   }
 
   if (projectConfig == null) {
-    print('\x1B[31m✗\x1B[0m No dartonic project found.');
+    print('\x1B[31m✗\x1B[0m No jao project found.');
     print('');
-    print('Run "dartonic init" to initialize a new project.');
+    print('Run "jao init" to initialize a new project.');
     print('');
     print('This will create:');
-    print('  - dartonic.yaml (database configuration)');
+    print('  - jao.yaml (database configuration)');
     print('  - lib/migrations/ (migrations directory)');
     print('  - bin/migrate.dart (project CLI)');
     exit(1);
@@ -104,18 +105,19 @@ Future<void> main(List<String> args) async {
   print('\x1B[33m⚠\x1B[0m Command "$command" requires migrations to be compiled.');
   print('');
   print('Please ensure bin/migrate.dart exists with your migrations imported.');
-  print('Run "dartonic init" to create the project structure.');
+  print('Run "jao init" to create the project structure.');
   exit(1);
 }
 
 void _printUsage() {
   print('''
-Dartonic Migration CLI
+JAO Migration CLI
+Because you didn't have enough options already.
 
-Usage: dartonic <command> [options]
+Usage: jao <command> [options]
 
 Commands:
-  init            Initialize dartonic in current project
+  init            Initialize jao in current project
   make            Generate an empty migration file
   makemigrations  Auto-detect model changes and create migration
   migrate         Run pending migrations
@@ -127,21 +129,21 @@ Commands:
   help            Show help
 
 Setup:
-  1. Run "dartonic init" to initialize your project
+  1. Run "jao init" to initialize your project
   2. Create migrations in lib/migrations/
   3. Import migrations in bin/migrate.dart
-  4. Run "dartonic migrate" to apply migrations
+  4. Run "jao migrate" to apply migrations
 
 Examples:
-  dartonic init                    # Initialize project
-  dartonic init --db=postgres      # Initialize with PostgreSQL
-  dartonic make -n=create_users    # Create empty migration
-  dartonic migrate                 # Run pending migrations
-  dartonic status                  # Show migration status
+  jao init                    # Initialize project
+  jao init --db=postgres      # Initialize with PostgreSQL
+  jao make -n=create_users    # Create empty migration
+  jao migrate                 # Run pending migrations
+  jao status                  # Show migration status
 ''');
 }
 
-/// Project configuration loaded from dartonic.yaml or environment.
+/// Project configuration loaded from jao.yaml or environment.
 class ProjectConfig {
   final DatabaseConfig database;
   final DatabaseAdapter adapter;
@@ -156,10 +158,10 @@ class ProjectConfig {
   });
 }
 
-/// Load project configuration from dartonic.yaml or environment.
+/// Load project configuration from jao.yaml or environment.
 Future<ProjectConfig?> _loadProjectConfig() async {
-  // Try dartonic.yaml first
-  final configFile = File('dartonic.yaml');
+  // Try jao.yaml first
+  final configFile = File('jao.yaml');
   if (configFile.existsSync()) {
     return _parseConfigFile(configFile);
   }
@@ -174,7 +176,7 @@ Future<ProjectConfig?> _loadProjectConfig() async {
         : DatabaseConfig(
             host: Platform.environment['DATABASE_HOST'] ?? 'localhost',
             port: int.tryParse(Platform.environment['DATABASE_PORT'] ?? '') ?? 5432,
-            database: Platform.environment['DATABASE_NAME'] ?? 'dartonic',
+            database: Platform.environment['DATABASE_NAME'] ?? 'jao',
             username: Platform.environment['DATABASE_USER'],
             password: Platform.environment['DATABASE_PASSWORD'],
             useSsl: Platform.environment['DATABASE_SSL']?.toLowerCase() == 'true',
@@ -195,7 +197,7 @@ Future<ProjectConfig?> _loadProjectConfig() async {
   return null;
 }
 
-/// Parse dartonic.yaml configuration file.
+/// Parse jao.yaml configuration file.
 Future<ProjectConfig> _parseConfigFile(File file) async {
   final content = await file.readAsString();
   final lines = content.split('\n');
@@ -250,7 +252,7 @@ Future<ProjectConfig> _parseConfigFile(File file) async {
     dbConfig = DatabaseConfig(
       host: host ?? 'localhost',
       port: port,
-      database: database ?? 'dartonic',
+      database: database ?? 'jao',
       username: username,
       password: password,
       useSsl: useSsl,
@@ -261,7 +263,7 @@ Future<ProjectConfig> _parseConfigFile(File file) async {
     dbConfig = DatabaseConfig(
       host: host ?? 'localhost',
       port: port,
-      database: database ?? 'dartonic',
+      database: database ?? 'jao',
       username: username,
       password: password,
       useSsl: useSsl,
@@ -308,7 +310,7 @@ Future<void> _makeEmptyMigration(List<String> args) async {
 
   if (name == null || name.isEmpty) {
     print('\x1B[31m✗\x1B[0m Migration name is required.');
-    print('Usage: dartonic make -n=<name>');
+    print('Usage: jao make -n=<name>');
     exit(1);
   }
 
@@ -334,7 +336,7 @@ Future<void> _makeEmptyMigration(List<String> args) async {
 
   // Generate content
   final content =
-      '''import 'package:dartonic/dartonic.dart';
+      '''import 'package:jao/jao.dart';
 
 /// Migration: $migrationName
 class $className extends Migration {
@@ -344,7 +346,7 @@ class $className extends Migration {
   @override
   void up(MigrationBuilder builder) {
     // Add your schema changes here
-    // 
+    //
     // Example - Create a table:
     // builder.createTable('users', (table) {
     //   table.id();
@@ -396,10 +398,10 @@ String _toPascalCase(String input) {
       .join('');
 }
 
-/// Initialize a new dartonic project.
+/// Initialize a new jao project.
 Future<void> _initProject(List<String> args) async {
-  print('\n\x1B[1mInitializing Dartonic Project\x1B[0m');
-  print('─' * 28);
+  print('\n\x1B[1mInitializing JAO Project\x1B[0m');
+  print('─' * 24);
 
   // Determine database type
   String dbType = 'sqlite';
@@ -409,9 +411,9 @@ Future<void> _initProject(List<String> args) async {
     }
   }
 
-  // Create dartonic.yaml
+  // Create jao.yaml
   final configContent =
-      '''# Dartonic Configuration
+      '''# JAO Configuration
 # Database settings
 
 type: $dbType
@@ -426,8 +428,8 @@ migrations_path: lib/migrations
 models_path: lib/models
 ''';
 
-  File('dartonic.yaml').writeAsStringSync(configContent);
-  print('\x1B[32m✓\x1B[0m Created dartonic.yaml');
+  File('jao.yaml').writeAsStringSync(configContent);
+  print('\x1B[32m✓\x1B[0m Created jao.yaml');
 
   // Create migrations directory
   final migrationsDir = Directory('lib/migrations');
@@ -440,11 +442,11 @@ models_path: lib/models
   final migrationsFile = File('lib/migrations/migrations.dart');
   if (!migrationsFile.existsSync()) {
     migrationsFile.writeAsStringSync('''/// Migrations registry.
-/// 
+///
 /// Import and add your migrations here in order.
 library;
 
-import 'package:dartonic/dartonic.dart';
+import 'package:jao/jao.dart';
 
 // Import your migrations:
 // import '20241227_create_users.dart';
@@ -468,21 +470,21 @@ final allMigrations = <Migration>[
   if (!migrateFile.existsSync()) {
     migrateFile.writeAsStringSync('''#!/usr/bin/env dart
 /// Project migration CLI.
-/// 
+///
 /// Usage:
 ///   dart run bin/migrate.dart migrate
 ///   dart run bin/migrate.dart makemigrations
 ///   dart run bin/migrate.dart status
 ///   dart run bin/migrate.dart rollback
 ///
-/// Or if dartonic is installed globally:
-///   dartonic migrate
-///   dartonic status
+/// Or if jao is installed globally:
+///   jao migrate
+///   jao status
 library;
 
 import 'dart:io';
-import 'package:dartonic/dartonic.dart';
-import 'package:dartonic_cli/dartonic_cli.dart';
+import 'package:jao/jao.dart';
+import 'package:jao_cli/jao_cli.dart';
 
 // Import your migrations
 import '../lib/migrations/migrations.dart';
@@ -491,7 +493,7 @@ void main(List<String> args) async {
   // Database configuration
   // Option 1: Read from environment
   // final config = MigrationRunnerConfig.fromEnvironment(migrations: allMigrations);
-  
+
   // Option 2: Explicit configuration
   final config = MigrationRunnerConfig(
     database: DatabaseConfig.${dbType == 'sqlite' ? "sqlite('database.db')" : '''(
@@ -510,7 +512,7 @@ void main(List<String> args) async {
     verbose: args.contains('-v') || args.contains('--verbose'),
   );
 
-  final cli = DartonicCli(config);
+  final cli = JaoCli(config);
   exit(await cli.run(args));
 }
 ''');
@@ -522,16 +524,16 @@ void main(List<String> args) async {
   print('');
   print('  1. Add dependencies to pubspec.yaml:');
   print('     dependencies:');
-  print('       dartonic: ^0.0.1');
+  print('       jao: ^0.0.1');
   print('     dev_dependencies:');
-  print('       dartonic_cli: ^0.0.1');
+  print('       jao_cli: ^0.0.1');
   print('');
   print('  2. Create your first migration:');
-  print('     dartonic make -n=create_users');
+  print('     jao make -n=create_users');
   print('');
   print('  3. Edit the migration file and add to migrations.dart');
   print('');
   print('  4. Run migrations:');
-  print('     dartonic migrate');
+  print('     jao migrate');
   print('');
 }

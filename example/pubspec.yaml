@@ -1,5 +1,5 @@
-name: dartonic_example
-description: Dart Frog API demonstrating dartonic ORM with SQLite.
+name: jao_example
+description: Dart Frog API demonstrating jao ORM with SQLite.
 version: 0.1.0
 publish_to: none
 
@@ -10,14 +10,14 @@ resolution: workspace
 
 dependencies:
   dart_frog: ^1.2.0
-  dartonic:
-    path: ../dartonic
-  dartonic_cli:
-    path: ../dartonic_cli
+  jao:
+    path: ../jao
+  jao_cli:
+    path: ../jao_cli
 
 dev_dependencies:
   build_runner: ^2.4.0
-  dartonic_generator:
-    path: ../dartonic_generator
+  jao_generator:
+    path: ../jao_generator
   test: ^1.24.0
   lints: ^3.0.0

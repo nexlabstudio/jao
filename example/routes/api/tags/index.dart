@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:dart_frog/dart_frog.dart';
-import 'package:dartonic_example/models/models.dart';
+import 'package:jao_example/models/models.dart';
 
 Future<Response> onRequest(RequestContext context) async {
   return switch (context.request.method) {
@@ -14,13 +14,13 @@ Future<Response> onRequest(RequestContext context) async {
 Future<Response> _getTags(RequestContext context) async {
   final params = context.request.uri.queryParameters;
 
-  var query = TagDartonic.objects.all();
+  var query = TagJao.objects.all();
 
   if (params['name'] case final name?) {
-    query = query.filter(TagDartonic.$.name.iContains(name));
+    query = query.filter(TagJao.$.name.iContains(name));
   }
 
-  query = query.orderBy(TagDartonic.$.name.asc());
+  query = query.orderBy(TagJao.$.name.asc());
 
   final tags = await query.toList();
 
@@ -34,13 +34,13 @@ Future<Response> _createTag(RequestContext context) async {
     return Response.json(statusCode: HttpStatus.badRequest, body: {'error': 'name is required'});
   }
 
-  final existing = await TagDartonic.objects.filter(TagDartonic.$.name.eq(body['name'] as String)).first();
+  final existing = await TagJao.objects.filter(TagJao.$.name.eq(body['name'] as String)).first();
 
   if (existing != null) {
     return Response.json(statusCode: HttpStatus.conflict, body: {'error': 'Tag already exists'});
   }
 
-  final tag = await TagDartonic.objects.create({'name': body['name'], 'color': body['color'] ?? '#3B82F6'});
+  final tag = await TagJao.objects.create({'name': body['name'], 'color': body['color'] ?? '#3B82F6'});
 
   return Response.json(statusCode: HttpStatus.created, body: _tagToJson(tag));
 }
