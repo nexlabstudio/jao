@@ -35,15 +35,11 @@ dart pub global activate jao_cli
 jao init
 ```
 
-This creates a `jao.yaml` configuration file:
-
-```yaml
-type: sqlite
-database: database.db
-
-migrations_path: lib/migrations
-models_path: lib/models
-```
+This creates:
+- `jao.yaml` - Paths configuration
+- `lib/config/database.dart` - Database configuration (single source of truth)
+- `lib/migrations/` - Migrations directory
+- `bin/migrate.dart` - Migration CLI entry point
 
 ### 3. Define Models
 
@@ -107,20 +103,50 @@ class Post {
 dart run build_runner build
 ```
 
-### 5. Register Model Schemas
+### 5. Configure Database
+
+Edit `lib/config/database.dart` to configure your database:
+
+```dart
+import 'package:jao/jao.dart';
+
+// SQLite (default)
+final databaseConfig = DatabaseConfig.sqlite('database.db');
+const databaseAdapter = SqliteAdapter();
+
+// PostgreSQL:
+// final databaseConfig = DatabaseConfig.postgres(
+//   database: 'myapp',
+//   username: 'postgres',
+//   password: 'password',
+// );
+// const databaseAdapter = PostgresAdapter();
+
+// MySQL:
+// final databaseConfig = DatabaseConfig.mysql(
+//   database: 'myapp',
+//   username: 'root',
+//   password: 'password',
+// );
+// const databaseAdapter = MySqlAdapter();
+```
+
+### 6. Register Model Schemas
 
 After code generation, register your model schemas in `bin/migrate.dart`:
 
 ```dart
-import 'package:jao/jao.dart';
+import 'dart:io';
 import 'package:jao_cli/jao_cli.dart';
 import 'package:your_app/models/models.dart';
+
+import '../lib/config/database.dart';
 import '../lib/migrations/migrations.dart';
 
 void main(List<String> args) async {
   final config = MigrationRunnerConfig(
-    database: DatabaseConfig.sqlite('database.db'),
-    adapter: const SqliteAdapter(),
+    database: databaseConfig,
+    adapter: databaseAdapter,
     migrations: allMigrations,
     modelSchemas: [
       Authors.schema,
@@ -134,7 +160,7 @@ void main(List<String> args) async {
 }
 ```
 
-### 6. Create & Run Migrations
+### 7. Create & Run Migrations
 
 ```bash
 jao makemigrations
@@ -142,20 +168,21 @@ jao makemigrations
 jao migrate
 ```
 
-### 7. Initialize Database (once at startup)
+### 8. Initialize Database (once at startup)
 
 ```dart
 import 'package:jao/jao.dart';
+import 'lib/config/database.dart';
 
 Future<void> initializeDatabase() async {
   await Jao.configure(
-    adapter: SqliteAdapter(),
-    config: DatabaseConfig.sqlite('database.db'),
+    adapter: databaseAdapter,
+    config: databaseConfig,
   );
 }
 ```
 
-### 8. Query Your Data
+### 9. Query Your Data
 
 No middleware needed - just query directly in your handlers:
 
@@ -329,47 +356,13 @@ await Authors.objects
 ## CLI Commands
 
 ```bash
-jao init            # Initialize project with jao.yaml
+jao init            # Initialize project structure
 jao makemigrations  # Auto-detect model changes and create migration
 jao migrate         # Run pending migrations
 jao status          # Show migration status
 jao rollback        # Rollback last migration
 jao reset           # Rollback all migrations
 jao refresh         # Reset and re-run all migrations
-```
-
-## Database Configuration
-
-### SQLite
-
-```yaml
-# jao.yaml
-type: sqlite
-database: database.db
-```
-
-### PostgreSQL
-
-```yaml
-# jao.yaml
-type: postgres
-host: localhost
-port: 5432
-database: myapp
-username: user
-password: pass
-```
-
-### MySQL
-
-```yaml
-# jao.yaml
-type: mysql
-host: localhost
-port: 3306
-database: myapp
-username: user
-password: pass
 ```
 
 ## Framework Integration
@@ -386,10 +379,12 @@ import 'dart:io';
 import 'package:dart_frog/dart_frog.dart';
 import 'package:jao/jao.dart';
 
+import 'lib/config/database.dart';
+
 Future<HttpServer> run(Handler handler, InternetAddress ip, int port) async {
   await Jao.configure(
-    adapter: SqliteAdapter(),
-    config: DatabaseConfig.sqlite('database.db'),
+    adapter: databaseAdapter,
+    config: databaseConfig,
   );
   return serve(handler, ip, port);
 }
@@ -398,15 +393,17 @@ Future<HttpServer> run(Handler handler, InternetAddress ip, int port) async {
 Option 2: Initialize in middleware
 
 ```dart
-// lib/_middleware.dart
+// routes/_middleware.dart
 import 'package:dart_frog/dart_frog.dart';
 import 'package:jao/jao.dart';
+
+import '../lib/config/database.dart';
 
 Handler middleware(Handler handler) {
   return (context) async {
     await Jao.configure(
-      adapter: SqliteAdapter(),
-      config: DatabaseConfig.sqlite('database.db'),
+      adapter: databaseAdapter,
+      config: databaseConfig,
     );
     return handler(context);
   };
@@ -422,11 +419,13 @@ import 'package:shelf/shelf_io.dart' as io;
 import 'package:jao/jao.dart';
 import 'package:your_app/models/models.dart';
 
+import 'lib/config/database.dart';
+
 void main() async {
   // Initialize ORM
   await Jao.configure(
-    adapter: SqliteAdapter(),
-    config: DatabaseConfig.sqlite('database.db'),
+    adapter: databaseAdapter,
+    config: databaseConfig,
   );
 
   // Define routes
@@ -455,11 +454,13 @@ import 'package:serinus/serinus.dart';
 import 'package:jao/jao.dart';
 import 'package:your_app/models/models.dart';
 
+import 'lib/config/database.dart';
+
 void main() async {
   // Initialize ORM before app starts
   await Jao.configure(
-    adapter: SqliteAdapter(),
-    config: DatabaseConfig.sqlite('database.db'),
+    adapter: databaseAdapter,
+    config: databaseConfig,
   );
 
   final app = await serinus.createApplication(entrypoint: AppModule());
@@ -485,11 +486,13 @@ import 'package:alfred/alfred.dart';
 import 'package:jao/jao.dart';
 import 'package:your_app/models/models.dart';
 
+import 'lib/config/database.dart';
+
 void main() async {
   // Initialize ORM
   await Jao.configure(
-    adapter: SqliteAdapter(),
-    config: DatabaseConfig.sqlite('database.db'),
+    adapter: databaseAdapter,
+    config: databaseConfig,
   );
 
   final app = Alfred();
@@ -517,18 +520,15 @@ import 'package:conduit/conduit.dart';
 import 'package:jao/jao.dart';
 import 'package:your_app/models/models.dart';
 
+import 'lib/config/database.dart';
+
 class AppChannel extends ApplicationChannel {
   @override
   Future prepare() async {
     // Initialize ORM
     await Jao.configure(
-      adapter: PostgresAdapter(),
-      config: DatabaseConfig.postgres(
-        host: 'localhost',
-        database: 'myapp',
-        username: 'user',
-        password: 'pass',
-      ),
+      adapter: databaseAdapter,
+      config: databaseConfig,
     );
   }
 
@@ -563,19 +563,16 @@ import 'package:serverpod/serverpod.dart';
 import 'package:jao/jao.dart';
 import 'package:your_app/models/models.dart';
 
+import 'lib/config/database.dart';
+
 void run(List<String> args) async {
   final pod = Serverpod(args, /* ... */);
 
   // Initialize ORM in onStart
   await pod.start(onStart: () async {
     await Jao.configure(
-      adapter: PostgresAdapter(),
-      config: DatabaseConfig.postgres(
-        host: 'localhost',
-        database: 'myapp',
-        username: 'user',
-        password: 'pass',
-      ),
+      adapter: databaseAdapter,
+      config: databaseConfig,
     );
   });
 }
