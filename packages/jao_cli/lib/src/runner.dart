@@ -254,6 +254,47 @@ final allMigrations = <Migration>[
       output.success('Created lib/migrations/migrations.dart');
     }
 
+    // Create lib/config directory and database.dart
+    final configDir = Directory('lib/config');
+    if (!configDir.existsSync()) {
+      configDir.createSync(recursive: true);
+    }
+
+    final databaseConfigFile = File('lib/config/database.dart');
+    if (!databaseConfigFile.existsSync()) {
+      databaseConfigFile.writeAsStringSync(r'''/// Database configuration.
+///
+/// This is the single source of truth for database settings.
+/// Used by both the migration CLI and the application runtime.
+library;
+
+import 'package:jao/jao.dart';
+
+/// Database configuration.
+final databaseConfig = DatabaseConfig.sqlite('database.db');
+
+/// Database adapter.
+const databaseAdapter = SqliteAdapter();
+
+// PostgreSQL example:
+// final databaseConfig = DatabaseConfig.postgres(
+//   database: 'myapp',
+//   username: String.fromEnvironment('DB_USER', defaultValue: 'postgres'),
+//   password: String.fromEnvironment('DB_PASSWORD', defaultValue: 'password'),
+// );
+// const databaseAdapter = PostgresAdapter();
+
+// MySQL example:
+// final databaseConfig = DatabaseConfig.mysql(
+//   database: 'myapp',
+//   username: String.fromEnvironment('DB_USER', defaultValue: 'root'),
+//   password: String.fromEnvironment('DB_PASSWORD', defaultValue: 'password'),
+// );
+// const databaseAdapter = MySqlAdapter();
+''');
+      output.success('Created lib/config/database.dart');
+    }
+
     final binDir = Directory('bin');
     if (!binDir.existsSync()) {
       binDir.createSync();
@@ -276,24 +317,15 @@ final allMigrations = <Migration>[
 library;
 
 import 'dart:io';
-import 'package:jao/jao.dart';
 import 'package:jao_cli/jao_cli.dart';
 
-// Import your migrations
+import '../lib/config/database.dart';
 import '../lib/migrations/migrations.dart';
 
 void main(List<String> args) async {
-  // Database configuration
   final config = MigrationRunnerConfig(
-    // SQLite example:
-    database: DatabaseConfig.sqlite('database.db'),
-    adapter: const SqliteAdapter(),
-    // PostgreSQL example:
-    // database: DatabaseConfig.postgres(database: 'myapp', username: 'postgres', password: 'password'),
-    // adapter: const PostgresAdapter(),
-    // MySQL example:
-    // database: DatabaseConfig.mysql(database: 'myapp', username: 'root', password: 'password'),
-    // adapter: const MySqlAdapter(),
+    database: databaseConfig,
+    adapter: databaseAdapter,
     migrations: allMigrations,
     verbose: args.contains('-v') || args.contains('--verbose'),
   );
@@ -311,13 +343,11 @@ void main(List<String> args) async {
     print('  1. Add dependencies to pubspec.yaml:');
     print('     dependencies:');
     print('       jao: ^0.0.1');
-    print('     dev_dependencies:');
-    print('       jao_cli: ^0.0.1');
     print('');
-    print('  2. Create your first migration:');
+    print('  2. Configure database in lib/config/database.dart');
+    print('');
+    print('  3. Create your first migration:');
     print('     jao make -n=create_users');
-    print('');
-    print('  3. Edit the migration file and add to migrations.dart');
     print('');
     print('  4. Run migrations:');
     print('     jao migrate');
@@ -342,11 +372,13 @@ Usage: jao init
 
 This command creates:
   - jao.yaml (paths configuration)
+  - lib/config/database.dart (database configuration)
   - lib/migrations/ (migrations directory)
   - lib/migrations/migrations.dart (migrations registry)
-  - bin/migrate.dart (project CLI with database configuration)
+  - bin/migrate.dart (migration CLI)
 
-Database configuration is done in bin/migrate.dart using DatabaseConfig.
+Database configuration is centralized in lib/config/database.dart.
+Import it in your application to use the same settings.
 ''');
       case 'makemigrations':
         print('''

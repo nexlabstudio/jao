@@ -47,8 +47,10 @@ jao init
 ```
 
 This creates:
-- `jao.yaml` - Configuration file
+- `jao.yaml` - Paths configuration
+- `lib/config/database.dart` - Database configuration (single source of truth)
 - `lib/migrations/` - Migrations directory
+- `bin/migrate.dart` - Migration CLI
 
 ## Defining Models
 
@@ -132,6 +134,40 @@ Check migration status:
 jao status
 ```
 
+## Database Configuration
+
+The database configuration lives in `lib/config/database.dart`. This is the single source of truth used by both migrations and your application:
+
+```dart
+import 'package:jao/jao.dart';
+
+/// Database configuration.
+final databaseConfig = DatabaseConfig.sqlite('database.db');
+
+/// Database adapter.
+const databaseAdapter = SqliteAdapter();
+```
+
+For PostgreSQL or MySQL, update the config:
+
+```dart
+// PostgreSQL
+final databaseConfig = DatabaseConfig.postgres(
+  database: 'myapp',
+  username: 'postgres',
+  password: 'password',
+);
+const databaseAdapter = PostgresAdapter();
+
+// MySQL
+final databaseConfig = DatabaseConfig.mysql(
+  database: 'myapp',
+  username: 'root',
+  password: 'password',
+);
+const databaseAdapter = MySqlAdapter();
+```
+
 ## Database Middleware
 
 Create `routes/_middleware.dart` to initialize the database connection:
@@ -140,11 +176,13 @@ Create `routes/_middleware.dart` to initialize the database connection:
 import 'package:dart_frog/dart_frog.dart';
 import 'package:jao/jao.dart';
 
+import '../lib/config/database.dart';
+
 Handler middleware(Handler handler) {
   return (context) async {
     await Jao.configure(
-      adapter: SqliteAdapter(),
-      config: DatabaseConfig.sqlite('database.db'),
+      adapter: databaseAdapter,
+      config: databaseConfig,
     );
     return handler(context);
   };
