@@ -20,4 +20,4 @@ dev_dependencies:
   jao_generator:
     path: ../jao_generator
   test: ^1.24.0
-  lints: ^3.0.0
+  lints: ^6.0.0

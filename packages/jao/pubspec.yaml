@@ -16,9 +16,9 @@ dependencies:
   # Database drivers
   postgres: ^3.1.0
   mysql1: ^0.20.0
-  sqlite3: ^2.4.0
+  sqlite3: ^3.1.1
 
 dev_dependencies:
   coverage: ^1.15.0
   test: ^1.24.0
-  lints: ^3.0.0
+  lints: ^6.0.0
