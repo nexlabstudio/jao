@@ -24,14 +24,14 @@ jobs:
       - name: Verify formatting
         run: dart format . -l 120 --output=none --set-exit-if-changed .
 
-      # - name: Analyze jao
-      #   run: dart analyze --fatal-infos packages/jao
+      - name: Analyze jao
+        run: dart analyze --fatal-infos packages/jao
 
-      # - name: Analyze jao_cli
-      #   run: dart analyze --fatal-infos packages/jao_cli
+      - name: Analyze jao_cli
+        run: dart analyze --fatal-infos packages/jao_cli
 
-      # - name: Analyze jao_generator
-      #   run: dart analyze --fatal-infos packages/jao_generator
+      - name: Analyze jao_generator
+        run: dart analyze --fatal-infos packages/jao_generator
 
   test:
     name: Test
