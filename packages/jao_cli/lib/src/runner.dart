@@ -680,22 +680,15 @@ class $className extends Migration {
     return 'AutoMigration';
   }
 
-  String _describeOperation(MigrationOperation op) {
-    if (op is CreateTable) {
-      return 'Create table "${op.table.name}" with ${op.table.columns.length} columns';
-    } else if (op is DropTable) {
-      return 'Drop table "${op.name}"';
-    } else if (op is AddColumn) {
-      return 'Add column "${op.column.name}" to "${op.table}"';
-    } else if (op is DropColumn) {
-      return 'Drop column "$op.column" from "${op.table}"';
-    } else if (op is CreateIndex) {
-      return 'Create index "${op.index.name}" on "${op.table}"';
-    } else if (op is AddForeignKey) {
-      return 'Add foreign key "${op.foreignKey.column}" on "${op.table}"';
-    }
-    return op.runtimeType.toString();
-  }
+  String _describeOperation(MigrationOperation op) => switch (op) {
+    CreateTable() => 'Create table "${op.table.name}" with ${op.table.columns.length} columns',
+    DropTable() => 'Drop table "${op.name}"',
+    AddColumn() => 'Add column "${op.column.name}" to "${op.table}"',
+    DropColumn() => 'Drop column "$op.column" from "${op.table}"',
+    CreateIndex() => 'Create index "${op.index.name}" on "${op.table}"',
+    AddForeignKey() => 'Add foreign key "${op.foreignKey.column}" on "${op.table}"',
+    _ => op.runtimeType.toString(),
+  };
 
   String _generateTimestamp() {
     final now = DateTime.now();
