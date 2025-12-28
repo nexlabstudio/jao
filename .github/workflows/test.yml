@@ -56,20 +56,10 @@ jobs:
         run: |
           cd packages/${{ matrix.package }}
           dart pub global activate coverage
-          dart test --coverage=coverage
+          dart pub global run coverage:test_with_coverage \
+            --scope-output=${{ matrix.package }} \
+            -- test/
         continue-on-error: ${{ matrix.package != 'jao' }}
-
-      - name: Format coverage
-        run: |
-          cd packages/${{ matrix.package }}
-          if [ -d coverage ]; then
-            dart pub global run coverage:format_coverage \
-              --lcov \
-              --in=coverage \
-              --out=coverage/lcov.info \
-              --report-on=lib
-          fi
-        continue-on-error: true
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v6
