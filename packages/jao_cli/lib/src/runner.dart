@@ -137,7 +137,9 @@ class JaoCli {
 
   ProjectConfig? _projectConfig;
 
-  JaoCli([this.config]) : verbose = config?.verbose ?? false, output = CliOutput(verbose: config?.verbose ?? false);
+  JaoCli([this.config])
+      : verbose = config?.verbose ?? false,
+        output = CliOutput(verbose: config?.verbose ?? false);
 
   ProjectConfig get projectConfig {
     _projectConfig ??= ProjectConfig.load();
@@ -226,8 +228,7 @@ Run 'jao help <command>' for more information.
     }
 
     // Create jao.yaml
-    final configContent =
-        '''# JAO Configuration
+    final configContent = '''# JAO Configuration
 # Database settings
 
 type: $dbType
@@ -314,11 +315,7 @@ void main(List<String> args) async {
       username: '${dbType == 'mysql' ? 'root' : 'postgres'}',
       password: 'password',
     )'''},
-    adapter: const ${dbType == 'sqlite'
-          ? 'SqliteAdapter'
-          : dbType == 'mysql'
-          ? 'MySqlAdapter'
-          : 'PostgresAdapter'}(),
+    adapter: const ${dbType == 'sqlite' ? 'SqliteAdapter' : dbType == 'mysql' ? 'MySqlAdapter' : 'PostgresAdapter'}(),
     migrations: allMigrations,
     verbose: args.contains('-v') || args.contains('--verbose'),
   );
@@ -611,8 +608,7 @@ Options:
     final fileName = '$migrationName.dart';
     final fullPath = '$path/$fileName';
 
-    final content =
-        '''import 'package:jao/jao.dart';
+    final content = '''import 'package:jao/jao.dart';
 
 /// Migration: $migrationName
 class $className extends Migration {
@@ -681,14 +677,14 @@ class $className extends Migration {
   }
 
   String _describeOperation(MigrationOperation op) => switch (op) {
-    CreateTable() => 'Create table "${op.table.name}" with ${op.table.columns.length} columns',
-    DropTable() => 'Drop table "${op.name}"',
-    AddColumn() => 'Add column "${op.column.name}" to "${op.table}"',
-    DropColumn() => 'Drop column "$op.column" from "${op.table}"',
-    CreateIndex() => 'Create index "${op.index.name}" on "${op.table}"',
-    AddForeignKey() => 'Add foreign key "${op.foreignKey.column}" on "${op.table}"',
-    _ => op.runtimeType.toString(),
-  };
+        CreateTable() => 'Create table "${op.table.name}" with ${op.table.columns.length} columns',
+        DropTable() => 'Drop table "${op.name}"',
+        AddColumn() => 'Add column "${op.column.name}" to "${op.table}"',
+        DropColumn() => 'Drop column "$op.column" from "${op.table}"',
+        CreateIndex() => 'Create index "${op.index.name}" on "${op.table}"',
+        AddForeignKey() => 'Add foreign key "${op.foreignKey.column}" on "${op.table}"',
+        _ => op.runtimeType.toString(),
+      };
 
   String _generateTimestamp() {
     final now = DateTime.now();
@@ -1015,8 +1011,7 @@ class $className extends Migration {
       output.info('Created directory: $path');
     }
 
-    final content =
-        '''import 'package:jao/jao.dart';
+    final content = '''import 'package:jao/jao.dart';
 
 class $className extends Migration {
   @override
@@ -1087,8 +1082,7 @@ class $className extends Migration {
           newListContent = '$listContent,\n  $migrationInstance\n';
         }
 
-        content =
-            content.substring(0, match.start) +
+        content = content.substring(0, match.start) +
             'final allMigrations = <Migration>[$newListContent]' +
             content.substring(match.end);
       }
@@ -1106,12 +1100,10 @@ class $className extends Migration {
   }
 
   String _toSnakeCase(String input) {
-    return input
-        .replaceAllMapped(RegExp(r'[A-Z]'), (match) {
-          if (match.group(0) case final g?) return '_${g.toLowerCase()}';
-          return '';
-        })
-        .replaceFirst(RegExp(r'^_'), '');
+    return input.replaceAllMapped(RegExp(r'[A-Z]'), (match) {
+      if (match.group(0) case final g?) return '_${g.toLowerCase()}';
+      return '';
+    }).replaceFirst(RegExp(r'^_'), '');
   }
 }
 

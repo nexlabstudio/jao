@@ -416,8 +416,7 @@ void main() {
             .boolean('active', defaultValue: true)
             .timestamps()
             .foreignKey('category_id', 'categories')
-            .index(['name'])
-            .build();
+            .index(['name']).build();
 
         expect(table.name, equals('complex'));
         expect(table.columns.length, equals(8)); // id, name, desc, count, active, created_at, updated_at, category_id

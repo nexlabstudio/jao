@@ -276,8 +276,7 @@ class MigrationRunner {
     await pool.withConnection((conn) async {
       final exists = await adapter.tableExists(conn, migrationsTable);
       if (!exists) {
-        final sql =
-            '''
+        final sql = '''
           CREATE TABLE ${adapter.dialect.quoteIdentifier(migrationsTable)} (
             id SERIAL PRIMARY KEY,
             name VARCHAR(255) NOT NULL UNIQUE,

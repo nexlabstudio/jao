@@ -26,9 +26,9 @@ class Jao {
   static Jao? _instance;
 
   static Jao get instance => switch (_instance) {
-    final i? => i,
-    null => throw StateError('Jao not initialized. Call Jao.configure() first.'),
-  };
+        final i? => i,
+        null => throw StateError('Jao not initialized. Call Jao.configure() first.'),
+      };
 
   static bool get isInitialized => _instance != null;
 

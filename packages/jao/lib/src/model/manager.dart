@@ -10,8 +10,8 @@ class Manager<T> {
   final List<Q> _baseFilters;
 
   const Manager({QueryExecutor<T>? executor, List<Q> baseFilters = const []})
-    : _executor = executor,
-      _baseFilters = baseFilters;
+      : _executor = executor,
+        _baseFilters = baseFilters;
 
   QuerySet<T> _baseQuerySet() {
     final executor = _executor ?? (Jao.isInitialized ? Jao.instance.executor<T>() : null);

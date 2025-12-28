@@ -125,7 +125,7 @@ class Trim extends FunctionCall {
 @immutable
 class Substr extends FunctionCall {
   Substr(Expression expr, int start, [int? length])
-    : super('SUBSTR', [expr, Value(start), if (length != null) Value(length)]);
+      : super('SUBSTR', [expr, Value(start), if (length != null) Value(length)]);
 }
 
 /// Concatenate strings

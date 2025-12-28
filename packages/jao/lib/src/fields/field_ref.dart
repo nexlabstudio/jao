@@ -82,12 +82,12 @@ abstract class ComparableFieldRef<T> extends FieldRef<T> {
 
   /// Between: field BETWEEN low AND high
   Q between(T low, T high) => Q(
-    BooleanExpr(
-      Comparison(col, ComparisonOp.gte, Value(low)),
-      BooleanOp.and,
-      Comparison(col, ComparisonOp.lte, Value(high)),
-    ),
-  );
+        BooleanExpr(
+          Comparison(col, ComparisonOp.gte, Value(low)),
+          BooleanOp.and,
+          Comparison(col, ComparisonOp.lte, Value(high)),
+        ),
+      );
 
   /// Compare less than another field
   Q ltField(FieldRef<T> other) => Q(Comparison(col, ComparisonOp.lt, other.col));
@@ -121,10 +121,10 @@ abstract class NumericFieldRef<T extends num> extends ComparableFieldRef<T> {
   ArithmeticExpr operator %(Object other) => ArithmeticExpr(col, ArithmeticOp.modulo, _toExpr(other));
 
   Expression _toExpr(Object value) => switch (value) {
-    Expression e => e,
-    FieldRef f => f.col,
-    _ => Value(value),
-  };
+        Expression e => e,
+        FieldRef f => f.col,
+        _ => Value(value),
+      };
 }
 
 // === Concrete Field Reference Types ===

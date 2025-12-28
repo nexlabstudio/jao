@@ -290,19 +290,19 @@ class SqlCompiler {
       ComparisonOp.isNotNull => '$left IS NOT NULL',
       ComparisonOp.between => throw UnsupportedError('Use BooleanExpr for BETWEEN'),
       _ => () {
-        final right = compileExpression(expr.right);
-        return switch (expr.op) {
-          ComparisonOp.eq => '$left = $right',
-          ComparisonOp.ne => '$left != $right',
-          ComparisonOp.lt => '$left < $right',
-          ComparisonOp.lte => '$left <= $right',
-          ComparisonOp.gt => '$left > $right',
-          ComparisonOp.gte => '$left >= $right',
-          ComparisonOp.like => '$left LIKE $right',
-          ComparisonOp.ilike => dialect.caseInsensitiveLike(left, right),
-          _ => throw StateError('Unhandled comparison op: ${expr.op}'),
-        };
-      }(),
+          final right = compileExpression(expr.right);
+          return switch (expr.op) {
+            ComparisonOp.eq => '$left = $right',
+            ComparisonOp.ne => '$left != $right',
+            ComparisonOp.lt => '$left < $right',
+            ComparisonOp.lte => '$left <= $right',
+            ComparisonOp.gt => '$left > $right',
+            ComparisonOp.gte => '$left >= $right',
+            ComparisonOp.like => '$left LIKE $right',
+            ComparisonOp.ilike => dialect.caseInsensitiveLike(left, right),
+            _ => throw StateError('Unhandled comparison op: ${expr.op}'),
+          };
+        }(),
     };
   }
 

@@ -532,6 +532,5 @@ $modelSource
 /// Fake BuildStep for testing - generator doesn't actually use it.
 class _FakeBuildStep implements BuildStep {
   @override
-  Never noSuchMethod(Invocation invocation) =>
-      throw UnimplementedError('FakeBuildStep.${invocation.memberName}');
+  Never noSuchMethod(Invocation invocation) => throw UnimplementedError('FakeBuildStep.${invocation.memberName}');
 }

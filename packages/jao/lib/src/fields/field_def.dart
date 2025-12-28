@@ -360,7 +360,7 @@ class ForeignKey extends Field {
 @immutable
 class OneToOneField extends ForeignKey {
   const OneToOneField(super.to, {super.onDelete, super.relatedName, super.column, super.nullable, super.helpText})
-    : super(index: true);
+      : super(index: true);
 }
 
 /// Many-to-many relationship

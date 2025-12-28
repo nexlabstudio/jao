@@ -154,8 +154,8 @@ class ValidationError implements Exception {
 
   /// Create a validation error for a single field
   factory ValidationError.forField(String field, String message) => ValidationError({
-    field: [message],
-  });
+        field: [message],
+      });
 
   @override
   String toString() {

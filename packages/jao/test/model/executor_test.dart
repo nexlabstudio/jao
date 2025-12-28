@@ -589,9 +589,8 @@ void main() {
           {'name': 'Bob', 'age': 30},
         ]);
 
-        final authors = await manager
-            .filter(Q(const Comparison(ColumnRef('age'), ComparisonOp.eq, Value(25))))
-            .toList();
+        final authors =
+            await manager.filter(Q(const Comparison(ColumnRef('age'), ComparisonOp.eq, Value(25)))).toList();
         expect(authors.length, equals(1));
         expect(authors[0].name, equals('Alice'));
       });
@@ -604,9 +603,8 @@ void main() {
           {'name': 'Bob', 'age': 30},
         ]);
 
-        final authors = await manager
-            .exclude(Q(const Comparison(ColumnRef('age'), ComparisonOp.eq, Value(25))))
-            .toList();
+        final authors =
+            await manager.exclude(Q(const Comparison(ColumnRef('age'), ComparisonOp.eq, Value(25)))).toList();
         expect(authors.length, equals(1));
         expect(authors[0].name, equals('Bob'));
       });
@@ -904,9 +902,8 @@ void main() {
         executor: executor,
       );
 
-      final authors = await manager
-          .filter(Q(const Comparison(ColumnRef('name'), ComparisonOp.like, Value('A%'))))
-          .toList();
+      final authors =
+          await manager.filter(Q(const Comparison(ColumnRef('name'), ComparisonOp.like, Value('A%')))).toList();
       expect(authors.length, equals(2));
     });
   });

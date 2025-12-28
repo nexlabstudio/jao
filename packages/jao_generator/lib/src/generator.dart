@@ -312,12 +312,10 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
   }
 
   String _toSnakeCase(String input) {
-    return input
-        .replaceAllMapped(RegExp(r'[A-Z]'), (match) {
-          if (match.group(0) case final g?) return '_${g.toLowerCase()}';
-          return '';
-        })
-        .replaceFirst(RegExp(r'^_'), '');
+    return input.replaceAllMapped(RegExp(r'[A-Z]'), (match) {
+      if (match.group(0) case final g?) return '_${g.toLowerCase()}';
+      return '';
+    }).replaceFirst(RegExp(r'^_'), '');
   }
 
   String _generateFromRowField(_FieldInfo field, String columnName) {
