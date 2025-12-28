@@ -11,8 +11,7 @@ environment:
 resolution: workspace
 
 dependencies:
-  jao:
-    path: ../jao
+  jao: ^0.0.1
 
 dev_dependencies:
   coverage: ^1.15.0
