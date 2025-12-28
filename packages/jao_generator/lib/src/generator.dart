@@ -143,8 +143,9 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
 
   _FieldInfo? _inferFieldType(FieldElement field) {
     final type = field.type;
-    final typeName = type.getDisplayString();
     final nullable = type.nullabilitySuffix != NullabilitySuffix.none;
+    final rawTypeName = type.getDisplayString();
+    final typeName = rawTypeName.endsWith('?') ? rawTypeName.substring(0, rawTypeName.length - 1) : rawTypeName;
 
     switch (typeName) {
       case 'String':
@@ -319,7 +320,8 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
   }
 
   String _generateFromRowField(_FieldInfo field, String columnName) {
-    final dartTypeName = field.dartType.getDisplayString();
+    final rawTypeName = field.dartType.getDisplayString();
+    final dartTypeName = rawTypeName.endsWith('?') ? rawTypeName.substring(0, rawTypeName.length - 1) : rawTypeName;
     final isNullable = field.nullable;
 
     if (dartTypeName == 'DateTime') {
@@ -350,7 +352,8 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
   }
 
   String _generateToRowField(_FieldInfo field, String prefix) {
-    final dartTypeName = field.dartType.getDisplayString();
+    final rawTypeName = field.dartType.getDisplayString();
+    final dartTypeName = rawTypeName.endsWith('?') ? rawTypeName.substring(0, rawTypeName.length - 1) : rawTypeName;
 
     if (dartTypeName == 'DateTime') {
       if (field.nullable) {
