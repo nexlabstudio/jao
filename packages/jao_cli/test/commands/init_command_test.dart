@@ -37,11 +37,10 @@ environment:
       expect(File('jao.yaml').existsSync(), isTrue);
     });
 
-    test('jao.yaml has correct structure', () async {
+    test('jao.yaml has correct structure (paths only)', () async {
       await cli.run(['init']);
 
       final content = File('jao.yaml').readAsStringSync();
-      expect(content, contains('type:'));
       expect(content, contains('migrations_path:'));
       expect(content, contains('models_path:'));
     });
@@ -63,6 +62,32 @@ environment:
       expect(content, contains('<Migration>'));
     });
 
+    test('Creates lib/config/ directory', () async {
+      await cli.run(['init']);
+
+      expect(Directory('lib/config').existsSync(), isTrue);
+    });
+
+    test('Creates lib/config/database.dart', () async {
+      await cli.run(['init']);
+
+      final file = File('lib/config/database.dart');
+      expect(file.existsSync(), isTrue);
+
+      final content = file.readAsStringSync();
+      expect(content, contains('databaseConfig'));
+      expect(content, contains('databaseAdapter'));
+      expect(content, contains('package:jao/jao.dart'));
+    });
+
+    test('lib/config/database.dart has SQLite as default', () async {
+      await cli.run(['init']);
+
+      final content = File('lib/config/database.dart').readAsStringSync();
+      expect(content, contains('DatabaseConfig.sqlite'));
+      expect(content, contains('SqliteAdapter'));
+    });
+
     test('Creates bin/migrate.dart', () async {
       await cli.run(['init']);
 
@@ -70,68 +95,35 @@ environment:
       expect(file.existsSync(), isTrue);
 
       final content = file.readAsStringSync();
-      expect(content, contains('package:jao/jao.dart'));
       expect(content, contains('package:jao_cli/jao_cli.dart'));
       expect(content, contains('JaoCli'));
     });
 
-    test('--db=sqlite sets SQLite config (default)', () async {
-      await cli.run(['init', '--db=sqlite']);
-
-      final content = File('jao.yaml').readAsStringSync();
-      expect(content, contains('type: sqlite'));
-      expect(content, contains('database: database.db'));
-    });
-
-    test('--db=postgres sets PostgreSQL config', () async {
-      await cli.run(['init', '--db=postgres']);
-
-      final content = File('jao.yaml').readAsStringSync();
-      expect(content, contains('type: postgres'));
-      expect(content, contains('port: 5432'));
-      expect(content, contains('host: localhost'));
-    });
-
-    test('--db=mysql sets MySQL config', () async {
-      await cli.run(['init', '--db=mysql']);
-
-      final content = File('jao.yaml').readAsStringSync();
-      expect(content, contains('type: mysql'));
-      expect(content, contains('port: 3306'));
-    });
-
-    test('bin/migrate.dart uses correct adapter for sqlite', () async {
-      await cli.run(['init', '--db=sqlite']);
+    test('bin/migrate.dart imports from lib/config/database.dart', () async {
+      await cli.run(['init']);
 
       final content = File('bin/migrate.dart').readAsStringSync();
-      expect(content, contains('SqliteAdapter'));
-      expect(content, contains("DatabaseConfig.sqlite"));
+      expect(content, contains("import '../lib/config/database.dart'"));
+      expect(content, contains('databaseConfig'));
+      expect(content, contains('databaseAdapter'));
     });
 
-    test('bin/migrate.dart uses correct adapter for postgres', () async {
-      await cli.run(['init', '--db=postgres']);
+    test('bin/migrate.dart imports migrations', () async {
+      await cli.run(['init']);
 
       final content = File('bin/migrate.dart').readAsStringSync();
-      expect(content, contains('PostgresAdapter'));
-    });
-
-    test('bin/migrate.dart uses correct adapter for mysql', () async {
-      await cli.run(['init', '--db=mysql']);
-
-      final content = File('bin/migrate.dart').readAsStringSync();
-      expect(content, contains('MySqlAdapter'));
+      expect(content, contains("import '../lib/migrations/migrations.dart'"));
+      expect(content, contains('allMigrations'));
     });
 
     test('Does not overwrite existing jao.yaml', () async {
-      final originalContent = '# Original config\ntype: sqlite\n';
+      final originalContent = '# Original config\nmigrations_path: custom/path\n';
       File('jao.yaml').writeAsStringSync(originalContent);
 
       await cli.run(['init']);
 
-      // File should be overwritten (init always writes)
       final content = File('jao.yaml').readAsStringSync();
-      // The init command will overwrite - this tests current behavior
-      expect(content, contains('type: sqlite'));
+      expect(content, contains('migrations_path: lib/migrations'));
     });
 
     test('Does not overwrite existing migrations.dart', () async {
@@ -141,8 +133,18 @@ environment:
 
       await cli.run(['init']);
 
-      // File should NOT be overwritten
       final content = File('lib/migrations/migrations.dart').readAsStringSync();
+      expect(content, equals(originalContent));
+    });
+
+    test('Does not overwrite existing lib/config/database.dart', () async {
+      Directory('lib/config').createSync(recursive: true);
+      final originalContent = '// Original database config\n';
+      File('lib/config/database.dart').writeAsStringSync(originalContent);
+
+      await cli.run(['init']);
+
+      final content = File('lib/config/database.dart').readAsStringSync();
       expect(content, equals(originalContent));
     });
 
@@ -153,7 +155,6 @@ environment:
 
       await cli.run(['init']);
 
-      // File should NOT be overwritten
       final content = File('bin/migrate.dart').readAsStringSync();
       expect(content, equals(originalContent));
     });
@@ -162,13 +163,6 @@ environment:
       final result = await cli.run(['init']);
 
       expect(result, equals(0));
-    });
-
-    test('--type= is alias for --db=', () async {
-      await cli.run(['init', '--type=postgres']);
-
-      final content = File('jao.yaml').readAsStringSync();
-      expect(content, contains('type: postgres'));
     });
   });
 }
