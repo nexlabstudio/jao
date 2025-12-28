@@ -29,10 +29,11 @@ jao init
 ```
 
 This creates:
-- `jao.yaml` - Database configuration
+- `jao.yaml` - Paths configuration
+- `lib/config/database.dart` - Database configuration (single source of truth)
 - `lib/migrations/` - Migrations directory
 - `lib/migrations/migrations.dart` - Migration registry
-- `bin/migrate.dart` - CLI entry point
+- `bin/migrate.dart` - Migration CLI entry point
 
 ### Create a Migration
 
@@ -53,12 +54,10 @@ jao migrate
 Initialize JAO in your project.
 
 ```bash
-jao init [options]
-
-Options:
-  --db=<type>    Database type: sqlite, postgres, mysql (default: sqlite)
-  --type=<type>  Alias for --db
+jao init
 ```
+
+Creates project structure with centralized database config in `lib/config/database.dart`.
 
 ### `make`
 
@@ -167,11 +166,38 @@ Options:
 
 ### jao.yaml
 
+Paths configuration only:
+
 ```yaml
-type: sqlite
-database: app.db
 migrations_path: lib/migrations
 models_path: lib/models
+```
+
+### lib/config/database.dart
+
+Database configuration (single source of truth for both migrations and runtime):
+
+```dart
+import 'package:jao/jao.dart';
+
+final databaseConfig = DatabaseConfig.sqlite('app.db');
+const databaseAdapter = SqliteAdapter();
+
+// PostgreSQL:
+// final databaseConfig = DatabaseConfig.postgres(
+//   database: 'myapp',
+//   username: 'postgres',
+//   password: 'password',
+// );
+// const databaseAdapter = PostgresAdapter();
+
+// MySQL:
+// final databaseConfig = DatabaseConfig.mysql(
+//   database: 'myapp',
+//   username: 'root',
+//   password: 'password',
+// );
+// const databaseAdapter = MySqlAdapter();
 ```
 
 ### Environment Variables
@@ -205,19 +231,21 @@ DATABASE_URL=sqlite:///path/to/database.db
 ### bin/migrate.dart
 
 ```dart
-import 'package:jao/jao.dart';
+import 'dart:io';
 import 'package:jao_cli/jao_cli.dart';
+
+import '../lib/config/database.dart';
 import '../lib/migrations/migrations.dart';
 
 void main(List<String> args) async {
-  final cli = JaoCli(
-    MigrationRunnerConfig(
-      database: DatabaseConfig.sqlite('app.db'),
-      adapter: const SqliteAdapter(),
-      migrations: allMigrations,
-    ),
+  final config = MigrationRunnerConfig(
+    database: databaseConfig,
+    adapter: databaseAdapter,
+    migrations: allMigrations,
+    verbose: args.contains('-v') || args.contains('--verbose'),
   );
 
+  final cli = JaoCli(config);
   exit(await cli.run(args));
 }
 ```
@@ -229,16 +257,15 @@ void main(List<String> args) async {
 
 ```bash
 # Initialize project
-jao init --db=sqlite
+jao init
 
-# Either you `make` and manually write the migration
-# Create migration
+# Configure database in lib/config/database.dart
+
+# Either manually create a migration:
 jao make -n=create_users_table
-
 # Edit the migration file...
 
-# Or you `makemigrations` and let jao do the rest
-# AutoCreate migrations from Models
+# Or auto-generate from models:
 jao makemigrations
 
 # Apply migrations

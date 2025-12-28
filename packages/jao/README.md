@@ -59,20 +59,45 @@ class User {
 dart run build_runner build
 ```
 
-### 3. Configure Database
+### 3. Initialize JAO
+
+```bash
+dart pub global activate jao_cli
+jao init
+```
+
+This creates `lib/config/database.dart` - your single source of truth for database settings:
 
 ```dart
 import 'package:jao/jao.dart';
 
+final databaseConfig = DatabaseConfig.sqlite('app.db');
+const databaseAdapter = SqliteAdapter();
+
+// PostgreSQL:
+// final databaseConfig = DatabaseConfig.postgres(
+//   database: 'myapp',
+//   username: 'postgres',
+//   password: 'password',
+// );
+// const databaseAdapter = PostgresAdapter();
+```
+
+### 4. Configure at Runtime
+
+```dart
+import 'package:jao/jao.dart';
+import 'lib/config/database.dart';
+
 void main() async {
-  Jao.configure(
-    adapter: SqliteAdapter(),
-    database: DatabaseConfig.sqlite('app.db'),
+  await Jao.configure(
+    adapter: databaseAdapter,
+    config: databaseConfig,
   );
 }
 ```
 
-### 4. Query Data
+### 5. Query Data
 
 ```dart
 // Create
