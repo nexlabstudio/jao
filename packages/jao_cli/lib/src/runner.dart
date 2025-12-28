@@ -855,7 +855,7 @@ class $className extends Migration {
 
     if (dryRun) {
       output.info('Dry run mode - showing SQL only\n');
-      await _showRollbackSql(_config.migrations.length);
+      _showRollbackSql(_config.migrations.length);
       print('');
       return _showPendingMigrationsSql();
     }
