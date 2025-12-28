@@ -11,7 +11,7 @@ environment:
 resolution: workspace
 
 dependencies:
-  analyzer: ^9.0.0
+  analyzer: '>=8.0.0 <10.0.0'
   build: ^4.0.3
   source_gen: ^4.1.1
   jao: ^0.0.1

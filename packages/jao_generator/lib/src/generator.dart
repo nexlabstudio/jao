@@ -13,7 +13,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     }
 
     final classElement = element;
-    final className = classElement.name;
+    final className = classElement.name ?? classElement.displayName;
     final fields = _extractFields(classElement);
     final tableName = annotation.peek('tableName')?.stringValue ?? _toSnakeCase(className);
 
@@ -36,7 +36,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
         final nullable = field.type.nullabilitySuffix != NullabilitySuffix.none;
         fields.add(
           _FieldInfo(
-            name: field.name,
+            name: field.name ?? field.displayName,
             dartType: field.type,
             fieldType: fieldAnnotation.fieldType,
             dbType: fieldAnnotation.dbType,
@@ -60,7 +60,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
   }
 
   _FieldAnnotationInfo? _getFieldAnnotation(FieldElement field) {
-    for (final annotation in field.metadata) {
+    for (final annotation in field.metadata.annotations) {
       final value = annotation.computeConstantValue();
       if (value == null) continue;
 
@@ -149,7 +149,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     switch (typeName) {
       case 'String':
         return _FieldInfo(
-          name: field.name,
+          name: field.name ?? field.displayName,
           dartType: type,
           fieldType: 'StringFieldRef',
           dbType: 'varchar',
@@ -158,7 +158,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
       case 'int':
         final isPk = field.name == 'id';
         return _FieldInfo(
-          name: field.name,
+          name: field.name ?? field.displayName,
           dartType: type,
           fieldType: 'IntFieldRef',
           dbType: isPk ? 'serial' : 'integer',
@@ -168,7 +168,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
         );
       case 'double':
         return _FieldInfo(
-          name: field.name,
+          name: field.name ?? field.displayName,
           dartType: type,
           fieldType: 'DoubleFieldRef',
           dbType: 'doublePrecision',
@@ -176,7 +176,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
         );
       case 'bool':
         return _FieldInfo(
-          name: field.name,
+          name: field.name ?? field.displayName,
           dartType: type,
           fieldType: 'BoolFieldRef',
           dbType: 'boolean',
@@ -184,7 +184,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
         );
       case 'DateTime':
         return _FieldInfo(
-          name: field.name,
+          name: field.name ?? field.displayName,
           dartType: type,
           fieldType: 'DateTimeFieldRef',
           dbType: 'timestampTz',
@@ -192,7 +192,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
         );
       case 'Duration':
         return _FieldInfo(
-          name: field.name,
+          name: field.name ?? field.displayName,
           dartType: type,
           fieldType: 'DurationFieldRef',
           dbType: 'interval',
