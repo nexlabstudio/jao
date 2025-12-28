@@ -1,537 +1,537 @@
+@TestOn('vm')
+library;
+
+import 'package:build/build.dart';
+import 'package:build_test/build_test.dart';
+import 'package:jao_generator/jao_generator.dart';
+import 'package:source_gen/source_gen.dart';
 import 'package:test/test.dart';
 
-// Since source_gen generators are difficult to unit test without the full build system,
-// we test the generator's output patterns and logic through golden-style tests.
-// These tests verify the expected output patterns that the generator produces.
-
 void main() {
-  group('JaoGenerator Output Patterns', () {
-    group('Field Class Generation', () {
-      test('ClassName\$ class pattern', () {
-        // The generator should produce a class named ClassName$
-        const expectedPattern = r'class User\$ implements ModelFields<User>';
-        expect(_sampleGeneratedOutput, contains(RegExp(expectedPattern)));
-      });
+  group('JaoGenerator Tests', () {
+    late JaoGenerator generator;
 
-      test('Const constructor pattern', () {
-        expect(_sampleGeneratedOutput, contains('const User\$();'));
-      });
-
-      test('Implements ModelFields<T>', () {
-        expect(_sampleGeneratedOutput, contains('implements ModelFields<User>'));
-      });
-
-      test('Generates field for each model field', () {
-        expect(_sampleGeneratedOutput, contains('final id ='));
-        expect(_sampleGeneratedOutput, contains('final name ='));
-        expect(_sampleGeneratedOutput, contains('final email ='));
-      });
-
-      test('Uses IntFieldRef for int', () {
-        expect(_sampleGeneratedOutput, contains("IntFieldRef('id')"));
-      });
-
-      test('Uses StringFieldRef for String', () {
-        expect(_sampleGeneratedOutput, contains("StringFieldRef('name')"));
-        expect(_sampleGeneratedOutput, contains("StringFieldRef('email')"));
-      });
-
-      test('Uses BoolFieldRef for bool', () {
-        expect(_sampleGeneratedOutput, contains("BoolFieldRef('is_active')"));
-      });
-
-      test('Uses DateTimeFieldRef for DateTime', () {
-        expect(_sampleGeneratedOutput, contains("DateTimeFieldRef('created_at')"));
-      });
-
-      test('Uses DoubleFieldRef for double', () {
-        expect(_sampleGeneratedOutput, contains("DoubleFieldRef('rating')"));
-      });
-
-      test('Converts camelCase to snake_case for columns', () {
-        expect(_sampleGeneratedOutput, contains("'is_active'"));
-        expect(_sampleGeneratedOutput, contains("'created_at'"));
-      });
-
-      test('Handles nullable fields in schema', () {
-        expect(_sampleNullableOutput, contains('nullable: true'));
-      });
+    setUp(() {
+      generator = JaoGenerator();
     });
 
-    group('Companion Class Generation', () {
-      test('Generates plural class name', () {
-        expect(_sampleGeneratedOutput, contains('class Users {'));
-      });
+    test('generates output for simple model', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  late int id;
+  late String name;
+}
+''');
 
-      test('Generates private constructor', () {
-        expect(_sampleGeneratedOutput, contains('Users._();'));
-      });
-
-      test('Generates static \$ field', () {
-        expect(_sampleGeneratedOutput, contains('static const \$ = User\$();'));
-      });
-
-      test('Generates static objects Manager', () {
-        expect(_sampleGeneratedOutput, contains('static final Manager<User> _objects'));
-        expect(_sampleGeneratedOutput, contains('static Manager<User> get objects'));
-      });
-
-      test('Generates tableName constant', () {
-        expect(_sampleGeneratedOutput, contains("static const tableName = 'user';"));
-      });
-
-      test('Generates pkField constant', () {
-        expect(_sampleGeneratedOutput, contains("static const pkField = 'id';"));
-      });
-
-      test('Generates fieldNames list', () {
-        expect(_sampleGeneratedOutput, contains('static const fieldNames = ['));
-        expect(_sampleGeneratedOutput, contains("'id',"));
-        expect(_sampleGeneratedOutput, contains("'name',"));
-      });
-
-      test('Generates schema ModelSchema', () {
-        expect(_sampleGeneratedOutput, contains('static final schema = ModelSchema('));
-        expect(_sampleGeneratedOutput, contains("className: 'User',"));
-        expect(_sampleGeneratedOutput, contains("tableName: 'user',"));
-      });
+      expect(result, contains('class User\$'));
+      expect(result, contains('implements ModelFields<User>'));
+      expect(result, contains('class Users'));
+      expect(result, contains("IntFieldRef('id')"));
+      expect(result, contains("StringFieldRef('name')"));
     });
 
-    group('fromRow Generation', () {
-      test('Generates fromRow static method', () {
-        expect(_sampleGeneratedOutput, contains('static User fromRow(Map<String, dynamic> row)'));
-      });
+    test('generates output with multiple field types', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class Product {
+  late int id;
+  late String name;
+  late double price;
+  late bool inStock;
+  late DateTime createdAt;
+}
+''');
 
-      test('fromRow returns correct type', () {
-        expect(_sampleGeneratedOutput, contains('return User()'));
-      });
-
-      test('Handles int fields', () {
-        expect(_sampleGeneratedOutput, contains("row['id'] as int"));
-      });
-
-      test('Handles String fields', () {
-        expect(_sampleGeneratedOutput, contains("row['name'] as String"));
-      });
-
-      test('Handles bool fields (int to bool)', () {
-        expect(_sampleGeneratedOutput, contains("row['is_active'] == 1 || row['is_active'] == true"));
-      });
-
-      test('Handles DateTime fields (String to DateTime)', () {
-        expect(_sampleGeneratedOutput, contains("DateTime.parse(row['created_at'] as String)"));
-      });
-
-      test('Handles double fields', () {
-        expect(_sampleGeneratedOutput, contains("row['rating'] as double"));
-      });
-
-      test('Handles nullable String fields', () {
-        expect(_sampleNullableOutput, contains("row['middle_name'] as String?"));
-      });
-
-      test('Handles nullable bool fields', () {
-        expect(_sampleNullableOutput, contains("row['is_verified'] == null ? null :"));
-      });
-
-      test('Handles nullable DateTime fields', () {
-        expect(_sampleNullableOutput, contains("row['deleted_at'] == null ? null : DateTime.parse"));
-      });
-
-      test('Maps snake_case column to camelCase field', () {
-        expect(_sampleGeneratedOutput, contains("..isActive = row['is_active']"));
-        expect(_sampleGeneratedOutput, contains("..createdAt = DateTime.parse(row['created_at']"));
-      });
+      expect(result, contains("IntFieldRef('id')"));
+      expect(result, contains("StringFieldRef('name')"));
+      expect(result, contains("DoubleFieldRef('price')"));
+      expect(result, contains("BoolFieldRef('in_stock')"));
+      expect(result, contains("DateTimeFieldRef('created_at')"));
     });
 
-    group('toRow Generation', () {
-      test('Generates toRow static method', () {
-        expect(_sampleGeneratedOutput, contains('static Map<String, dynamic> toRow(User model)'));
-      });
+    test('respects custom tableName', () async {
+      final result = await _generateForSource(generator, '''
+@Model(tableName: 'app_users')
+class User {
+  late int id;
+}
+''');
 
-      test('toRow returns Map', () {
-        expect(_sampleGeneratedOutput, contains('return {'));
-      });
-
-      test('Uses snake_case keys', () {
-        expect(_sampleGeneratedOutput, contains("'is_active': model.isActive"));
-        expect(_sampleGeneratedOutput, contains("'created_at':"));
-      });
-
-      test('Converts DateTime to ISO string', () {
-        expect(_sampleGeneratedOutput, contains('model.createdAt.toIso8601String()'));
-      });
-
-      test('Handles nullable DateTime', () {
-        expect(_sampleNullableOutput, contains('model.deletedAt?.toIso8601String()'));
-      });
+      expect(result, contains("tableName = 'app_users'"));
     });
 
-    group('Edge Cases', () {
-      test('Custom tableName from annotation', () {
-        expect(_customTableNameOutput, contains("static const tableName = 'custom_users';"));
-      });
+    test('handles nullable fields', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  late int id;
+  String? nickname;
+  DateTime? deletedAt;
+}
+''');
 
-      test('Handles autoNowAdd fields', () {
-        expect(_autoNowOutput, contains("autoNowAddFields: ['created_at']"));
-      });
-
-      test('Handles autoNow fields', () {
-        expect(_autoNowOutput, contains("autoNowFields: ['updated_at']"));
-      });
-
-      test('Handles Duration fields with DurationFieldRef', () {
-        expect(_durationOutput, contains("DurationFieldRef('duration')"));
-      });
-
-      test('Duration fromRow uses microseconds', () {
-        expect(_durationOutput, contains("Duration(microseconds: row['duration'] as int)"));
-      });
-
-      test('Duration toRow uses inMicroseconds', () {
-        expect(_durationOutput, contains('model.duration.inMicroseconds'));
-      });
+      expect(result, contains('nullable: true'));
+      expect(result, contains("as String?"));
+      expect(result, contains("row['deleted_at'] == null ? null : DateTime.parse"));
     });
 
-    group('Model Registration', () {
-      test('Generates Jao.registerModel call', () {
-        expect(_sampleGeneratedOutput, contains('Jao.registerModel<User>(ModelRegistration('));
-      });
+    test('handles @AutoField annotation', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  @AutoField()
+  late int id;
+}
+''');
 
-      test('Registration includes tableName', () {
-        expect(_sampleGeneratedOutput, contains('tableName: tableName,'));
-      });
-
-      test('Registration includes pkField', () {
-        expect(_sampleGeneratedOutput, contains('pkField: pkField,'));
-      });
-
-      test('Registration includes fromRow', () {
-        expect(_sampleGeneratedOutput, contains('fromRow: fromRow,'));
-      });
-
-      test('Registration includes toRow', () {
-        expect(_sampleGeneratedOutput, contains('toRow: toRow,'));
-      });
+      expect(result, contains('primaryKey: true'));
+      expect(result, contains('autoIncrement: true'));
+      expect(result, contains('dbType: FieldType.serial'));
     });
 
-    group('Schema Generation', () {
-      test('Schema includes className', () {
-        expect(_sampleGeneratedOutput, contains("className: 'User',"));
-      });
+    test('handles @BigAutoField annotation', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  @BigAutoField()
+  late int id;
+}
+''');
 
-      test('Schema includes tableName', () {
-        expect(_sampleGeneratedOutput, contains("tableName: 'user',"));
-      });
-
-      test('Schema includes fields list', () {
-        expect(_sampleGeneratedOutput, contains('fields: ['));
-      });
-
-      test('ModelFieldSchema includes name', () {
-        expect(_sampleGeneratedOutput, contains("name: 'id',"));
-        expect(_sampleGeneratedOutput, contains("name: 'name',"));
-      });
-
-      test('ModelFieldSchema includes columnName', () {
-        expect(_sampleGeneratedOutput, contains("columnName: 'id',"));
-        expect(_sampleGeneratedOutput, contains("columnName: 'is_active',"));
-      });
-
-      test('ModelFieldSchema includes dbType', () {
-        expect(_sampleGeneratedOutput, contains('dbType: FieldType.serial,'));
-        expect(_sampleGeneratedOutput, contains('dbType: FieldType.varchar,'));
-        expect(_sampleGeneratedOutput, contains('dbType: FieldType.boolean,'));
-      });
-
-      test('ModelFieldSchema includes primaryKey flag', () {
-        expect(_sampleGeneratedOutput, contains('primaryKey: true,'));
-        expect(_sampleGeneratedOutput, contains('primaryKey: false,'));
-      });
-
-      test('ModelFieldSchema includes autoIncrement flag', () {
-        expect(_sampleGeneratedOutput, contains('autoIncrement: true,'));
-        expect(_sampleGeneratedOutput, contains('autoIncrement: false,'));
-      });
+      expect(result, contains('primaryKey: true'));
+      expect(result, contains('autoIncrement: true'));
+      expect(result, contains('dbType: FieldType.bigSerial'));
     });
 
-    group('Integration', () {
-      test('Generated code has valid structure', () {
-        // Verify class declarations
-        expect(_sampleGeneratedOutput, contains('class User\$ implements ModelFields<User> {'));
-        expect(_sampleGeneratedOutput, contains('class Users {'));
+    test('handles @DateTimeField with autoNowAdd', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  late int id;
+  @DateTimeField(autoNowAdd: true)
+  late DateTime createdAt;
+}
+''');
 
-        // Verify methods
-        expect(_sampleGeneratedOutput, contains('static User fromRow('));
-        expect(_sampleGeneratedOutput, contains('static Map<String, dynamic> toRow('));
+      expect(result, contains('autoNowAdd: true'));
+      expect(result, contains("autoNowAddFields:"));
+      expect(result, contains("'created_at'"));
+    });
 
-        // Verify schema
-        expect(_sampleGeneratedOutput, contains('static final schema = ModelSchema('));
-      });
+    test('handles @DateTimeField with autoNow', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  late int id;
+  @DateTimeField(autoNow: true)
+  late DateTime updatedAt;
+}
+''');
 
-      test('All curly braces are balanced', () {
-        final openBraces = '{'.allMatches(_sampleGeneratedOutput).length;
-        final closeBraces = '}'.allMatches(_sampleGeneratedOutput).length;
-        expect(openBraces, equals(closeBraces));
-      });
+      expect(result, contains('autoNow: true'));
+      expect(result, contains("autoNowFields:"));
+      expect(result, contains("'updated_at'"));
+    });
 
-      test('All parentheses are balanced', () {
-        final openParens = '('.allMatches(_sampleGeneratedOutput).length;
-        final closeParens = ')'.allMatches(_sampleGeneratedOutput).length;
-        expect(openParens, equals(closeParens));
-      });
+    test('handles @CharField annotation', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  late int id;
+  @CharField(maxLength: 100)
+  late String name;
+}
+''');
 
-      test('All square brackets are balanced', () {
-        final openBrackets = '['.allMatches(_sampleGeneratedOutput).length;
-        final closeBrackets = ']'.allMatches(_sampleGeneratedOutput).length;
-        expect(openBrackets, equals(closeBrackets));
-      });
+      expect(result, contains("StringFieldRef('name')"));
+      expect(result, contains('dbType: FieldType.varchar'));
+    });
+
+    test('handles @TextField annotation', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  late int id;
+  @TextField()
+  late String bio;
+}
+''');
+
+      expect(result, contains("StringFieldRef('bio')"));
+      expect(result, contains('dbType: FieldType.text'));
+    });
+
+    test('handles @IntegerField annotation', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  late int id;
+  @IntegerField()
+  late int age;
+}
+''');
+
+      expect(result, contains("IntFieldRef('age')"));
+      expect(result, contains('dbType: FieldType.integer'));
+    });
+
+    test('handles @BooleanField annotation', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  late int id;
+  @BooleanField()
+  late bool isActive;
+}
+''');
+
+      expect(result, contains("BoolFieldRef('is_active')"));
+      expect(result, contains('dbType: FieldType.boolean'));
+    });
+
+    test('handles @FloatField annotation', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  late int id;
+  @FloatField()
+  late double rating;
+}
+''');
+
+      expect(result, contains("DoubleFieldRef('rating')"));
+      expect(result, contains('dbType: FieldType.real'));
+    });
+
+    test('handles @DecimalField annotation', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class Product {
+  late int id;
+  @DecimalField(maxDigits: 10, decimalPlaces: 2)
+  late double price;
+}
+''');
+
+      expect(result, contains("DoubleFieldRef('price')"));
+      expect(result, contains('dbType: FieldType.decimal'));
+    });
+
+    test('handles @DurationField annotation', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class Task {
+  late int id;
+  @DurationField()
+  late Duration duration;
+}
+''');
+
+      expect(result, contains("DurationFieldRef('duration')"));
+      expect(result, contains('dbType: FieldType.interval'));
+      expect(result, contains("Duration(microseconds: row['duration'] as int)"));
+      expect(result, contains('.inMicroseconds'));
+    });
+
+    test('handles Duration type inference', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class Task {
+  late int id;
+  late Duration duration;
+}
+''');
+
+      expect(result, contains("DurationFieldRef('duration')"));
+    });
+
+    test('converts camelCase to snake_case for column names', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  late int id;
+  late String firstName;
+  late String lastName;
+  late bool isActive;
+}
+''');
+
+      expect(result, contains("'first_name'"));
+      expect(result, contains("'last_name'"));
+      expect(result, contains("'is_active'"));
+    });
+
+    test('generates fromRow for bool fields correctly', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  late int id;
+  late bool isActive;
+}
+''');
+
+      expect(result, contains("row['is_active'] == 1 || row['is_active'] == true"));
+    });
+
+    test('generates fromRow for nullable bool fields correctly', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  late int id;
+  bool? isActive;
+}
+''');
+
+      expect(result, contains("row['is_active'] == null ? null :"));
+    });
+
+    test('generates toRow for DateTime fields correctly', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  late int id;
+  late DateTime createdAt;
+}
+''');
+
+      expect(result, contains('.toIso8601String()'));
+    });
+
+    test('generates toRow for nullable DateTime fields correctly', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  late int id;
+  DateTime? deletedAt;
+}
+''');
+
+      expect(result, contains('?.toIso8601String()'));
+    });
+
+    test('generates ModelSchema correctly', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  late int id;
+  late String name;
+}
+''');
+
+      expect(result, contains('static final schema = ModelSchema('));
+      expect(result, contains("className: 'User'"));
+      expect(result, contains("tableName: 'user'"));
+      expect(result, contains('fields: ['));
+      expect(result, contains('ModelFieldSchema('));
+    });
+
+    test('generates Jao.registerModel call correctly', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  late int id;
+}
+''');
+
+      expect(result, contains('Jao.registerModel<User>('));
+      expect(result, contains('ModelRegistration('));
+      expect(result, contains('tableName: tableName'));
+      expect(result, contains('pkField: pkField'));
+      expect(result, contains('fromRow: fromRow'));
+      expect(result, contains('toRow: toRow'));
+    });
+
+    test('generates fieldNames list correctly', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  late int id;
+  late String name;
+  late String email;
+}
+''');
+
+      expect(result, contains("static const fieldNames = ["));
+      expect(result, contains("'id',"));
+      expect(result, contains("'name',"));
+      expect(result, contains("'email',"));
+    });
+
+    test('identifies primary key field correctly', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  late int id;
+  late String name;
+}
+''');
+
+      expect(result, contains("static const pkField = 'id'"));
+    });
+
+    test('skips static fields', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  static const tableName = 'users';
+  late int id;
+  late String name;
+}
+''');
+
+      expect(result, isNot(contains("'tableName',")));
+      expect(result, contains("'id',"));
+      expect(result, contains("'name',"));
     });
   });
 }
 
-// Sample generated output for a User model with common field types
-// This represents what the generator would produce for:
-// @Model()
-// class User {
-//   late int id;
-//   late String name;
-//   late String email;
-//   late bool isActive;
-//   late double rating;
-//   late DateTime createdAt;
-// }
-const _sampleGeneratedOutput = '''
-class User\$ implements ModelFields<User> {
-  const User\$();
-
-  final id = const IntFieldRef('id');
-  final name = const StringFieldRef('name');
-  final email = const StringFieldRef('email');
-  final isActive = const BoolFieldRef('is_active');
-  final rating = const DoubleFieldRef('rating');
-  final createdAt = const DateTimeFieldRef('created_at');
+/// Stub of jao package with required annotations for testing.
+const _jaoStub = '''
+class Model {
+  final String? tableName;
+  const Model({this.tableName});
 }
 
-class Users {
-  Users._();
+class AutoField {
+  const AutoField();
+}
 
-  static const \$ = User\$();
-  static bool _registered = false;
-  static final Manager<User> _objects = Manager<User>();
+class BigAutoField {
+  const BigAutoField();
+}
 
-  static Manager<User> get objects {
-    if (!_registered) {
-      _registered = true;
-      Jao.registerModel<User>(ModelRegistration(
-        tableName: tableName,
-        pkField: pkField,
-        fromRow: fromRow,
-        toRow: toRow,
-      ));
-    }
-    return _objects;
-  }
+class CharField {
+  final int maxLength;
+  const CharField({this.maxLength = 255});
+}
 
-  static const tableName = 'user';
-  static const pkField = 'id';
-  static const fieldNames = [
-    'id',
-    'name',
-    'email',
-    'isActive',
-    'rating',
-    'createdAt',
-  ];
+class TextField {
+  const TextField();
+}
 
-  static User fromRow(Map<String, dynamic> row) {
-    return User()
-      ..id = row['id'] as int
-      ..name = row['name'] as String
-      ..email = row['email'] as String
-      ..isActive = row['is_active'] == 1 || row['is_active'] == true
-      ..rating = row['rating'] as double
-      ..createdAt = DateTime.parse(row['created_at'] as String);
-  }
+class EmailField {
+  final int maxLength;
+  const EmailField({this.maxLength = 254});
+}
 
-  static Map<String, dynamic> toRow(User model) {
-    return {
-      'id': model.id,
-      'name': model.name,
-      'email': model.email,
-      'is_active': model.isActive,
-      'rating': model.rating,
-      'created_at': model.createdAt.toIso8601String(),
-    };
-  }
+class UrlField {
+  final int maxLength;
+  const UrlField({this.maxLength = 200});
+}
 
-  static final schema = ModelSchema(
-    className: 'User',
-    tableName: 'user',
-    fields: [
-      ModelFieldSchema(
-        name: 'id',
-        columnName: 'id',
-        dbType: FieldType.serial,
-        nullable: false,
-        primaryKey: true,
-        autoIncrement: true,
-        autoNowAdd: false,
-        autoNow: false,
-      ),
-      ModelFieldSchema(
-        name: 'name',
-        columnName: 'name',
-        dbType: FieldType.varchar,
-        nullable: false,
-        primaryKey: false,
-        autoIncrement: false,
-        autoNowAdd: false,
-        autoNow: false,
-      ),
-      ModelFieldSchema(
-        name: 'email',
-        columnName: 'email',
-        dbType: FieldType.varchar,
-        nullable: false,
-        primaryKey: false,
-        autoIncrement: false,
-        autoNowAdd: false,
-        autoNow: false,
-      ),
-      ModelFieldSchema(
-        name: 'isActive',
-        columnName: 'is_active',
-        dbType: FieldType.boolean,
-        nullable: false,
-        primaryKey: false,
-        autoIncrement: false,
-        autoNowAdd: false,
-        autoNow: false,
-      ),
-      ModelFieldSchema(
-        name: 'rating',
-        columnName: 'rating',
-        dbType: FieldType.doublePrecision,
-        nullable: false,
-        primaryKey: false,
-        autoIncrement: false,
-        autoNowAdd: false,
-        autoNow: false,
-      ),
-      ModelFieldSchema(
-        name: 'createdAt',
-        columnName: 'created_at',
-        dbType: FieldType.timestampTz,
-        nullable: false,
-        primaryKey: false,
-        autoIncrement: false,
-        autoNowAdd: false,
-        autoNow: false,
-      ),
-    ],
+class IntegerField {
+  const IntegerField();
+}
+
+class SmallIntegerField {
+  const SmallIntegerField();
+}
+
+class BigIntegerField {
+  const BigIntegerField();
+}
+
+class PositiveIntegerField {
+  const PositiveIntegerField();
+}
+
+class FloatField {
+  const FloatField();
+}
+
+class DecimalField {
+  final int maxDigits;
+  final int decimalPlaces;
+  const DecimalField({this.maxDigits = 10, this.decimalPlaces = 2});
+}
+
+class BooleanField {
+  const BooleanField();
+}
+
+class DateField {
+  final bool autoNowAdd;
+  final bool autoNow;
+  const DateField({this.autoNowAdd = false, this.autoNow = false});
+}
+
+class DateTimeField {
+  final bool autoNowAdd;
+  final bool autoNow;
+  const DateTimeField({this.autoNowAdd = false, this.autoNow = false});
+}
+
+class DurationField {
+  const DurationField();
+}
+
+class TimeField {
+  const TimeField();
+}
+
+class UuidField {
+  const UuidField();
+}
+
+class JsonField {
+  const JsonField();
+}
+
+class BinaryField {
+  const BinaryField();
+}
+
+class ForeignKey {
+  final Type to;
+  const ForeignKey(this.to);
+}
+
+class OneToOneField {
+  final Type to;
+  const OneToOneField(this.to);
+}
+''';
+
+/// Helper to generate output by calling the generator directly.
+/// This ensures coverage is captured.
+Future<String> _generateForSource(JaoGenerator generator, String modelSource) async {
+  final sources = {
+    'jao|lib/jao.dart': _jaoStub,
+    'pkg|lib/model.dart': '''
+import 'package:jao/jao.dart';
+
+$modelSource
+''',
+  };
+
+  final library = await resolveSources(
+    sources,
+    (resolver) async {
+      final assetId = AssetId('pkg', 'lib/model.dart');
+      return resolver.libraryFor(assetId);
+    },
   );
-}
-''';
 
-// Sample output for nullable fields
-const _sampleNullableOutput = '''
-class User\$ implements ModelFields<User> {
-  const User\$();
+  final libraryReader = LibraryReader(library);
+  final modelChecker = TypeChecker.fromUrl('package:jao/jao.dart#Model');
 
-  final id = const IntFieldRef('id');
-  final middleName = const StringFieldRef('middle_name');
-  final isVerified = const BoolFieldRef('is_verified');
-  final deletedAt = const DateTimeFieldRef('deleted_at');
-}
-
-class Users {
-  Users._();
-
-  static User fromRow(Map<String, dynamic> row) {
-    return User()
-      ..id = row['id'] as int
-      ..middleName = row['middle_name'] as String?
-      ..isVerified = row['is_verified'] == null ? null : (row['is_verified'] == 1 || row['is_verified'] == true)
-      ..deletedAt = row['deleted_at'] == null ? null : DateTime.parse(row['deleted_at'] as String);
+  final buffer = StringBuffer();
+  for (final annotated in libraryReader.annotatedWith(modelChecker)) {
+    buffer.writeln(generator.generateForAnnotatedElement(
+      annotated.element,
+      annotated.annotation,
+      _FakeBuildStep(),
+    ));
   }
 
-  static Map<String, dynamic> toRow(User model) {
-    return {
-      'id': model.id,
-      'middle_name': model.middleName,
-      'is_verified': model.isVerified,
-      'deleted_at': model.deletedAt?.toIso8601String(),
-    };
-  }
-
-  static final schema = ModelSchema(
-    className: 'User',
-    tableName: 'user',
-    fields: [
-      ModelFieldSchema(
-        name: 'middleName',
-        columnName: 'middle_name',
-        dbType: FieldType.varchar,
-        nullable: true,
-        primaryKey: false,
-        autoIncrement: false,
-        autoNowAdd: false,
-        autoNow: false,
-      ),
-    ],
-  );
-}
-''';
-
-// Sample output for custom table name
-const _customTableNameOutput = '''
-class Users {
-  static const tableName = 'custom_users';
-}
-''';
-
-// Sample output for autoNow and autoNowAdd
-const _autoNowOutput = '''
-class Users {
-  static Manager<User> get objects {
-    if (!_registered) {
-      _registered = true;
-      Jao.registerModel<User>(ModelRegistration(
-        tableName: tableName,
-        pkField: pkField,
-        fromRow: fromRow,
-        toRow: toRow,
-        autoNowAddFields: ['created_at'],
-        autoNowFields: ['updated_at'],
-      ));
-    }
-    return _objects;
-  }
-}
-''';
-
-// Sample output for Duration fields
-const _durationOutput = '''
-class Task\$ implements ModelFields<Task> {
-  const Task\$();
-
-  final id = const IntFieldRef('id');
-  final duration = const DurationFieldRef('duration');
+  return buffer.toString();
 }
 
-class Tasks {
-  static Task fromRow(Map<String, dynamic> row) {
-    return Task()
-      ..id = row['id'] as int
-      ..duration = Duration(microseconds: row['duration'] as int);
-  }
-
-  static Map<String, dynamic> toRow(Task model) {
-    return {
-      'id': model.id,
-      'duration': model.duration.inMicroseconds,
-    };
-  }
+/// Fake BuildStep for testing - generator doesn't actually use it.
+class _FakeBuildStep implements BuildStep {
+  @override
+  Never noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('FakeBuildStep.${invocation.memberName}');
 }
-''';
