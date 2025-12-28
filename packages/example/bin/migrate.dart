@@ -1,4 +1,5 @@
 #!/usr/bin/env dart
+
 /// Project migration CLI.
 ///
 /// Usage:
