@@ -1,0 +1,258 @@
+# Publish packages to pub.dev and create GitHub releases
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 0.1.0)'
+        required: true
+        type: string
+      package:
+        description: 'Package to publish'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - jao
+          - jao_cli
+          - jao_generator
+      dry_run:
+        description: 'Dry run (validate without publishing)'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  JAO_REPO: https://github.com/nexlabstudio/jao
+
+jobs:
+  prepare:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_prerelease: ${{ steps.version.outputs.is_prerelease }}
+    steps:
+      - name: Extract version from tag or input
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "push" ]; then
+            # Extract version from tag (v0.1.0 -> 0.1.0)
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+          # Check if prerelease
+          if [[ "$VERSION" == *"alpha"* ]] || [[ "$VERSION" == *"beta"* ]] || [[ "$VERSION" == *"rc"* ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+  publish:
+    name: Publish to pub.dev
+    runs-on: ubuntu-latest
+    needs: prepare
+    permissions:
+      id-token: write # Required for OIDC authentication with pub.dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Update package versions
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          echo "Updating all packages to version $VERSION"
+
+          # Update version in all pubspec.yaml files
+          for pkg in jao jao_generator jao_cli; do
+            sed -i "s/^version: .*/version: $VERSION/" packages/$pkg/pubspec.yaml
+            echo "Updated packages/$pkg/pubspec.yaml to version $VERSION"
+          done
+
+      - name: Convert path dependencies to version dependencies
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+
+          # jao_generator: replace path dep with version
+          sed -i '/^  jao:$/,/^  [a-z]/{s/    path: .*/  jao: ^'"$VERSION"'/}' packages/jao_generator/pubspec.yaml
+
+          # jao_cli: replace path dep with version
+          sed -i '/^  jao:$/,/^  [a-z]/{s/    path: .*/  jao: ^'"$VERSION"'/}' packages/jao_cli/pubspec.yaml
+
+          echo "=== jao pubspec.yaml ==="
+          cat packages/jao/pubspec.yaml
+          echo ""
+          echo "=== jao_generator pubspec.yaml ==="
+          cat packages/jao_generator/pubspec.yaml
+          echo ""
+          echo "=== jao_cli pubspec.yaml ==="
+          cat packages/jao_cli/pubspec.yaml
+
+      - name: Validate packages
+        run: |
+          echo "=== Validating packages ==="
+          for pkg in jao jao_generator jao_cli; do
+            echo "--- $pkg ---"
+            cd packages/$pkg
+            dart pub publish --dry-run 2>&1 || true
+            cd ../..
+          done
+
+      # Publish in order: jao first (core), then generator, then cli
+      - name: Publish jao
+        if: github.event.inputs.dry_run != 'true' && (github.event_name == 'push' || github.event.inputs.package == 'all' || github.event.inputs.package == 'jao')
+        run: |
+          cd packages/jao
+          dart pub publish --force
+
+      - name: Wait for pub.dev to index jao
+        if: github.event.inputs.dry_run != 'true' && github.event.inputs.package != 'jao'
+        run: sleep 60
+
+      - name: Publish jao_generator
+        if: github.event.inputs.dry_run != 'true' && (github.event_name == 'push' || github.event.inputs.package == 'all' || github.event.inputs.package == 'jao_generator')
+        run: |
+          cd packages/jao_generator
+          dart pub publish --force
+
+      - name: Wait for pub.dev to index jao_generator
+        if: github.event.inputs.dry_run != 'true' && github.event.inputs.package != 'jao_generator'
+        run: sleep 60
+
+      - name: Publish jao_cli
+        if: github.event.inputs.dry_run != 'true' && (github.event_name == 'push' || github.event.inputs.package == 'all' || github.event.inputs.package == 'jao_cli')
+        run: |
+          cd packages/jao_cli
+          dart pub publish --force
+
+  # Build CLI executables for all platforms
+  build-executables:
+    name: Build CLI (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: prepare
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: jao-linux-x64
+            extension: ""
+          - os: macos-latest
+            artifact: jao-macos-x64
+            extension: ""
+          - os: windows-latest
+            artifact: jao-windows-x64
+            extension: ".exe"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Compile executable
+        run: dart compile exe packages/jao_cli/bin/jao.dart -o ${{ matrix.artifact }}${{ matrix.extension }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}${{ matrix.extension }}
+
+  # Create GitHub release with executables and release notes
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [prepare, publish, build-executables]
+    if: github.event.inputs.dry_run != 'true'
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+
+          # Move and rename executables
+          mv artifacts/jao-linux-x64/jao-linux-x64 release-assets/jao-linux-x64
+          mv artifacts/jao-macos-x64/jao-macos-x64 release-assets/jao-macos-x64
+          mv artifacts/jao-windows-x64/jao-windows-x64.exe release-assets/jao-windows-x64.exe
+
+          # Make executables executable
+          chmod +x release-assets/jao-linux-x64 release-assets/jao-macos-x64
+
+          ls -la release-assets/
+
+      - name: Generate release notes
+        run: |
+          cat << EOF > release-notes.md
+          ## JAO v${{ needs.prepare.outputs.version }}
+
+          ### Published Packages
+
+          | Package | Version | pub.dev |
+          |---------|---------|---------|
+          | jao | ${{ needs.prepare.outputs.version }} | [![pub](https://img.shields.io/pub/v/jao.svg)](https://pub.dev/packages/jao) |
+          | jao_generator | ${{ needs.prepare.outputs.version }} | [![pub](https://img.shields.io/pub/v/jao_generator.svg)](https://pub.dev/packages/jao_generator) |
+          | jao_cli | ${{ needs.prepare.outputs.version }} | [![pub](https://img.shields.io/pub/v/jao_cli.svg)](https://pub.dev/packages/jao_cli) |
+
+          ### Installation
+
+          \`\`\`yaml
+          dependencies:
+            jao: ^${{ needs.prepare.outputs.version }}
+
+          dev_dependencies:
+            jao_generator: ^${{ needs.prepare.outputs.version }}
+            jao_cli: ^${{ needs.prepare.outputs.version }}
+            build_runner: ^2.4.0
+          \`\`\`
+
+          ### CLI Executables
+
+          Download the pre-built CLI executable for your platform:
+          - **Linux**: \`jao-linux-x64\`
+          - **macOS**: \`jao-macos-x64\`
+          - **Windows**: \`jao-windows-x64.exe\`
+
+          Or install globally via pub:
+          \`\`\`bash
+          dart pub global activate jao_cli
+          \`\`\`
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.prepare.outputs.version }}
+          name: JAO v${{ needs.prepare.outputs.version }}
+          body_path: release-notes.md
+          files: |
+            release-assets/jao-linux-x64
+            release-assets/jao-macos-x64
+            release-assets/jao-windows-x64.exe
+          draft: false
+          prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}

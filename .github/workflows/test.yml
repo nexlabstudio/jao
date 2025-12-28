@@ -120,7 +120,6 @@ jobs:
           slug: nexlabstudio/jao
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  # Summary job that depends on all tests passing
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest

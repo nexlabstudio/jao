@@ -1,7 +1,9 @@
 name: jao_generator
 description: Code generator for jao ORM. Generates typed field accessors and model metadata.
 version: 0.0.1
-homepage: https://github.com/example/jao
+homepage: https://github.com/nexlabstudio/jao/jao_generator
+repository: https://github.com/nexlabstudio/jao/jao_generator
+issue_tracker: https://github.com/nexlabstudio/jao/issues
 
 environment:
   sdk: ^3.10.0

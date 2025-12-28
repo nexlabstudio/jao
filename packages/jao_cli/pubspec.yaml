@@ -1,7 +1,9 @@
 name: jao_cli
 description: Command-line interface for jao ORM. Run migrations, generate schemas, and manage your database.
 version: 0.0.1
-homepage: https://github.com/example/jao
+homepage: https://github.com/nexlabstudio/jao/packages/jao_cli
+repository: https://github.com/nexlabstudio/jao/packages/jao_cli
+issue_tracker: https://github.com/nexlabstudio/jao/issues
 
 environment:
   sdk: ^3.10.0
