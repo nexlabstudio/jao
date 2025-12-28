@@ -1,3 +1,17 @@
+## [0.1.0] - 2025-12-28
+
+### Changed
+
+- `jao init` now creates centralized database configuration in `lib/config/database.dart`
+- `jao.yaml` now only contains paths configuration (`migrations_path`, `models_path`)
+- `bin/migrate.dart` template now imports from `lib/config/database.dart`
+- Removed `--db` and `--type` options from `jao init` (database type is now configured in code)
+
+### Added
+
+- `lib/config/database.dart` as single source of truth for database settings
+- PostgreSQL and MySQL examples in generated `lib/config/database.dart`
+
 ## [0.0.1] - 2025-12-28
 
 ### Added
