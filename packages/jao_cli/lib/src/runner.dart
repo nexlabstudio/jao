@@ -89,9 +89,8 @@ class MigrationRunnerConfig {
 class ProjectConfig {
   final String migrationsPath;
   final String modelsPath;
-  final String dbType;
 
-  const ProjectConfig({this.migrationsPath = 'lib/migrations', this.modelsPath = 'lib/models', this.dbType = 'sqlite'});
+  const ProjectConfig({this.migrationsPath = 'lib/migrations', this.modelsPath = 'lib/models'});
 
   static ProjectConfig? load() {
     final configFile = File('jao.yaml');
@@ -103,7 +102,6 @@ class ProjectConfig {
 
       String migrationsPath = 'lib/migrations';
       String modelsPath = 'lib/models';
-      String dbType = 'sqlite';
 
       for (final line in lines) {
         final trimmed = line.trim();
@@ -118,12 +116,10 @@ class ProjectConfig {
             migrationsPath = value;
           case 'models_path':
             modelsPath = value;
-          case 'type':
-            dbType = value;
         }
       }
 
-      return ProjectConfig(migrationsPath: migrationsPath, modelsPath: modelsPath, dbType: dbType);
+      return ProjectConfig(migrationsPath: migrationsPath, modelsPath: modelsPath);
     } catch (_) {
       return null;
     }
@@ -220,23 +216,8 @@ Run 'jao help <command>' for more information.
   Future<int> _init(List<String> args) async {
     output.header('Initializing JAO Project');
 
-    String dbType = 'sqlite';
-    for (final arg in args) {
-      if (arg.startsWith('--db=') || arg.startsWith('--type=')) {
-        dbType = arg.split('=').last;
-      }
-    }
-
     // Create jao.yaml
     final configContent = '''# JAO Configuration
-# Database settings
-
-type: $dbType
-${dbType == 'sqlite' ? 'database: database.db' : '''host: localhost
-port: ${dbType == 'mysql' ? '3306' : '5432'}
-database: myapp
-username: ${dbType == 'mysql' ? 'root' : 'postgres'}
-password: password'''}
 
 # Paths
 migrations_path: lib/migrations
@@ -280,7 +261,7 @@ final allMigrations = <Migration>[
 
     final migrateFile = File('bin/migrate.dart');
     if (!migrateFile.existsSync()) {
-      migrateFile.writeAsStringSync('''#!/usr/bin/env dart
+      migrateFile.writeAsStringSync(r'''#!/usr/bin/env dart
 /// Project migration CLI.
 ///
 /// Usage:
@@ -289,7 +270,7 @@ final allMigrations = <Migration>[
 ///   dart run bin/migrate.dart status
 ///   dart run bin/migrate.dart rollback
 ///
-/// Or if jao is installed globally:
+/// Or if jao_cli is installed globally:
 ///   jao migrate
 ///   jao status
 library;
@@ -303,19 +284,16 @@ import '../lib/migrations/migrations.dart';
 
 void main(List<String> args) async {
   // Database configuration
-  // Option 1: Read from environment
-  // final config = MigrationRunnerConfig.fromEnvironment(migrations: allMigrations);
-
-  // Option 2: Explicit configuration
   final config = MigrationRunnerConfig(
-    database: DatabaseConfig.${dbType == 'sqlite' ? "sqlite('database.db')" : '''(
-      host: 'localhost',
-      port: ${dbType == 'mysql' ? '3306' : '5432'},
-      database: 'myapp',
-      username: '${dbType == 'mysql' ? 'root' : 'postgres'}',
-      password: 'password',
-    )'''},
-    adapter: const ${dbType == 'sqlite' ? 'SqliteAdapter' : dbType == 'mysql' ? 'MySqlAdapter' : 'PostgresAdapter'}(),
+    // SQLite example:
+    database: DatabaseConfig.sqlite('database.db'),
+    adapter: const SqliteAdapter(),
+    // PostgreSQL example:
+    // database: DatabaseConfig.postgres(database: 'myapp', username: 'postgres', password: 'password'),
+    // adapter: const PostgresAdapter(),
+    // MySQL example:
+    // database: DatabaseConfig.mysql(database: 'myapp', username: 'root', password: 'password'),
+    // adapter: const MySqlAdapter(),
     migrations: allMigrations,
     verbose: args.contains('-v') || args.contains('--verbose'),
   );
@@ -360,22 +338,15 @@ void main(List<String> args) async {
         print('''
 jao init - Initialize jao in current project
 
-Usage: jao init [options]
-
-Options:
-  --db=TYPE       Database type: sqlite (default), postgres, mysql
-  --type=TYPE     Alias for --db
+Usage: jao init
 
 This command creates:
-  - jao.yaml (database configuration)
+  - jao.yaml (paths configuration)
   - lib/migrations/ (migrations directory)
   - lib/migrations/migrations.dart (migrations registry)
-  - bin/migrate.dart (project CLI)
+  - bin/migrate.dart (project CLI with database configuration)
 
-Examples:
-  jao init                    # Initialize with SQLite (default)
-  jao init --db=postgres      # Initialize with PostgreSQL
-  jao init --db=mysql         # Initialize with MySQL
+Database configuration is done in bin/migrate.dart using DatabaseConfig.
 ''');
       case 'makemigrations':
         print('''

@@ -63,6 +63,50 @@ class DatabaseConfig {
   /// Create config for SQLite in-memory database
   factory DatabaseConfig.sqliteMemory() => DatabaseConfig(host: ':memory:', port: 0, database: ':memory:');
 
+  /// Create config for PostgreSQL database
+  factory DatabaseConfig.postgres({
+    String host = 'localhost',
+    int port = 5432,
+    required String database,
+    String? username,
+    String? password,
+    bool useSsl = false,
+    int minConnections = 1,
+    int maxConnections = 10,
+  }) =>
+      DatabaseConfig(
+        host: host,
+        port: port,
+        database: database,
+        username: username,
+        password: password,
+        useSsl: useSsl,
+        minConnections: minConnections,
+        maxConnections: maxConnections,
+      );
+
+  /// Create config for MySQL database
+  factory DatabaseConfig.mysql({
+    String host = 'localhost',
+    int port = 3306,
+    required String database,
+    String? username,
+    String? password,
+    bool useSsl = false,
+    int minConnections = 1,
+    int maxConnections = 10,
+  }) =>
+      DatabaseConfig(
+        host: host,
+        port: port,
+        database: database,
+        username: username,
+        password: password,
+        useSsl: useSsl,
+        minConnections: minConnections,
+        maxConnections: maxConnections,
+      );
+
   /// Create config from connection URL
   factory DatabaseConfig.fromUrl(String url) {
     final uri = Uri.parse(url);
