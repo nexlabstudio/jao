@@ -236,6 +236,80 @@ void main() {
       }
     });
 
+    group('project config', () {
+      test('Uses migrations_path from jao.yaml', () async {
+        final cwd = Directory.current;
+        Directory.current = tempDir;
+
+        try {
+          // Create a jao.yaml with custom migrations path
+          File('jao.yaml').writeAsStringSync('''
+type: sqlite
+database: test.db
+migrations_path: custom/migrations
+models_path: custom/models
+''');
+
+          // Create a fresh cli without config to use project config
+          final cliWithoutConfig = JaoCli();
+
+          final result = await cliWithoutConfig.run(['make', '-n=test_migration']);
+
+          expect(result, equals(0));
+          // Should have created in custom/migrations
+          expect(Directory('custom/migrations').existsSync(), isTrue);
+
+          final files = Directory('custom/migrations').listSync();
+          expect(files, hasLength(1));
+        } finally {
+          Directory.current = cwd;
+        }
+      });
+
+      test('Defaults to lib/migrations when no jao.yaml', () async {
+        final cwd = Directory.current;
+        Directory.current = tempDir;
+
+        try {
+          // No jao.yaml - should use default path
+          final cliWithoutConfig = JaoCli();
+
+          final result = await cliWithoutConfig.run(['make', '-n=test_migration']);
+
+          expect(result, equals(0));
+          // Should have created in lib/migrations (default)
+          expect(Directory('lib/migrations').existsSync(), isTrue);
+        } finally {
+          Directory.current = cwd;
+        }
+      });
+
+      test('-p flag overrides jao.yaml path', () async {
+        final cwd = Directory.current;
+        Directory.current = tempDir;
+
+        try {
+          // Create a jao.yaml with custom migrations path
+          File('jao.yaml').writeAsStringSync('''
+type: sqlite
+migrations_path: custom/migrations
+''');
+
+          final cliWithoutConfig = JaoCli();
+
+          // Override with -p flag
+          final result = await cliWithoutConfig.run(['make', '-n=test', '-p=override/path']);
+
+          expect(result, equals(0));
+          // Should have created in override/path, NOT custom/migrations
+          expect(Directory('override/path').existsSync(), isTrue);
+          expect(Directory('custom/migrations').existsSync(), isFalse);
+        } finally {
+          Directory.current = cwd;
+        }
+      });
+    });
+
     group('registry update', () {
       test('Adds to migrations.dart if exists', () async {
         final path = '${tempDir.path}/migrations';

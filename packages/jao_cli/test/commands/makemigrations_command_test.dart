@@ -25,12 +25,7 @@ void main() {
               primaryKey: true,
               autoIncrement: true,
             ),
-            const ModelFieldSchema(
-              name: 'name',
-              columnName: 'name',
-              dbType: FieldType.varchar,
-              maxLength: 100,
-            ),
+            const ModelFieldSchema(name: 'name', columnName: 'name', dbType: FieldType.varchar, maxLength: 100),
             const ModelFieldSchema(
               name: 'email',
               columnName: 'email',
@@ -61,10 +56,7 @@ void main() {
     test('Detects new model and creates migration', () async {
       final path = '${tempDir.path}/migrations';
 
-      final result = await cli.run([
-        'makemigrations',
-        '-p=$path',
-      ]);
+      final result = await cli.run(['makemigrations', '-p=$path']);
 
       expect(result, equals(0));
 
@@ -76,11 +68,7 @@ void main() {
     test('--dry-run shows without creating', () async {
       final path = '${tempDir.path}/migrations';
 
-      final result = await cli.run([
-        'makemigrations',
-        '--dry-run',
-        '-p=$path',
-      ]);
+      final result = await cli.run(['makemigrations', '--dry-run', '-p=$path']);
 
       expect(result, equals(0));
 
@@ -91,12 +79,7 @@ void main() {
     test('--empty creates empty migration', () async {
       final path = '${tempDir.path}/migrations';
 
-      final result = await cli.run([
-        'makemigrations',
-        '--empty',
-        '-n=empty_migration',
-        '-p=$path',
-      ]);
+      final result = await cli.run(['makemigrations', '--empty', '-n=empty_migration', '-p=$path']);
 
       expect(result, equals(0));
 
@@ -110,12 +93,7 @@ void main() {
     test('--name sets migration name', () async {
       final path = '${tempDir.path}/migrations';
 
-      final result = await cli.run([
-        'makemigrations',
-        '--empty',
-        '--name=custom_name',
-        '-p=$path',
-      ]);
+      final result = await cli.run(['makemigrations', '--empty', '--name=custom_name', '-p=$path']);
 
       expect(result, equals(0));
 
@@ -127,12 +105,7 @@ void main() {
     test('-n flag sets migration name', () async {
       final path = '${tempDir.path}/migrations';
 
-      final result = await cli.run([
-        'makemigrations',
-        '--empty',
-        '-n=short_name',
-        '-p=$path',
-      ]);
+      final result = await cli.run(['makemigrations', '--empty', '-n=short_name', '-p=$path']);
 
       expect(result, equals(0));
 
@@ -153,10 +126,7 @@ void main() {
 
       final path = '${tempDir.path}/migrations';
 
-      final result = await cli.run([
-        'makemigrations',
-        '-p=$path',
-      ]);
+      final result = await cli.run(['makemigrations', '-p=$path']);
 
       // Should fail because no models
       expect(result, equals(1));
@@ -165,12 +135,7 @@ void main() {
     test('Exit code 0 on success', () async {
       final path = '${tempDir.path}/migrations';
 
-      final result = await cli.run([
-        'makemigrations',
-        '--empty',
-        '-n=test',
-        '-p=$path',
-      ]);
+      final result = await cli.run(['makemigrations', '--empty', '-n=test', '-p=$path']);
 
       expect(result, equals(0));
     });
@@ -178,12 +143,7 @@ void main() {
     test('Generated file has up() method', () async {
       final path = '${tempDir.path}/migrations';
 
-      await cli.run([
-        'makemigrations',
-        '--empty',
-        '-n=test',
-        '-p=$path',
-      ]);
+      await cli.run(['makemigrations', '--empty', '-n=test', '-p=$path']);
 
       final files = Directory(path).listSync();
       final content = File(files.first.path).readAsStringSync();
@@ -194,12 +154,7 @@ void main() {
     test('Generated file has down() method', () async {
       final path = '${tempDir.path}/migrations';
 
-      await cli.run([
-        'makemigrations',
-        '--empty',
-        '-n=test',
-        '-p=$path',
-      ]);
+      await cli.run(['makemigrations', '--empty', '-n=test', '-p=$path']);
 
       final files = Directory(path).listSync();
       final content = File(files.first.path).readAsStringSync();
@@ -211,12 +166,7 @@ void main() {
       final path = '${tempDir.path}/new/nested/migrations';
       expect(Directory(path).existsSync(), isFalse);
 
-      await cli.run([
-        'makemigrations',
-        '--empty',
-        '-n=test',
-        '-p=$path',
-      ]);
+      await cli.run(['makemigrations', '--empty', '-n=test', '-p=$path']);
 
       expect(Directory(path).existsSync(), isTrue);
     });

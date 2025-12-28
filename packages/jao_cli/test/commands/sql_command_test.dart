@@ -8,10 +8,7 @@ void main() {
     late List<Migration> migrations;
 
     setUp(() {
-      migrations = [
-        _TestMigration1(),
-        _TestMigration2(),
-      ];
+      migrations = [_TestMigration1(), _TestMigration2()];
       cli = JaoCli(
         MigrationRunnerConfig(
           database: DatabaseConfig.sqlite(':memory:'),
@@ -34,19 +31,13 @@ void main() {
     });
 
     test('--migration=NAME shows specific migration', () async {
-      final result = await cli.run([
-        'sql',
-        '--migration=20240101000001_first',
-      ]);
+      final result = await cli.run(['sql', '--migration=20240101000001_first']);
 
       expect(result, equals(0));
     });
 
     test('-m flag is alias for --migration', () async {
-      final result = await cli.run([
-        'sql',
-        '-m=20240101000001_first',
-      ]);
+      final result = await cli.run(['sql', '-m=20240101000001_first']);
 
       expect(result, equals(0));
     });
@@ -58,10 +49,7 @@ void main() {
     });
 
     test('Error for non-existent migration name', () async {
-      final result = await cli.run([
-        'sql',
-        '--migration=nonexistent',
-      ]);
+      final result = await cli.run(['sql', '--migration=nonexistent']);
 
       expect(result, equals(1));
     });
@@ -87,11 +75,7 @@ void main() {
     });
 
     test('Shows SQL for single migration with --down', () async {
-      final result = await cli.run([
-        'sql',
-        '--migration=20240101000001_first',
-        '--down',
-      ]);
+      final result = await cli.run(['sql', '--migration=20240101000001_first', '--down']);
 
       expect(result, equals(0));
     });

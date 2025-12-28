@@ -8,10 +8,7 @@ void main() {
     late List<Migration> migrations;
 
     setUp(() {
-      migrations = [
-        _TestMigration1(),
-        _TestMigration2(),
-      ];
+      migrations = [_TestMigration1(), _TestMigration2()];
       cli = JaoCli(
         MigrationRunnerConfig(
           database: DatabaseConfig.sqlite(':memory:'),

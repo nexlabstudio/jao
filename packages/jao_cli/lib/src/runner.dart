@@ -85,11 +85,74 @@ class MigrationRunnerConfig {
   }
 }
 
-class JaoCli {
-  final MigrationRunnerConfig config;
-  final CliOutput output;
+/// Project configuration loaded from jao.yaml.
+class ProjectConfig {
+  final String migrationsPath;
+  final String modelsPath;
+  final String dbType;
 
-  JaoCli(this.config) : output = CliOutput(verbose: config.verbose);
+  const ProjectConfig({this.migrationsPath = 'lib/migrations', this.modelsPath = 'lib/models', this.dbType = 'sqlite'});
+
+  static ProjectConfig? load() {
+    final configFile = File('jao.yaml');
+    if (!configFile.existsSync()) return null;
+
+    try {
+      final content = configFile.readAsStringSync();
+      final lines = content.split('\n');
+
+      String migrationsPath = 'lib/migrations';
+      String modelsPath = 'lib/models';
+      String dbType = 'sqlite';
+
+      for (final line in lines) {
+        final trimmed = line.trim();
+        if (trimmed.startsWith('#') || !trimmed.contains(':')) continue;
+
+        final parts = trimmed.split(':');
+        final key = parts[0].trim();
+        final value = parts.skip(1).join(':').trim();
+
+        switch (key) {
+          case 'migrations_path':
+            migrationsPath = value;
+          case 'models_path':
+            modelsPath = value;
+          case 'type':
+            dbType = value;
+        }
+      }
+
+      return ProjectConfig(migrationsPath: migrationsPath, modelsPath: modelsPath, dbType: dbType);
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+class JaoCli {
+  final MigrationRunnerConfig? config;
+  final CliOutput output;
+  final bool verbose;
+
+  ProjectConfig? _projectConfig;
+
+  JaoCli([this.config]) : verbose = config?.verbose ?? false, output = CliOutput(verbose: config?.verbose ?? false);
+
+  ProjectConfig get projectConfig {
+    _projectConfig ??= ProjectConfig.load();
+    return _projectConfig ?? const ProjectConfig();
+  }
+
+  MigrationRunnerConfig get _config {
+    if (config == null) {
+      throw StateError(
+        'This command requires database configuration.\n'
+        'Please ensure bin/migrate.dart exists with MigrationRunnerConfig.',
+      );
+    }
+    return config!;
+  }
 
   Future<int> run(List<String> args) async {
     if (args.isEmpty) {
@@ -102,6 +165,7 @@ class JaoCli {
 
     try {
       return await switch (command) {
+        'init' => _init(commandArgs),
         'migrate' => _migrate(commandArgs),
         'makemigrations' => _makeMigrations(commandArgs),
         'rollback' => _rollback(commandArgs),
@@ -115,7 +179,7 @@ class JaoCli {
       };
     } catch (e, stack) {
       output.error('Error: $e');
-      if (config.verbose) {
+      if (verbose) {
         print(stack);
       }
       return 1;
@@ -130,6 +194,7 @@ Because you didn't have enough options already.
 Usage: jao <command> [options]
 
 Commands:
+  init            Initialize jao in current project
   makemigrations  Auto-detect model changes and create migration
   migrate         Run pending migrations
   rollback        Rollback migrations
@@ -150,6 +215,142 @@ Run 'jao help <command>' for more information.
     return 1;
   }
 
+  Future<int> _init(List<String> args) async {
+    output.header('Initializing JAO Project');
+
+    String dbType = 'sqlite';
+    for (final arg in args) {
+      if (arg.startsWith('--db=') || arg.startsWith('--type=')) {
+        dbType = arg.split('=').last;
+      }
+    }
+
+    // Create jao.yaml
+    final configContent =
+        '''# JAO Configuration
+# Database settings
+
+type: $dbType
+${dbType == 'sqlite' ? 'database: database.db' : '''host: localhost
+port: ${dbType == 'mysql' ? '3306' : '5432'}
+database: myapp
+username: ${dbType == 'mysql' ? 'root' : 'postgres'}
+password: password'''}
+
+# Paths
+migrations_path: lib/migrations
+models_path: lib/models
+''';
+
+    File('jao.yaml').writeAsStringSync(configContent);
+    output.success('Created jao.yaml');
+
+    final migrationsDir = Directory('lib/migrations');
+    if (!migrationsDir.existsSync()) {
+      migrationsDir.createSync(recursive: true);
+      output.success('Created lib/migrations/');
+    }
+
+    final migrationsFile = File('lib/migrations/migrations.dart');
+    if (!migrationsFile.existsSync()) {
+      migrationsFile.writeAsStringSync('''/// Migrations registry.
+///
+/// Import and add your migrations here in order.
+library;
+
+import 'package:jao/jao.dart';
+
+// Import your migrations:
+// import '20241227_create_users.dart';
+
+/// All migrations in order of execution.
+final allMigrations = <Migration>[
+  // Add migrations here in order, e.g.:
+  // CreateUsers(),
+];
+''');
+      output.success('Created lib/migrations/migrations.dart');
+    }
+
+    final binDir = Directory('bin');
+    if (!binDir.existsSync()) {
+      binDir.createSync();
+    }
+
+    final migrateFile = File('bin/migrate.dart');
+    if (!migrateFile.existsSync()) {
+      migrateFile.writeAsStringSync('''#!/usr/bin/env dart
+/// Project migration CLI.
+///
+/// Usage:
+///   dart run bin/migrate.dart migrate
+///   dart run bin/migrate.dart makemigrations
+///   dart run bin/migrate.dart status
+///   dart run bin/migrate.dart rollback
+///
+/// Or if jao is installed globally:
+///   jao migrate
+///   jao status
+library;
+
+import 'dart:io';
+import 'package:jao/jao.dart';
+import 'package:jao_cli/jao_cli.dart';
+
+// Import your migrations
+import '../lib/migrations/migrations.dart';
+
+void main(List<String> args) async {
+  // Database configuration
+  // Option 1: Read from environment
+  // final config = MigrationRunnerConfig.fromEnvironment(migrations: allMigrations);
+
+  // Option 2: Explicit configuration
+  final config = MigrationRunnerConfig(
+    database: DatabaseConfig.${dbType == 'sqlite' ? "sqlite('database.db')" : '''(
+      host: 'localhost',
+      port: ${dbType == 'mysql' ? '3306' : '5432'},
+      database: 'myapp',
+      username: '${dbType == 'mysql' ? 'root' : 'postgres'}',
+      password: 'password',
+    )'''},
+    adapter: const ${dbType == 'sqlite'
+          ? 'SqliteAdapter'
+          : dbType == 'mysql'
+          ? 'MySqlAdapter'
+          : 'PostgresAdapter'}(),
+    migrations: allMigrations,
+    verbose: args.contains('-v') || args.contains('--verbose'),
+  );
+
+  final cli = JaoCli(config);
+  exit(await cli.run(args));
+}
+''');
+      output.success('Created bin/migrate.dart');
+    }
+
+    print('');
+    output.info('Project initialized! Next steps:');
+    print('');
+    print('  1. Add dependencies to pubspec.yaml:');
+    print('     dependencies:');
+    print('       jao: ^0.0.1');
+    print('     dev_dependencies:');
+    print('       jao_cli: ^0.0.1');
+    print('');
+    print('  2. Create your first migration:');
+    print('     jao make -n=create_users');
+    print('');
+    print('  3. Edit the migration file and add to migrations.dart');
+    print('');
+    print('  4. Run migrations:');
+    print('     jao migrate');
+    print('');
+
+    return 0;
+  }
+
   Future<int> _help(List<String> args) async {
     if (args.isEmpty) {
       _printUsage();
@@ -158,6 +359,27 @@ Run 'jao help <command>' for more information.
 
     final command = args.first;
     switch (command) {
+      case 'init':
+        print('''
+jao init - Initialize jao in current project
+
+Usage: jao init [options]
+
+Options:
+  --db=TYPE       Database type: sqlite (default), postgres, mysql
+  --type=TYPE     Alias for --db
+
+This command creates:
+  - jao.yaml (database configuration)
+  - lib/migrations/ (migrations directory)
+  - lib/migrations/migrations.dart (migrations registry)
+  - bin/migrate.dart (project CLI)
+
+Examples:
+  jao init                    # Initialize with SQLite (default)
+  jao init --db=postgres      # Initialize with PostgreSQL
+  jao init --db=mysql         # Initialize with MySQL
+''');
       case 'makemigrations':
         print('''
 jao makemigrations - Auto-detect model changes and create migration
@@ -245,13 +467,13 @@ Options:
       return _showPendingMigrationsSql();
     }
 
-    output.debug('Connecting to ${config.adapter.name}...');
-    final pool = await config.adapter.createPool(config.database);
+    output.debug('Connecting to ${_config.adapter.name}...');
+    final pool = await _config.adapter.createPool(_config.database);
 
     try {
-      final runner = MigrationRunner(adapter: config.adapter, pool: pool, migrationsTable: config.migrationsTable);
+      final runner = MigrationRunner(adapter: _config.adapter, pool: pool, migrationsTable: _config.migrationsTable);
       final applied = await runner.getAppliedMigrations();
-      final pending = config.migrations.where((m) => !applied.contains(m.name)).toList();
+      final pending = _config.migrations.where((m) => !applied.contains(m.name)).toList();
 
       if (pending.isEmpty) {
         output.info('No pending migrations.');
@@ -259,7 +481,7 @@ Options:
       }
 
       output.info('Found ${pending.length} pending migration(s)\n');
-      final result = await runner.migrate(config.migrations);
+      final result = await runner.migrate(_config.migrations);
 
       if (result.isSuccess) {
         for (final name in result.applied) {
@@ -289,7 +511,7 @@ Options:
   Future<int> _makeMigrations(List<String> args) async {
     final dryRun = args.contains('--dry-run');
     final empty = args.contains('--empty');
-    var path = 'lib/migrations';
+    String? path;
     String? name;
 
     for (final arg in args) {
@@ -300,6 +522,8 @@ Options:
       }
     }
 
+    path ??= projectConfig.migrationsPath;
+
     output.header('Making Migrations');
 
     if (empty) {
@@ -307,13 +531,13 @@ Options:
     }
 
     output.info('Detecting model changes...\n');
-    final pool = await config.adapter.createPool(config.database);
+    final pool = await _config.adapter.createPool(_config.database);
 
     try {
       final conn = await pool.acquire();
       try {
-        final generator = SchemaGenerator(config.adapter);
-        final models = config.modelSchemas;
+        final generator = SchemaGenerator(_config.adapter);
+        final models = _config.modelSchemas;
         if (models.isEmpty) {
           output.warning('No model schemas registered.');
           output.info('Register models in MigrationRunnerConfig.modelSchemas');
@@ -495,11 +719,11 @@ class $className extends Migration {
       return _showRollbackSql(steps);
     }
 
-    output.debug('Connecting to ${config.adapter.name}...');
-    final pool = await config.adapter.createPool(config.database);
+    output.debug('Connecting to ${_config.adapter.name}...');
+    final pool = await _config.adapter.createPool(_config.database);
 
     try {
-      final runner = MigrationRunner(adapter: config.adapter, pool: pool, migrationsTable: config.migrationsTable);
+      final runner = MigrationRunner(adapter: _config.adapter, pool: pool, migrationsTable: _config.migrationsTable);
 
       final applied = await runner.getAppliedMigrations();
       if (applied.isEmpty) {
@@ -509,7 +733,7 @@ class $className extends Migration {
 
       output.info('Rolling back $steps migration(s)\n');
 
-      final result = await runner.rollback(config.migrations, count: steps);
+      final result = await runner.rollback(_config.migrations, count: steps);
 
       if (result.isSuccess) {
         for (final name in result.rolledBack) {
@@ -538,13 +762,13 @@ class $className extends Migration {
 
   Future<int> _status(List<String> args) async {
     output.header('Migration Status');
-    output.debug('Connecting to ${config.adapter.name}...');
-    final pool = await config.adapter.createPool(config.database);
+    output.debug('Connecting to ${_config.adapter.name}...');
+    final pool = await _config.adapter.createPool(_config.database);
 
     try {
-      final runner = MigrationRunner(adapter: config.adapter, pool: pool, migrationsTable: config.migrationsTable);
+      final runner = MigrationRunner(adapter: _config.adapter, pool: pool, migrationsTable: _config.migrationsTable);
 
-      final status = await runner.status(config.migrations);
+      final status = await runner.status(_config.migrations);
 
       final rows = <List<String>>[];
       var appliedCount = 0;
@@ -592,15 +816,15 @@ class $className extends Migration {
 
     if (dryRun) {
       output.info('Dry run mode - showing SQL only\n');
-      return _showRollbackSql(config.migrations.length);
+      return _showRollbackSql(_config.migrations.length);
     }
 
-    final pool = await config.adapter.createPool(config.database);
+    final pool = await _config.adapter.createPool(_config.database);
 
     try {
-      final runner = MigrationRunner(adapter: config.adapter, pool: pool, migrationsTable: config.migrationsTable);
+      final runner = MigrationRunner(adapter: _config.adapter, pool: pool, migrationsTable: _config.migrationsTable);
 
-      final result = await runner.reset(config.migrations);
+      final result = await runner.reset(_config.migrations);
 
       for (final name in result.rolledBack) {
         output.success('Rolled back: $name');
@@ -639,18 +863,18 @@ class $className extends Migration {
 
     if (dryRun) {
       output.info('Dry run mode - showing SQL only\n');
-      await _showRollbackSql(config.migrations.length);
+      await _showRollbackSql(_config.migrations.length);
       print('');
       return _showPendingMigrationsSql();
     }
 
-    final pool = await config.adapter.createPool(config.database);
+    final pool = await _config.adapter.createPool(_config.database);
 
     try {
-      final runner = MigrationRunner(adapter: config.adapter, pool: pool, migrationsTable: config.migrationsTable);
+      final runner = MigrationRunner(adapter: _config.adapter, pool: pool, migrationsTable: _config.migrationsTable);
 
       output.info('Rolling back all migrations...\n');
-      final resetResult = await runner.reset(config.migrations);
+      final resetResult = await runner.reset(_config.migrations);
 
       for (final name in resetResult.rolledBack) {
         output.success('Rolled back: $name');
@@ -665,7 +889,7 @@ class $className extends Migration {
 
       print('');
       output.info('Running all migrations...\n');
-      final migrateResult = await runner.migrate(config.migrations);
+      final migrateResult = await runner.migrate(_config.migrations);
 
       for (final name in migrateResult.applied) {
         output.success('Applied: $name');
@@ -701,7 +925,7 @@ class $className extends Migration {
     final direction = showDown ? MigrationDirection.down : MigrationDirection.up;
 
     if (migrationName != null) {
-      final migration = config.migrations.where((m) => m.name == migrationName).firstOrNull;
+      final migration = _config.migrations.where((m) => m.name == migrationName).firstOrNull;
 
       if (migration == null) {
         output.error("Migration not found: '$migrationName'");
@@ -710,7 +934,7 @@ class $className extends Migration {
 
       _printMigrationSql(migration, direction);
     } else {
-      for (final migration in config.migrations) {
+      for (final migration in _config.migrations) {
         _printMigrationSql(migration, direction);
         print('');
       }
@@ -733,8 +957,8 @@ class $className extends Migration {
 
     for (final operation in builder.operations) {
       final sql = direction == MigrationDirection.up
-          ? operation.toSql(config.adapter.dialect)
-          : operation.toReverseSql(config.adapter.dialect);
+          ? operation.toSql(_config.adapter.dialect)
+          : operation.toReverseSql(_config.adapter.dialect);
       if (sql != null && sql.isNotEmpty) {
         print(sql);
         print(';');
@@ -744,7 +968,7 @@ class $className extends Migration {
   }
 
   int _showPendingMigrationsSql() {
-    for (final migration in config.migrations) {
+    for (final migration in _config.migrations) {
       _printMigrationSql(migration, MigrationDirection.up);
       print('');
     }
@@ -752,7 +976,7 @@ class $className extends Migration {
   }
 
   int _showRollbackSql(int count) {
-    final toShow = config.migrations.reversed.take(count);
+    final toShow = _config.migrations.reversed.take(count);
     for (final migration in toShow) {
       _printMigrationSql(migration, MigrationDirection.down);
       print('');
@@ -762,7 +986,7 @@ class $className extends Migration {
 
   Future<int> _make(List<String> args) async {
     String? name;
-    var path = 'lib/migrations';
+    String? path;
 
     for (final arg in args) {
       if (arg.startsWith('-n=') || arg.startsWith('--name=')) {
@@ -773,6 +997,8 @@ class $className extends Migration {
         name ??= arg;
       }
     }
+
+    path ??= projectConfig.migrationsPath;
 
     if (name == null || name.isEmpty) {
       output.error('Migration name is required.');
