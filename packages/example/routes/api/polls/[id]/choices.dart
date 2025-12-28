@@ -31,9 +31,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
 }
 
 Future<Response> _listChoices(int pollId) async {
-  final choices = await Choices.objects
-      .filter(Choices.$.pollId.eq(pollId))
-      .toList();
+  final choices = await Choices.objects.filter(Choices.$.pollId.eq(pollId)).toList();
 
   return Response.json(
     body: choices

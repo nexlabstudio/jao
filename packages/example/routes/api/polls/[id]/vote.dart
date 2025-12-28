@@ -55,9 +55,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
     }
 
     // Increment the vote count
-    await Choices.objects
-        .filter(Choices.$.id.eq(choiceId))
-        .update({'votes': choice.votes + 1});
+    await Choices.objects.filter(Choices.$.id.eq(choiceId)).update({'votes': choice.votes + 1});
 
     final updated = await Choices.objects.get(choiceId);
 
