@@ -1,0 +1,12 @@
+# Build configuration for jao code generation
+# This optimizes build_runner to only scan model directories
+
+targets:
+  $default:
+    builders:
+      jao_generator|jao:
+        # Only process files in these directories
+        # This significantly speeds up builds in large projects
+        generate_for:
+          include:
+            - lib/models/**

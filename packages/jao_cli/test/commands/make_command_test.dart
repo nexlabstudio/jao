@@ -58,7 +58,6 @@ void main() {
       final files = Directory(path).listSync();
       final content = File(files.first.path).readAsStringSync();
 
-      // Class name should be PascalCase
       expect(content, contains('class CreateUsers extends Migration'));
     });
 
@@ -70,7 +69,6 @@ void main() {
       final content = File(files.first.path).readAsStringSync();
 
       expect(content, contains('void up(MigrationBuilder builder)'));
-      // Should have TODO comment inside
       expect(content, contains('// TODO:'));
     });
 
