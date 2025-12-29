@@ -1,4 +1,3 @@
-@Tags(['integration'])
 import 'package:jao/jao.dart';
 import 'package:test/test.dart';
 

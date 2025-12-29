@@ -140,8 +140,8 @@ class SqliteConnection implements DatabaseConnection {
 
         for (final row in result) {
           final map = <String, dynamic>{};
-          for (var i = 0; i < columns.length; i++) {
-            map[columns[i]] = _convertValue(row[i]);
+          for (final column in columns) {
+            map[column] = _convertValue(row[column]);
           }
           rows.add(map);
         }
@@ -270,8 +270,8 @@ class SqliteTransaction implements Transaction {
 
         for (final row in result) {
           final map = <String, dynamic>{};
-          for (var i = 0; i < columns.length; i++) {
-            map[columns[i]] = row[i];
+          for (final column in columns) {
+            map[column] = row[column];
           }
           rows.add(map);
         }

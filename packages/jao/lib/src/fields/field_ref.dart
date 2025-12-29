@@ -62,8 +62,6 @@ abstract class FieldRef<T> {
 }
 
 /// Field reference for comparable types (int, double, DateTime, etc.)
-/// Note: The Comparable bound is intentionally omitted because num doesn't
-/// implement Comparable<num> (int/double implement Comparable<num> instead).
 @immutable
 abstract class ComparableFieldRef<T> extends FieldRef<T> {
   const ComparableFieldRef(super.name, {super.table});
