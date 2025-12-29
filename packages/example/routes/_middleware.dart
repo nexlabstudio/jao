@@ -5,10 +5,7 @@ import '../lib/config/database.dart';
 
 Handler middleware(Handler handler) {
   return (context) async {
-    await Jao.configure(
-      adapter: databaseAdapter,
-      config: databaseConfig,
-    );
+    await Jao.configure(adapter: databaseAdapter, config: databaseConfig);
     return handler(context);
   };
 }
