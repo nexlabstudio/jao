@@ -9,11 +9,11 @@ Code generator for [JAO](https://pub.dev/packages/jao) ORM. Generates typed fiel
 
 ```yaml
 dependencies:
-  jao: ^0.0.1
+  jao: ^0.2.0
 
 dev_dependencies:
   build_runner: ^2.4.0
-  jao_generator: ^0.0.1
+  jao_generator: ^0.2.0
 ```
 
 ## Usage

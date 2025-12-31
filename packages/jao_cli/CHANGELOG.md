@@ -1,3 +1,7 @@
+## [0.2.0] - 2025-12-31
+
+- Version bump to align with jao and jao_generator packages
+
 ## [0.1.0] - 2025-12-28
 
 ### Changed

@@ -1,3 +1,18 @@
+## [0.2.0] - 2025-12-31
+
+### Added
+
+- Type converter functions for cross-database compatibility:
+  - `dbDateTime`, `dbDateTimeOrNull` - handles DateTime, String, and int (timestamp)
+  - `dbBool`, `dbBoolOrNull` - handles bool, int (0/1), and String
+  - `dbInt`, `dbIntOrNull` - handles int, double, and String
+  - `dbDouble`, `dbDoubleOrNull` - handles double, int, and String
+  - `dbDuration`, `dbDurationOrNull` - handles Duration, int (microseconds), and String
+
+### Fixed
+
+- Cross-database type compatibility issue where `fromRow()` failed with PostgreSQL native types ([#4](https://github.com/nexlabstudio/jao/issues/4))
+
 ## [0.1.0] - 2025-12-28
 
 ### Added
