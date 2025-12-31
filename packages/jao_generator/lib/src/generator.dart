@@ -323,32 +323,58 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     final rawTypeName = field.dartType.getDisplayString();
     final dartTypeName = rawTypeName.endsWith('?') ? rawTypeName.substring(0, rawTypeName.length - 1) : rawTypeName;
     final isNullable = field.nullable;
+    final rowAccess = "row['$columnName']";
 
-    if (dartTypeName == 'DateTime') {
-      if (isNullable) {
-        return "row['$columnName'] == null ? null : DateTime.parse(row['$columnName'] as String)";
-      }
-      return "DateTime.parse(row['$columnName'] as String)";
-    }
+    switch (dartTypeName) {
+      case 'DateTime':
+        if (isNullable) {
+          return 'dbDateTimeOrNull($rowAccess)';
+        } else {
+          return 'dbDateTime($rowAccess)';
+        }
 
-    if (dartTypeName == 'Duration') {
-      if (isNullable) {
-        return "row['$columnName'] == null ? null : Duration(microseconds: row['$columnName'] as int)";
-      }
-      return "Duration(microseconds: row['$columnName'] as int)";
-    }
+      case 'bool':
+        if (isNullable) {
+          return 'dbBoolOrNull($rowAccess)';
+        } else {
+          return 'dbBool($rowAccess)';
+        }
 
-    if (dartTypeName == 'bool') {
-      if (isNullable) {
-        return "row['$columnName'] == null ? null : (row['$columnName'] == 1 || row['$columnName'] == true)";
-      }
-      return "row['$columnName'] == 1 || row['$columnName'] == true";
-    }
+      case 'int':
+        if (isNullable) {
+          return 'dbIntOrNull($rowAccess)';
+        } else {
+          return 'dbInt($rowAccess)';
+        }
 
-    if (isNullable) {
-      return "row['$columnName'] as $dartTypeName?";
+      case 'double':
+        if (isNullable) {
+          return 'dbDoubleOrNull($rowAccess)';
+        } else {
+          return 'dbDouble($rowAccess)';
+        }
+
+      case 'String':
+        if (isNullable) {
+          return '$rowAccess as String?';
+        } else {
+          return '$rowAccess as String';
+        }
+
+      case 'Duration':
+        if (isNullable) {
+          return 'dbDurationOrNull($rowAccess)';
+        } else {
+          return 'dbDuration($rowAccess)';
+        }
+
+      default:
+        if (isNullable) {
+          return '$rowAccess as $rawTypeName?';
+        } else {
+          return '$rowAccess as $rawTypeName';
+        }
     }
-    return "row['$columnName'] as $dartTypeName";
   }
 
   String _generateToRowField(_FieldInfo field, String prefix) {
