@@ -78,8 +78,15 @@ class Product {
   final String name;
   final int quantity;
   final double price;
+  final double? discount;
 
-  Product({this.id, required this.name, required this.quantity, required this.price});
+  Product({
+    this.id,
+    required this.name,
+    required this.quantity,
+    required this.price,
+    this.discount,
+  });
 
   // Updated to use type converters (matches new generator output)
   static Product fromRow(Map<String, dynamic> row) {
@@ -88,6 +95,7 @@ class Product {
       name: row['name'] as String,
       quantity: dbInt(row['quantity']),
       price: dbDouble(row['price']),
+      discount: dbDoubleOrNull(row['discount']),
     );
   }
 
@@ -97,6 +105,40 @@ class Product {
       'name': product.name,
       'quantity': product.quantity,
       'price': product.price,
+      if (product.discount != null) 'discount': product.discount,
+    };
+  }
+}
+
+// Test model with Duration field
+class Task {
+  final int? id;
+  final String name;
+  final Duration estimatedTime;
+  final Duration? actualTime;
+
+  Task({
+    this.id,
+    required this.name,
+    required this.estimatedTime,
+    this.actualTime,
+  });
+
+  static Task fromRow(Map<String, dynamic> row) {
+    return Task(
+      id: dbIntOrNull(row['id']),
+      name: row['name'] as String,
+      estimatedTime: dbDuration(row['estimated_time']),
+      actualTime: dbDurationOrNull(row['actual_time']),
+    );
+  }
+
+  static Map<String, dynamic> toRow(Task task) {
+    return {
+      if (task.id != null) 'id': task.id,
+      'name': task.name,
+      'estimated_time': task.estimatedTime.inMicroseconds,
+      if (task.actualTime != null) 'actual_time': task.actualTime!.inMicroseconds,
     };
   }
 }
@@ -312,6 +354,325 @@ void main() {
       expect(posts[0].title, equals('Post 1'));
       expect(posts[0].createdAt, equals(DateTime(2024, 1, 15, 10, 30, 0)));
       expect(posts[0].updatedAt, equals(DateTime(2024, 1, 16, 12, 0, 0)));
+    });
+  });
+
+  // Additional Post.fromRow tests for full DateTime coverage
+  group('Post.fromRow - additional DateTime coverage', () {
+    test('should work with unix timestamp (int milliseconds)', () {
+      final timestamp = DateTime(2024, 1, 15, 10, 30, 0).millisecondsSinceEpoch;
+      final row = {
+        'id': 1,
+        'title': 'Hello World',
+        'created_at': timestamp,
+        'updated_at': null,
+      };
+
+      final post = Post.fromRow(row);
+
+      expect(post.createdAt, equals(DateTime.fromMillisecondsSinceEpoch(timestamp)));
+    });
+
+    test('throws on null for non-nullable DateTime', () {
+      final row = {
+        'id': 1,
+        'title': 'Hello World',
+        'created_at': null,
+        'updated_at': null,
+      };
+
+      expect(() => Post.fromRow(row), throwsArgumentError);
+    });
+
+    test('throws on unsupported type for DateTime', () {
+      final row = {
+        'id': 1,
+        'title': 'Hello World',
+        'created_at': [1, 2, 3], // unsupported type
+        'updated_at': null,
+      };
+
+      expect(() => Post.fromRow(row), throwsArgumentError);
+    });
+  });
+
+  // Additional User.fromRow tests for full bool coverage
+  group('User.fromRow - additional bool coverage', () {
+    test('should work with String "true"', () {
+      final row = {
+        'id': 1,
+        'name': 'Alice',
+        'is_active': 'true',
+        'is_admin': 'TRUE',
+      };
+
+      final user = User.fromRow(row);
+
+      expect(user.isActive, isTrue);
+      expect(user.isAdmin, isTrue);
+    });
+
+    test('should work with String "1"', () {
+      final row = {
+        'id': 1,
+        'name': 'Alice',
+        'is_active': '1',
+        'is_admin': null,
+      };
+
+      final user = User.fromRow(row);
+
+      expect(user.isActive, isTrue);
+    });
+
+    test('should work with String "yes"', () {
+      final row = {
+        'id': 1,
+        'name': 'Alice',
+        'is_active': 'yes',
+        'is_admin': 'YES',
+      };
+
+      final user = User.fromRow(row);
+
+      expect(user.isActive, isTrue);
+      expect(user.isAdmin, isTrue);
+    });
+
+    test('should work with String "false" and other values', () {
+      final row = {
+        'id': 1,
+        'name': 'Alice',
+        'is_active': 'false',
+        'is_admin': 'anything',
+      };
+
+      final user = User.fromRow(row);
+
+      expect(user.isActive, isFalse);
+      expect(user.isAdmin, isFalse);
+    });
+
+    test('throws on null for non-nullable bool', () {
+      final row = {
+        'id': 1,
+        'name': 'Alice',
+        'is_active': null,
+        'is_admin': null,
+      };
+
+      expect(() => User.fromRow(row), throwsArgumentError);
+    });
+
+    test('throws on unsupported type for bool', () {
+      final row = {
+        'id': 1,
+        'name': 'Alice',
+        'is_active': 3.14, // unsupported type
+        'is_admin': null,
+      };
+
+      expect(() => User.fromRow(row), throwsArgumentError);
+    });
+  });
+
+  // Additional Product.fromRow tests for full int/double coverage
+  group('Product.fromRow - additional numeric coverage', () {
+    test('throws on null for non-nullable int', () {
+      final row = {
+        'id': 1,
+        'name': 'Widget',
+        'quantity': null,
+        'price': 19.99,
+        'discount': null,
+      };
+
+      expect(() => Product.fromRow(row), throwsArgumentError);
+    });
+
+    test('throws on unsupported type for int', () {
+      final row = {
+        'id': 1,
+        'name': 'Widget',
+        'quantity': [1, 2, 3], // unsupported type
+        'price': 19.99,
+        'discount': null,
+      };
+
+      expect(() => Product.fromRow(row), throwsArgumentError);
+    });
+
+    test('throws on null for non-nullable double', () {
+      final row = {
+        'id': 1,
+        'name': 'Widget',
+        'quantity': 100,
+        'price': null,
+        'discount': null,
+      };
+
+      expect(() => Product.fromRow(row), throwsArgumentError);
+    });
+
+    test('throws on unsupported type for double', () {
+      final row = {
+        'id': 1,
+        'name': 'Widget',
+        'quantity': 100,
+        'price': [1, 2, 3], // unsupported type
+        'discount': null,
+      };
+
+      expect(() => Product.fromRow(row), throwsArgumentError);
+    });
+
+    test('should work with nullable double (null)', () {
+      final row = {
+        'id': 1,
+        'name': 'Widget',
+        'quantity': 100,
+        'price': 19.99,
+        'discount': null,
+      };
+
+      final product = Product.fromRow(row);
+
+      expect(product.discount, isNull);
+    });
+
+    test('should work with nullable double (value)', () {
+      final row = {
+        'id': 1,
+        'name': 'Widget',
+        'quantity': 100,
+        'price': 19.99,
+        'discount': 5.0,
+      };
+
+      final product = Product.fromRow(row);
+
+      expect(product.discount, equals(5.0));
+    });
+
+    test('should work with nullable double from int', () {
+      final row = {
+        'id': 1,
+        'name': 'Widget',
+        'quantity': 100,
+        'price': 19.99,
+        'discount': 5,
+      };
+
+      final product = Product.fromRow(row);
+
+      expect(product.discount, equals(5.0));
+    });
+
+    test('should work with nullable double from String', () {
+      final row = {
+        'id': 1,
+        'name': 'Widget',
+        'quantity': 100,
+        'price': 19.99,
+        'discount': '5.5',
+      };
+
+      final product = Product.fromRow(row);
+
+      expect(product.discount, equals(5.5));
+    });
+  });
+
+  // Task.fromRow tests for Duration coverage
+  group('Task.fromRow - @DurationField', () {
+    test('should work with Duration (PostgreSQL)', () {
+      final duration = Duration(hours: 1, minutes: 30);
+      final row = {
+        'id': 1,
+        'name': 'Task 1',
+        'estimated_time': duration,
+        'actual_time': Duration(hours: 2),
+      };
+
+      final task = Task.fromRow(row);
+
+      expect(task.estimatedTime, equals(duration));
+      expect(task.actualTime, equals(Duration(hours: 2)));
+    });
+
+    test('should work with int (microseconds from SQLite)', () {
+      final micros = 5400000000; // 1.5 hours
+      final row = {
+        'id': 1,
+        'name': 'Task 1',
+        'estimated_time': micros,
+        'actual_time': 7200000000,
+      };
+
+      final task = Task.fromRow(row);
+
+      expect(task.estimatedTime, equals(Duration(microseconds: micros)));
+      expect(task.actualTime, equals(Duration(hours: 2)));
+    });
+
+    test('should work with String (microseconds)', () {
+      final row = {
+        'id': 1,
+        'name': 'Task 1',
+        'estimated_time': '5400000000',
+        'actual_time': null,
+      };
+
+      final task = Task.fromRow(row);
+
+      expect(task.estimatedTime, equals(Duration(microseconds: 5400000000)));
+      expect(task.actualTime, isNull);
+    });
+
+    test('should work with null for nullable Duration', () {
+      final row = {
+        'id': 1,
+        'name': 'Task 1',
+        'estimated_time': Duration(hours: 1),
+        'actual_time': null,
+      };
+
+      final task = Task.fromRow(row);
+
+      expect(task.actualTime, isNull);
+    });
+
+    test('throws on invalid String for Duration', () {
+      final row = {
+        'id': 1,
+        'name': 'Task 1',
+        'estimated_time': 'not-a-number',
+        'actual_time': null,
+      };
+
+      expect(() => Task.fromRow(row), throwsArgumentError);
+    });
+
+    test('throws on null for non-nullable Duration', () {
+      final row = {
+        'id': 1,
+        'name': 'Task 1',
+        'estimated_time': null,
+        'actual_time': null,
+      };
+
+      expect(() => Task.fromRow(row), throwsArgumentError);
+    });
+
+    test('throws on unsupported type for Duration', () {
+      final row = {
+        'id': 1,
+        'name': 'Task 1',
+        'estimated_time': 3.14, // unsupported type
+        'actual_time': null,
+      };
+
+      expect(() => Task.fromRow(row), throwsArgumentError);
     });
   });
 }
