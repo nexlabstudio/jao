@@ -4,9 +4,13 @@ import 'package:test/test.dart';
 /// Tests for cross-database type compatibility.
 ///
 /// These tests verify that fromRow() handles types correctly across different
-/// database adapters. The issue is that different databases return different types:
+/// database adapters using the type converter functions. Different databases
+/// return different types:
 /// - SQLite: String for timestamps, int (0/1) for booleans
 /// - PostgreSQL: DateTime objects, bool values
+///
+/// The type converters (dbDateTime, dbBool, dbInt, dbDouble, dbDuration)
+/// normalize these differences so models work across all databases.
 ///
 /// See: https://github.com/nexlabstudio/jao/issues/4
 
@@ -19,13 +23,13 @@ class Post {
 
   Post({this.id, required this.title, required this.createdAt, this.updatedAt});
 
-  // This is what the generator currently produces
+  // Updated to use type converters (matches new generator output)
   static Post fromRow(Map<String, dynamic> row) {
     return Post(
-      id: row['id'] as int?,
+      id: dbIntOrNull(row['id']),
       title: row['title'] as String,
-      createdAt: DateTime.parse(row['created_at'] as String),
-      updatedAt: row['updated_at'] == null ? null : DateTime.parse(row['updated_at'] as String),
+      createdAt: dbDateTime(row['created_at']),
+      updatedAt: dbDateTimeOrNull(row['updated_at']),
     );
   }
 
@@ -48,13 +52,13 @@ class User {
 
   User({this.id, required this.name, required this.isActive, this.isAdmin});
 
-  // This is what the generator currently produces
+  // Updated to use type converters (matches new generator output)
   static User fromRow(Map<String, dynamic> row) {
     return User(
-      id: row['id'] as int?,
+      id: dbIntOrNull(row['id']),
       name: row['name'] as String,
-      isActive: row['is_active'] as bool,
-      isAdmin: row['is_admin'] as bool?,
+      isActive: dbBool(row['is_active']),
+      isAdmin: dbBoolOrNull(row['is_admin']),
     );
   }
 
@@ -77,13 +81,13 @@ class Product {
 
   Product({this.id, required this.name, required this.quantity, required this.price});
 
-  // This is what the generator currently produces
+  // Updated to use type converters (matches new generator output)
   static Product fromRow(Map<String, dynamic> row) {
     return Product(
-      id: row['id'] as int?,
+      id: dbIntOrNull(row['id']),
       name: row['name'] as String,
-      quantity: row['quantity'] as int,
-      price: row['price'] as double,
+      quantity: dbInt(row['quantity']),
+      price: dbDouble(row['price']),
     );
   }
 
