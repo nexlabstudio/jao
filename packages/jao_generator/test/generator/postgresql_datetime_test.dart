@@ -34,9 +34,7 @@ void main() {
     //     ? null
     //     : DateTime.parse(row['deleted_at'] as String)
     DateTime? generatedFromRowNullable(Map<String, dynamic> row) {
-      return row['deleted_at'] == null
-          ? null
-          : DateTime.parse(row['deleted_at'] as String);
+      return row['deleted_at'] == null ? null : DateTime.parse(row['deleted_at'] as String);
     }
 
     test('should work with SQLite (String timestamp)', () {
@@ -209,9 +207,7 @@ void main() {
     //     ? null
     //     : Duration(microseconds: row['duration'] as int)
     Duration? generatedFromRowDurationNullable(Map<String, dynamic> row) {
-      return row['duration'] == null
-          ? null
-          : Duration(microseconds: row['duration'] as int);
+      return row['duration'] == null ? null : Duration(microseconds: row['duration'] as int);
     }
 
     test('should work with int microseconds (SQLite)', () {
