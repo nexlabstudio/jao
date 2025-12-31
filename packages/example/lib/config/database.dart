@@ -7,7 +7,7 @@ library;
 import 'package:jao/jao.dart';
 
 /// Database configuration.
-final databaseConfig = DatabaseConfig.sqlite('database.db');
+final databaseConfig = DatabaseConfig.sqlite('hospitable-cook.db');
 
 /// Database adapter.
 const databaseAdapter = SqliteAdapter();

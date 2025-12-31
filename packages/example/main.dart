@@ -1,11 +1,11 @@
 import 'dart:io';
 
 import 'package:dart_frog/dart_frog.dart';
-import 'lib/database.dart';
+import 'package:jao/jao.dart';
+import 'package:jao_example/config/database.dart';
 
 Future<HttpServer> run(Handler handler, InternetAddress ip, int port) async {
-  // Initialize database
-  await initializeDatabase();
+  await Jao.configure(adapter: databaseAdapter, config: databaseConfig);
 
   return serve(handler, ip, port);
 }

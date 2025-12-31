@@ -10,8 +10,10 @@ resolution: workspace
 
 dependencies:
   dart_frog: ^1.2.0
-  jao: ^0.2.0
-  jao_cli: ^0.2.0
+  jao:
+    path: ../jao
+  jao_cli:
+    path: ../jao_cli
 
 dev_dependencies:
   build_runner: ^2.4.0

@@ -4,7 +4,7 @@
 library;
 
 import 'package:jao/jao.dart';
-import '20251228142539_create_tables.dart';
+import '20251231122829_create_tables.dart';
 
 // Import your migrations:
 // import '20241227_create_users.dart';
