@@ -195,7 +195,7 @@ class User {
 ''',
         },
         outputs: {
-          'pkg|lib/user.jao.dart': decodedMatches(contains("row['is_active'] == 1 || row['is_active'] == true")),
+          'pkg|lib/user.jao.dart': decodedMatches(contains("dbBool(row['is_active'])")),
         },
       );
     });

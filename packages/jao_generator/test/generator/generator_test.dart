@@ -73,7 +73,7 @@ class User {
 
       expect(result, contains('nullable: true'));
       expect(result, contains("as String?"));
-      expect(result, contains("row['deleted_at'] == null ? null : DateTime.parse"));
+      expect(result, contains("dbDateTimeOrNull(row['deleted_at'])"));
     });
 
     test('handles @AutoField annotation', () async {
@@ -230,7 +230,7 @@ class Task {
 
       expect(result, contains("DurationFieldRef('duration')"));
       expect(result, contains('dbType: FieldType.interval'));
-      expect(result, contains("Duration(microseconds: row['duration'] as int)"));
+      expect(result, contains("dbDuration(row['duration'])"));
       expect(result, contains('.inMicroseconds'));
     });
 
@@ -271,7 +271,7 @@ class User {
 }
 ''');
 
-      expect(result, contains("row['is_active'] == 1 || row['is_active'] == true"));
+      expect(result, contains("dbBool(row['is_active'])"));
     });
 
     test('generates fromRow for nullable bool fields correctly', () async {
@@ -283,7 +283,7 @@ class User {
 }
 ''');
 
-      expect(result, contains("row['is_active'] == null ? null :"));
+      expect(result, contains("dbBoolOrNull(row['is_active'])"));
     });
 
     test('generates toRow for DateTime fields correctly', () async {
