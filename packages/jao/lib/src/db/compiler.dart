@@ -1,5 +1,6 @@
 library;
 
+import '../meta/model_registry.dart';
 import '../query/expressions.dart';
 import '../query/queryset.dart';
 import 'connection.dart';
@@ -244,8 +245,23 @@ class SqlCompiler {
     return '$expr $dir$nulls';
   }
 
-  // NOTE(mastersam07): Simplified join - full implementation needs model metadata
   String _compileJoin(String baseTable, String relation) {
+    final registry = ModelRegistry.instance;
+    final joins = registry.resolveJoinPath(baseTable, relation);
+
+    if (joins case final joins? when joins.isNotEmpty) {
+      final buffer = StringBuffer();
+      for (final join in joins) {
+        buffer.write(' LEFT JOIN ${dialect.quoteIdentifier(join.toTable)} ON ');
+        buffer.write('${dialect.quoteIdentifier(join.fromTable)}.');
+        buffer.write('${dialect.quoteIdentifier(join.fromColumn)} = ');
+        buffer.write('${dialect.quoteIdentifier(join.toTable)}.');
+        buffer.write(dialect.quoteIdentifier(join.toColumn));
+      }
+      return buffer.toString();
+    }
+
+    // Fallback: convention-based join (table_id -> table.id)
     final parts = relation.split('__');
     final joinTable = parts.first;
     return ' LEFT JOIN ${dialect.quoteIdentifier(joinTable)} ON '
