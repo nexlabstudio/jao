@@ -298,6 +298,439 @@ class User {
         },
       );
     });
+
+    test('Generator handles @ForeignKey and generates relation metadata', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/models.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class Author {
+  late int id;
+  late String name;
+}
+
+@Model()
+class Post {
+  late int id;
+  late String title;
+  @ForeignKey(Author)
+  late int author;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/models.jao.dart': decodedMatches(
+            allOf([
+              contains('_registerMetadata()'),
+              contains('ModelRegistry.instance.register'),
+              contains('relations: {'),
+              contains("RelationMeta("),
+              contains("fieldName: 'author'"),
+              contains("relatedModel: Author"),
+              contains("RelationType.foreignKey"),
+            ]),
+          ),
+        },
+      );
+    });
+
+    test('Generator handles @OneToOneField with relation type', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/models.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class User {
+  late int id;
+}
+
+@Model()
+class Profile {
+  late int id;
+  @OneToOneField(User)
+  late int user;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/models.jao.dart': decodedMatches(
+            allOf([
+              contains("RelationMeta("),
+              contains("fieldName: 'user'"),
+              contains("relatedModel: User"),
+              contains("RelationType.oneToOne"),
+            ]),
+          ),
+        },
+      );
+    });
+
+    test('Generator handles Duration field fromRow/toRow', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/task.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class Task {
+  late int id;
+  late Duration estimatedTime;
+  Duration? actualTime;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/task.jao.dart': decodedMatches(
+            allOf([
+              contains("DurationFieldRef('estimated_time')"),
+              contains("dbDuration(row['estimated_time'])"),
+              contains("dbDurationOrNull(row['actual_time'])"),
+              contains(".inMicroseconds"),
+            ]),
+          ),
+        },
+      );
+    });
+
+    test('Generator handles @DurationField annotation', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/task.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class Task {
+  late int id;
+  @DurationField()
+  late Duration duration;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/task.jao.dart': decodedMatches(
+            allOf([
+              contains("DurationFieldRef('duration')"),
+              contains('dbType: FieldType.interval'),
+            ]),
+          ),
+        },
+      );
+    });
+
+    test('Generator handles @UuidField annotation', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/entity.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class Entity {
+  late int id;
+  @UuidField()
+  late String uuid;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/entity.jao.dart': decodedMatches(
+            allOf([
+              contains("StringFieldRef('uuid')"),
+              contains('dbType: FieldType.uuid'),
+            ]),
+          ),
+        },
+      );
+    });
+
+    test('Generator handles @JsonField annotation', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/config.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class Config {
+  late int id;
+  @JsonField()
+  late dynamic settings;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/config.jao.dart': decodedMatches(
+            allOf([
+              contains("FieldRef('settings')"),
+              contains('dbType: FieldType.jsonb'),
+            ]),
+          ),
+        },
+      );
+    });
+
+    test('Generator handles @BinaryField annotation', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/file.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class File {
+  late int id;
+  @BinaryField()
+  late List<int> content;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/file.jao.dart': decodedMatches(
+            allOf([
+              contains("FieldRef('content')"),
+              contains('dbType: FieldType.bytea'),
+            ]),
+          ),
+        },
+      );
+    });
+
+    test('Generator handles @TimeField annotation', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/schedule.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class Schedule {
+  late int id;
+  @TimeField()
+  late Duration startTime;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/schedule.jao.dart': decodedMatches(
+            allOf([
+              contains("DurationFieldRef('start_time')"),
+              contains('dbType: FieldType.time'),
+            ]),
+          ),
+        },
+      );
+    });
+
+    test('Generator handles @BigAutoField annotation', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/bigmodel.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class BigModel {
+  @BigAutoField()
+  late int id;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/bigmodel.jao.dart': decodedMatches(
+            allOf([
+              contains('primaryKey: true'),
+              contains('autoIncrement: true'),
+              contains('dbType: FieldType.bigSerial'),
+            ]),
+          ),
+        },
+      );
+    });
+
+    test('Generator handles various field annotations', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/allfields.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class AllFields {
+  late int id;
+  @CharField()
+  late String charField;
+  @TextField()
+  late String textField;
+  @EmailField()
+  late String email;
+  @UrlField()
+  late String url;
+  @IntegerField()
+  late int intField;
+  @SmallIntegerField()
+  late int smallInt;
+  @BigIntegerField()
+  late int bigInt;
+  @PositiveIntegerField()
+  late int positiveInt;
+  @FloatField()
+  late double floatField;
+  @DecimalField()
+  late double decimalField;
+  @BooleanField()
+  late bool boolField;
+  @DateField()
+  late DateTime dateField;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/allfields.jao.dart': decodedMatches(
+            allOf([
+              contains('FieldType.varchar'),
+              contains('FieldType.text'),
+              contains('FieldType.integer'),
+              contains('FieldType.smallInt'),
+              contains('FieldType.bigInt'),
+              contains('FieldType.real'),
+              contains('FieldType.decimal'),
+              contains('FieldType.boolean'),
+              contains('FieldType.date'),
+            ]),
+          ),
+        },
+      );
+    });
+
+    test('Generator handles @ManyToManyField with relation type', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/models.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class Tag {
+  late int id;
+  late String name;
+}
+
+@Model()
+class Article {
+  late int id;
+  @ManyToManyField(Tag)
+  late int tags;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/models.jao.dart': decodedMatches(
+            allOf([
+              contains("RelationMeta("),
+              contains("fieldName: 'tags'"),
+              contains("relatedModel: Tag"),
+              contains("RelationType.manyToMany"),
+            ]),
+          ),
+        },
+      );
+    });
+
+    test('Generator handles nullable int and double fields', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/nullable_model.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class NullableModel {
+  late int id;
+  int? nullableInt;
+  double? nullableDouble;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/nullable_model.jao.dart': decodedMatches(
+            allOf([
+              contains("dbIntOrNull(row['nullable_int'])"),
+              contains("dbDoubleOrNull(row['nullable_double'])"),
+            ]),
+          ),
+        },
+      );
+    });
+
+    test('Generator handles model without explicit pk uses first field', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/uuid_model.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class UuidModel {
+  late String uuid;
+  late String name;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/uuid_model.jao.dart': decodedMatches(
+            allOf([
+              contains("pkField = 'uuid'"),
+            ]),
+          ),
+        },
+      );
+    });
+
+    test('Generator handles nullable BinaryField with default cast', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/file_data.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class FileData {
+  late int id;
+  @BinaryField()
+  List<int>? content;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/file_data.jao.dart': decodedMatches(
+            allOf([
+              contains("as List<int>?"),
+            ]),
+          ),
+        },
+      );
+    });
   });
 }
 
@@ -400,11 +833,19 @@ class BinaryField {
 
 class ForeignKey {
   final Type to;
-  const ForeignKey(this.to);
+  final String toColumn;
+  const ForeignKey(this.to, {this.toColumn = 'id'});
 }
 
 class OneToOneField {
   final Type to;
-  const OneToOneField(this.to);
+  final String toColumn;
+  const OneToOneField(this.to, {this.toColumn = 'id'});
+}
+
+class ManyToManyField {
+  final Type to;
+  final String toColumn;
+  const ManyToManyField(this.to, {this.toColumn = 'id'});
 }
 ''';
