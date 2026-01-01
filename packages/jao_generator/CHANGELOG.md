@@ -1,3 +1,11 @@
+## [0.2.1] - 2026-01-01
+
+### Added
+
+- Generates `_registerMetadata()` method in companion class for model metadata registration
+- Extracts ForeignKey/OneToOneField relationship info for proper JOIN support
+- Auto-registers `ModelMetadata` with `ModelRegistry` on first Manager access
+
 ## [0.2.0] - 2025-12-31
 
 ### Changed
