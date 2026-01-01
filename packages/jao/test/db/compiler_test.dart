@@ -524,6 +524,88 @@ void main() {
       final result = compiler.compileExpression(Q(const Comparison(ColumnRef('age'), ComparisonOp.eq, Value(18))));
       expect(result, equals('"age" = ?1'));
     });
+
+    test('compiles Case expression with single when', () {
+      final result = compiler.compileExpression(
+        Case([
+          When(
+            const Comparison(ColumnRef('status'), ComparisonOp.eq, Value(1)),
+            const Value('Active'),
+          ),
+        ]),
+      );
+      expect(result, equals('CASE WHEN "status" = ?1 THEN ?2 END'));
+      expect(compiler.parameters, equals([1, 'Active']));
+    });
+
+    test('compiles Case expression with multiple whens', () {
+      compiler.reset();
+      final result = compiler.compileExpression(
+        Case([
+          When(
+            const Comparison(ColumnRef('status'), ComparisonOp.eq, Value(1)),
+            const Value('Active'),
+          ),
+          When(
+            const Comparison(ColumnRef('status'), ComparisonOp.eq, Value(2)),
+            const Value('Pending'),
+          ),
+        ]),
+      );
+      expect(result, equals('CASE WHEN "status" = ?1 THEN ?2 WHEN "status" = ?3 THEN ?4 END'));
+      expect(compiler.parameters, equals([1, 'Active', 2, 'Pending']));
+    });
+
+    test('compiles Case expression with else clause', () {
+      compiler.reset();
+      final result = compiler.compileExpression(
+        Case(
+          [
+            When(
+              const Comparison(ColumnRef('status'), ComparisonOp.eq, Value(1)),
+              const Value('Active'),
+            ),
+          ],
+          elseResult: const Value('Unknown'),
+        ),
+      );
+      expect(result, equals('CASE WHEN "status" = ?1 THEN ?2 ELSE ?3 END'));
+      expect(compiler.parameters, equals([1, 'Active', 'Unknown']));
+    });
+
+    test('compiles Case expression with column result', () {
+      compiler.reset();
+      final result = compiler.compileExpression(
+        Case([
+          When(
+            const Comparison(ColumnRef('is_admin'), ComparisonOp.eq, Value(true)),
+            const ColumnRef('admin_name'),
+          ),
+        ], elseResult: const ColumnRef('user_name')),
+      );
+      expect(result, equals('CASE WHEN "is_admin" = ?1 THEN "admin_name" ELSE "user_name" END'));
+    });
+
+    test('compiles Case expression in annotation', () {
+      compiler.reset();
+      final config = QueryConfig(
+        annotations: {
+          'status_label': Case([
+            When(
+              const Comparison(ColumnRef('status'), ComparisonOp.eq, Value(1)),
+              const Value('Active'),
+            ),
+            When(
+              const Comparison(ColumnRef('status'), ComparisonOp.eq, Value(0)),
+              const Value('Inactive'),
+            ),
+          ], elseResult: const Value('Unknown')),
+        },
+      );
+      final result = compiler.compileSelect(table: 'users', config: config);
+      expect(result.sql, contains('CASE WHEN'));
+      expect(result.sql, contains('AS "status_label"'));
+    });
   });
 
   group('CompiledQuery', () {
