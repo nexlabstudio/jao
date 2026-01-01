@@ -176,8 +176,162 @@ class QuerySet<T> {
     };
   }
 
+  ValuesQuerySet<T> values(List<String> fields) {
+    return ValuesQuerySet<T>(
+      config: config.copyWith(only: fields),
+      executor: _executor,
+      fields: fields,
+    );
+  }
+
+  ValuesListQuerySet<T, V> valuesFlat<V>(String field) {
+    return ValuesListQuerySet<T, V>(
+      config: config.copyWith(only: [field]),
+      executor: _executor,
+      field: field,
+    );
+  }
+
   @override
   String toString() => 'QuerySet<$T>($config)';
+}
+
+@immutable
+class ValuesQuerySet<T> {
+  final QueryConfig config;
+  final QueryExecutor<T>? _executor;
+  final List<String> fields;
+
+  const ValuesQuerySet({
+    required this.config,
+    required QueryExecutor<T>? executor,
+    required this.fields,
+  }) : _executor = executor;
+
+  ValuesQuerySet<T> _copyWith({
+    List<Q>? filters,
+    List<Q>? excludes,
+    List<OrderBy>? ordering,
+    int? limit,
+    int? offset,
+    bool? distinct,
+  }) {
+    return ValuesQuerySet<T>(
+      config: config.copyWith(
+        filters: filters,
+        excludes: excludes,
+        ordering: ordering,
+        limit: limit,
+        offset: offset,
+        distinct: distinct,
+      ),
+      executor: _executor,
+      fields: fields,
+    );
+  }
+
+  ValuesQuerySet<T> filter(Q condition) {
+    return _copyWith(filters: [...config.filters, condition]);
+  }
+
+  ValuesQuerySet<T> exclude(Q condition) {
+    return _copyWith(excludes: [...config.excludes, condition]);
+  }
+
+  ValuesQuerySet<T> orderBy(OrderBy order, [OrderBy? order2, OrderBy? order3]) {
+    final newOrdering = [order];
+    if (order2 != null) newOrdering.add(order2);
+    if (order3 != null) newOrdering.add(order3);
+    return _copyWith(ordering: [...config.ordering, ...newOrdering]);
+  }
+
+  ValuesQuerySet<T> limit(int count) => _copyWith(limit: count);
+  ValuesQuerySet<T> offset(int count) => _copyWith(offset: count);
+  ValuesQuerySet<T> distinct() => _copyWith(distinct: true);
+
+  Future<List<Map<String, dynamic>>> toList() async {
+    return switch (_executor) {
+      final executor? => executor.executeValues(config, fields),
+      null => throw StateError('ValuesQuerySet has no executor configured'),
+    };
+  }
+
+  Future<Map<String, dynamic>?> first() async {
+    final results = await limit(1).toList();
+    return results.isEmpty ? null : results.first;
+  }
+
+  @override
+  String toString() => 'ValuesQuerySet<$T>($config, fields: $fields)';
+}
+
+@immutable
+class ValuesListQuerySet<T, V> {
+  final QueryConfig config;
+  final QueryExecutor<T>? _executor;
+  final String field;
+
+  const ValuesListQuerySet({
+    required this.config,
+    required QueryExecutor<T>? executor,
+    required this.field,
+  }) : _executor = executor;
+
+  ValuesListQuerySet<T, V> _copyWith({
+    List<Q>? filters,
+    List<Q>? excludes,
+    List<OrderBy>? ordering,
+    int? limit,
+    int? offset,
+    bool? distinct,
+  }) {
+    return ValuesListQuerySet<T, V>(
+      config: config.copyWith(
+        filters: filters,
+        excludes: excludes,
+        ordering: ordering,
+        limit: limit,
+        offset: offset,
+        distinct: distinct,
+      ),
+      executor: _executor,
+      field: field,
+    );
+  }
+
+  ValuesListQuerySet<T, V> filter(Q condition) {
+    return _copyWith(filters: [...config.filters, condition]);
+  }
+
+  ValuesListQuerySet<T, V> exclude(Q condition) {
+    return _copyWith(excludes: [...config.excludes, condition]);
+  }
+
+  ValuesListQuerySet<T, V> orderBy(OrderBy order, [OrderBy? order2, OrderBy? order3]) {
+    final newOrdering = [order];
+    if (order2 != null) newOrdering.add(order2);
+    if (order3 != null) newOrdering.add(order3);
+    return _copyWith(ordering: [...config.ordering, ...newOrdering]);
+  }
+
+  ValuesListQuerySet<T, V> limit(int count) => _copyWith(limit: count);
+  ValuesListQuerySet<T, V> offset(int count) => _copyWith(offset: count);
+  ValuesListQuerySet<T, V> distinct() => _copyWith(distinct: true);
+
+  Future<List<V>> toList() async {
+    return switch (_executor) {
+      final executor? => executor.executeValuesFlat<V>(config, field),
+      null => throw StateError('ValuesListQuerySet has no executor configured'),
+    };
+  }
+
+  Future<V?> first() async {
+    final results = await limit(1).toList();
+    return results.isEmpty ? null : results.first;
+  }
+
+  @override
+  String toString() => 'ValuesListQuerySet<$T, $V>($config, field: $field)';
 }
 
 @immutable
@@ -256,4 +410,6 @@ abstract class QueryExecutor<T> {
   Stream<T> stream(QueryConfig config);
   Future<int> update(QueryConfig config, Map<String, Object?> values);
   Future<int> delete(QueryConfig config);
+  Future<List<Map<String, dynamic>>> executeValues(QueryConfig config, List<String> fields);
+  Future<List<V>> executeValuesFlat<V>(QueryConfig config, String field);
 }
