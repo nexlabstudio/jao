@@ -131,9 +131,9 @@ class SqlCompiler {
       buffer.write('*');
     }
 
-    if (config.tableName != null) {
+    if (config.tableName case final tableName?) {
       buffer.write(' FROM ');
-      buffer.write(dialect.quoteIdentifier(config.tableName!));
+      buffer.write(dialect.quoteIdentifier(tableName));
     }
 
     final whereClause = _compileWhere(config.filters, config.excludes);
@@ -147,8 +147,8 @@ class SqlCompiler {
       buffer.write(config.ordering.map(_compileOrderBy).join(', '));
     }
 
-    if (config.limit != null || config.offset != null) {
-      buffer.write(dialect.limitOffset(config.limit, config.offset));
+    if (config.limit case final limit? when config.offset != null) {
+      buffer.write(dialect.limitOffset(limit, config.offset));
     }
 
     return buffer.toString();
