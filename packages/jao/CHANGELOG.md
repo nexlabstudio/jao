@@ -1,3 +1,9 @@
+## [0.2.1] - 2026-01-01
+
+### Added
+
+- Case expression support in SQL compiler (`Case`, `When` expressions)
+
 ## [0.2.0] - 2025-12-31
 
 ### Added
