@@ -46,6 +46,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
             autoIncrement: fieldAnnotation.autoIncrement,
             autoNowAdd: fieldAnnotation.autoNowAdd,
             autoNow: fieldAnnotation.autoNow,
+            relation: fieldAnnotation.relation,
           ),
         );
       } else {
@@ -127,7 +128,37 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
           return _FieldAnnotationInfo('Duration', 'DurationFieldRef', 'interval', annotation.toSource());
         case 'ForeignKey':
         case 'OneToOneField':
-          return _FieldAnnotationInfo('int', 'IntFieldRef', 'integer', annotation.toSource());
+        case 'ManyToManyField':
+          final toField = value.getField('to');
+          String? relatedModel;
+          if (toField != null) {
+            final toType = toField.toTypeValue();
+            if (toType != null) {
+              relatedModel = toType.getDisplayString();
+            }
+          }
+          final toColumn = value.getField('toColumn')?.toStringValue() ?? 'id';
+          final relatedTable = relatedModel != null ? _toSnakeCase(relatedModel) : null;
+          final relationType = switch (typeName) {
+            'ForeignKey' => _RelationType.foreignKey,
+            'OneToOneField' => _RelationType.oneToOne,
+            'ManyToManyField' => _RelationType.manyToMany,
+            _ => _RelationType.foreignKey,
+          };
+          return _FieldAnnotationInfo(
+            'int',
+            'IntFieldRef',
+            'integer',
+            annotation.toSource(),
+            relation: relatedModel != null && relatedTable != null
+                ? _RelationInfo(
+                    relatedModel: relatedModel,
+                    relatedTable: relatedTable,
+                    relatedColumn: toColumn,
+                    relationType: relationType,
+                  )
+                : null,
+          );
         case 'UuidField':
           return _FieldAnnotationInfo('String', 'StringFieldRef', 'uuid', annotation.toSource());
         case 'JsonField':
@@ -245,6 +276,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     buffer.writeln('  static Manager<$className> get objects {');
     buffer.writeln('    if (!_registered) {');
     buffer.writeln('      _registered = true;');
+    buffer.writeln('      _registerMetadata();');
     buffer.writeln('      Jao.registerModel<$className>(ModelRegistration(');
     buffer.writeln('        tableName: tableName,');
     buffer.writeln('        pkField: pkField,');
@@ -307,6 +339,47 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     }
     buffer.writeln('    ],');
     buffer.writeln('  );');
+    buffer.writeln();
+    buffer.writeln('  static void _registerMetadata() {');
+    buffer.writeln('    ModelRegistry.instance.register(ModelMetadata(');
+    buffer.writeln('      modelType: $className,');
+    buffer.writeln('      tableName: tableName,');
+    buffer.writeln('      primaryKey: pkField,');
+    buffer.writeln('      fields: {');
+    for (final field in fields) {
+      final columnName = _toSnakeCase(field.name);
+      final rawTypeName = field.dartType.getDisplayString();
+      final dartTypeName = rawTypeName.endsWith('?') ? rawTypeName.substring(0, rawTypeName.length - 1) : rawTypeName;
+      buffer.writeln('        \'${field.name}\': FieldMeta(');
+      buffer.writeln('          fieldName: \'${field.name}\',');
+      buffer.writeln('          columnName: \'$columnName\',');
+      buffer.writeln('          dartType: $dartTypeName,');
+      buffer.writeln('          nullable: ${field.nullable},');
+      buffer.writeln('          isPrimaryKey: ${field.primaryKey},');
+      buffer.writeln('        ),');
+    }
+    buffer.writeln('      },');
+    buffer.writeln('      relations: {');
+    for (final field in fields) {
+      if (field.relation case final relation?) {
+        final columnName = _toSnakeCase(field.name);
+        final relationType = switch (relation.relationType) {
+          _RelationType.foreignKey => 'RelationType.foreignKey',
+          _RelationType.oneToOne => 'RelationType.oneToOne',
+          _RelationType.manyToMany => 'RelationType.manyToMany',
+        };
+        buffer.writeln('        \'${field.name}\': RelationMeta(');
+        buffer.writeln('          fieldName: \'${field.name}\',');
+        buffer.writeln('          columnName: \'${columnName}_id\',');
+        buffer.writeln('          relatedModel: ${relation.relatedModel},');
+        buffer.writeln('          relatedColumn: \'${relation.relatedColumn}\',');
+        buffer.writeln('          type: $relationType,');
+        buffer.writeln('        ),');
+      }
+    }
+    buffer.writeln('      },');
+    buffer.writeln('    ));');
+    buffer.writeln('  }');
     buffer.writeln('}');
 
     return buffer.toString();
@@ -410,6 +483,7 @@ class _FieldInfo {
   final bool autoIncrement;
   final bool autoNowAdd;
   final bool autoNow;
+  final _RelationInfo? relation;
 
   _FieldInfo({
     required this.name,
@@ -422,6 +496,23 @@ class _FieldInfo {
     this.autoIncrement = false,
     this.autoNowAdd = false,
     this.autoNow = false,
+    this.relation,
+  });
+}
+
+enum _RelationType { foreignKey, oneToOne, manyToMany }
+
+class _RelationInfo {
+  final String relatedModel;
+  final String relatedTable;
+  final String relatedColumn;
+  final _RelationType relationType;
+
+  _RelationInfo({
+    required this.relatedModel,
+    required this.relatedTable,
+    required this.relatedColumn,
+    this.relationType = _RelationType.foreignKey,
   });
 }
 
@@ -434,6 +525,7 @@ class _FieldAnnotationInfo {
   final bool autoIncrement;
   final bool autoNowAdd;
   final bool autoNow;
+  final _RelationInfo? relation;
 
   _FieldAnnotationInfo(
     this.type,
@@ -444,5 +536,6 @@ class _FieldAnnotationInfo {
     this.autoIncrement = false,
     this.autoNowAdd = false,
     this.autoNow = false,
+    this.relation,
   });
 }

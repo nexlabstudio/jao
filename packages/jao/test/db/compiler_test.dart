@@ -627,4 +627,144 @@ void main() {
       expect(debug, contains("'John'"));
     });
   });
+
+  group('JOIN with ModelRegistry', () {
+    setUp(() {
+      ModelRegistry.instance.clear();
+    });
+
+    tearDown(() {
+      ModelRegistry.instance.clear();
+    });
+
+    test('falls back to convention-based join when no metadata', () {
+      final result = compiler.compileSelect(
+        table: 'posts',
+        config: const QueryConfig(selectRelated: ['author']),
+      );
+      expect(result.sql, contains('LEFT JOIN "author"'));
+      expect(result.sql, contains('"posts"."author_id" = "author"."id"'));
+    });
+
+    test('uses registry metadata for accurate joins', () {
+      // Register Author model first (so Post can reference it)
+      ModelRegistry.instance.register(
+        const ModelMetadata(
+          modelType: _TestAuthor,
+          tableName: 'authors',
+          primaryKey: 'id',
+          fields: {
+            'id': FieldMeta(fieldName: 'id', columnName: 'id', dartType: int, isPrimaryKey: true),
+            'name': FieldMeta(fieldName: 'name', columnName: 'name', dartType: String),
+          },
+        ),
+      );
+
+      // Register Post model with author relation
+      ModelRegistry.instance.register(
+        const ModelMetadata(
+          modelType: _TestPost,
+          tableName: 'posts',
+          primaryKey: 'id',
+          fields: {
+            'id': FieldMeta(fieldName: 'id', columnName: 'id', dartType: int, isPrimaryKey: true),
+            'title': FieldMeta(fieldName: 'title', columnName: 'title', dartType: String),
+            'authorId': FieldMeta(fieldName: 'authorId', columnName: 'author_id', dartType: int),
+          },
+          relations: {
+            'author': RelationMeta(
+              fieldName: 'author',
+              columnName: 'author_id',
+              relatedModel: _TestAuthor,
+              relatedColumn: 'id',
+            ),
+          },
+        ),
+      );
+
+      final result = compiler.compileSelect(
+        table: 'posts',
+        config: const QueryConfig(selectRelated: ['author']),
+      );
+
+      expect(result.sql, contains('LEFT JOIN "authors"'));
+      expect(result.sql, contains('"posts"."author_id" = "authors"."id"'));
+    });
+
+    test('supports chained joins with registry metadata', () {
+      // Register Publisher first
+      ModelRegistry.instance.register(
+        const ModelMetadata(
+          modelType: _TestPublisher,
+          tableName: 'publishers',
+          primaryKey: 'id',
+          fields: {
+            'id': FieldMeta(fieldName: 'id', columnName: 'id', dartType: int, isPrimaryKey: true),
+            'name': FieldMeta(fieldName: 'name', columnName: 'name', dartType: String),
+          },
+        ),
+      );
+
+      // Register Author with publisher relation
+      ModelRegistry.instance.register(
+        const ModelMetadata(
+          modelType: _TestAuthor,
+          tableName: 'authors',
+          primaryKey: 'id',
+          fields: {
+            'id': FieldMeta(fieldName: 'id', columnName: 'id', dartType: int, isPrimaryKey: true),
+            'publisherId': FieldMeta(fieldName: 'publisherId', columnName: 'publisher_id', dartType: int),
+          },
+          relations: {
+            'publisher': RelationMeta(
+              fieldName: 'publisher',
+              columnName: 'publisher_id',
+              relatedModel: _TestPublisher,
+              relatedColumn: 'id',
+            ),
+          },
+        ),
+      );
+
+      // Register Book with author relation
+      ModelRegistry.instance.register(
+        const ModelMetadata(
+          modelType: _TestBook,
+          tableName: 'books',
+          primaryKey: 'id',
+          fields: {
+            'id': FieldMeta(fieldName: 'id', columnName: 'id', dartType: int, isPrimaryKey: true),
+            'authorId': FieldMeta(fieldName: 'authorId', columnName: 'author_id', dartType: int),
+          },
+          relations: {
+            'author': RelationMeta(
+              fieldName: 'author',
+              columnName: 'author_id',
+              relatedModel: _TestAuthor,
+              relatedColumn: 'id',
+            ),
+          },
+        ),
+      );
+
+      final result = compiler.compileSelect(
+        table: 'books',
+        config: const QueryConfig(selectRelated: ['author__publisher']),
+      );
+
+      expect(result.sql, contains('LEFT JOIN "authors"'));
+      expect(result.sql, contains('LEFT JOIN "publishers"'));
+      expect(result.sql, contains('"books"."author_id" = "authors"."id"'));
+      expect(result.sql, contains('"authors"."publisher_id" = "publishers"."id"'));
+    });
+  });
 }
+
+// Test model classes for type registration
+class _TestPost {}
+
+class _TestAuthor {}
+
+class _TestBook {}
+
+class _TestPublisher {}

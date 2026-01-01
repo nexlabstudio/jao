@@ -1,3 +1,13 @@
+## [0.2.2] - 2026-01-01
+
+### Added
+
+- Model metadata system for proper JOIN compilation:
+  - `ModelMetadata`, `FieldMeta`, `RelationMeta` classes for runtime metadata
+  - `ModelRegistry` for global model metadata lookups
+  - SQL compiler now uses registry for accurate JOIN clauses
+  - Falls back to convention-based joins if metadata not registered
+
 ## [0.2.1] - 2026-01-01
 
 ### Added
