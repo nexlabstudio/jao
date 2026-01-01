@@ -285,6 +285,245 @@ void main() {
         expect(() => qs.aggregate({'total': Count.all()}), throwsStateError);
       });
     });
+
+    group('values()', () {
+      test('returns ValuesQuerySet with specified fields', () {
+        final qs = QuerySet<Map<String, dynamic>>();
+        final valuesQs = qs.values(['name', 'email']);
+
+        expect(valuesQs, isA<ValuesQuerySet<Map<String, dynamic>>>());
+        expect(valuesQs.fields, equals(['name', 'email']));
+        expect(valuesQs.config.only, equals(['name', 'email']));
+      });
+
+      test('preserves existing filters', () {
+        final q = Q(const Comparison(ColumnRef('status'), ComparisonOp.eq, Value('active')));
+        final qs = QuerySet<Map<String, dynamic>>().filter(q);
+        final valuesQs = qs.values(['name']);
+
+        expect(valuesQs.config.filters.length, equals(1));
+      });
+    });
+
+    group('valuesFlat()', () {
+      test('returns ValuesListQuerySet with specified field', () {
+        final qs = QuerySet<Map<String, dynamic>>();
+        final valuesQs = qs.valuesFlat<String>('name');
+
+        expect(valuesQs, isA<ValuesListQuerySet<Map<String, dynamic>, String>>());
+        expect(valuesQs.field, equals('name'));
+        expect(valuesQs.config.only, equals(['name']));
+      });
+
+      test('preserves existing filters', () {
+        final q = Q(const Comparison(ColumnRef('status'), ComparisonOp.eq, Value('active')));
+        final qs = QuerySet<Map<String, dynamic>>().filter(q);
+        final valuesQs = qs.valuesFlat<String>('name');
+
+        expect(valuesQs.config.filters.length, equals(1));
+      });
+    });
+  });
+
+  group('ValuesQuerySet', () {
+    test('filter() adds to filters list', () {
+      final valuesQs = ValuesQuerySet<Map<String, dynamic>>(
+        config: const QueryConfig(),
+        executor: null,
+        fields: ['name'],
+      );
+      final q = Q(const Comparison(ColumnRef('status'), ComparisonOp.eq, Value('active')));
+      final filtered = valuesQs.filter(q);
+
+      expect(filtered.config.filters.length, equals(1));
+      expect(filtered.fields, equals(['name']));
+    });
+
+    test('exclude() adds to excludes list', () {
+      final valuesQs = ValuesQuerySet<Map<String, dynamic>>(
+        config: const QueryConfig(),
+        executor: null,
+        fields: ['name'],
+      );
+      final q = Q(const Comparison(ColumnRef('status'), ComparisonOp.eq, Value('deleted')));
+      final excluded = valuesQs.exclude(q);
+
+      expect(excluded.config.excludes.length, equals(1));
+    });
+
+    test('orderBy() sets ordering', () {
+      final valuesQs = ValuesQuerySet<Map<String, dynamic>>(
+        config: const QueryConfig(),
+        executor: null,
+        fields: ['name'],
+      );
+      final ordered = valuesQs.orderBy(const OrderBy(ColumnRef('name')));
+
+      expect(ordered.config.ordering.length, equals(1));
+    });
+
+    test('limit() sets limit', () {
+      final valuesQs = ValuesQuerySet<Map<String, dynamic>>(
+        config: const QueryConfig(),
+        executor: null,
+        fields: ['name'],
+      );
+      final limited = valuesQs.limit(10);
+
+      expect(limited.config.limit, equals(10));
+    });
+
+    test('offset() sets offset', () {
+      final valuesQs = ValuesQuerySet<Map<String, dynamic>>(
+        config: const QueryConfig(),
+        executor: null,
+        fields: ['name'],
+      );
+      final offsetted = valuesQs.offset(5);
+
+      expect(offsetted.config.offset, equals(5));
+    });
+
+    test('distinct() sets distinct flag', () {
+      final valuesQs = ValuesQuerySet<Map<String, dynamic>>(
+        config: const QueryConfig(),
+        executor: null,
+        fields: ['name'],
+      );
+      final distinctQs = valuesQs.distinct();
+
+      expect(distinctQs.config.distinct, isTrue);
+    });
+
+    test('toList() throws without executor', () {
+      final valuesQs = ValuesQuerySet<Map<String, dynamic>>(
+        config: const QueryConfig(),
+        executor: null,
+        fields: ['name'],
+      );
+      expect(() => valuesQs.toList(), throwsStateError);
+    });
+
+    test('first() throws without executor', () {
+      final valuesQs = ValuesQuerySet<Map<String, dynamic>>(
+        config: const QueryConfig(),
+        executor: null,
+        fields: ['name'],
+      );
+      expect(() => valuesQs.first(), throwsStateError);
+    });
+
+    test('toString() includes type and fields', () {
+      final valuesQs = ValuesQuerySet<Map<String, dynamic>>(
+        config: const QueryConfig(),
+        executor: null,
+        fields: ['name', 'email'],
+      );
+      final str = valuesQs.toString();
+      expect(str, contains('ValuesQuerySet'));
+      expect(str, contains('name'));
+      expect(str, contains('email'));
+    });
+  });
+
+  group('ValuesListQuerySet', () {
+    test('filter() adds to filters list', () {
+      final valuesQs = ValuesListQuerySet<Map<String, dynamic>, String>(
+        config: const QueryConfig(),
+        executor: null,
+        field: 'name',
+      );
+      final q = Q(const Comparison(ColumnRef('status'), ComparisonOp.eq, Value('active')));
+      final filtered = valuesQs.filter(q);
+
+      expect(filtered.config.filters.length, equals(1));
+      expect(filtered.field, equals('name'));
+    });
+
+    test('exclude() adds to excludes list', () {
+      final valuesQs = ValuesListQuerySet<Map<String, dynamic>, String>(
+        config: const QueryConfig(),
+        executor: null,
+        field: 'name',
+      );
+      final q = Q(const Comparison(ColumnRef('status'), ComparisonOp.eq, Value('deleted')));
+      final excluded = valuesQs.exclude(q);
+
+      expect(excluded.config.excludes.length, equals(1));
+    });
+
+    test('orderBy() sets ordering', () {
+      final valuesQs = ValuesListQuerySet<Map<String, dynamic>, String>(
+        config: const QueryConfig(),
+        executor: null,
+        field: 'name',
+      );
+      final ordered = valuesQs.orderBy(const OrderBy(ColumnRef('name')));
+
+      expect(ordered.config.ordering.length, equals(1));
+    });
+
+    test('limit() sets limit', () {
+      final valuesQs = ValuesListQuerySet<Map<String, dynamic>, String>(
+        config: const QueryConfig(),
+        executor: null,
+        field: 'name',
+      );
+      final limited = valuesQs.limit(10);
+
+      expect(limited.config.limit, equals(10));
+    });
+
+    test('offset() sets offset', () {
+      final valuesQs = ValuesListQuerySet<Map<String, dynamic>, String>(
+        config: const QueryConfig(),
+        executor: null,
+        field: 'name',
+      );
+      final offsetted = valuesQs.offset(5);
+
+      expect(offsetted.config.offset, equals(5));
+    });
+
+    test('distinct() sets distinct flag', () {
+      final valuesQs = ValuesListQuerySet<Map<String, dynamic>, String>(
+        config: const QueryConfig(),
+        executor: null,
+        field: 'name',
+      );
+      final distinctQs = valuesQs.distinct();
+
+      expect(distinctQs.config.distinct, isTrue);
+    });
+
+    test('toList() throws without executor', () {
+      final valuesQs = ValuesListQuerySet<Map<String, dynamic>, String>(
+        config: const QueryConfig(),
+        executor: null,
+        field: 'name',
+      );
+      expect(() => valuesQs.toList(), throwsStateError);
+    });
+
+    test('first() throws without executor', () {
+      final valuesQs = ValuesListQuerySet<Map<String, dynamic>, String>(
+        config: const QueryConfig(),
+        executor: null,
+        field: 'name',
+      );
+      expect(() => valuesQs.first(), throwsStateError);
+    });
+
+    test('toString() includes type and field', () {
+      final valuesQs = ValuesListQuerySet<Map<String, dynamic>, String>(
+        config: const QueryConfig(),
+        executor: null,
+        field: 'name',
+      );
+      final str = valuesQs.toString();
+      expect(str, contains('ValuesListQuerySet'));
+      expect(str, contains('name'));
+    });
   });
 
   group('QueryConfig', () {

@@ -403,6 +403,171 @@ void main() {
       });
     });
 
+    group('executeValues()', () {
+      test('returns raw maps with specified fields', () async {
+        await executor.bulkCreate([
+          {'name': 'Alice', 'age': 25},
+          {'name': 'Bob', 'age': 30},
+        ]);
+
+        final rows = await executor.executeValues(const QueryConfig(), ['name', 'age']);
+
+        expect(rows.length, equals(2));
+        expect(rows[0], isA<Map<String, dynamic>>());
+        expect(rows[0]['name'], equals('Alice'));
+        expect(rows[0]['age'], equals(25));
+      });
+
+      test('selects only specified columns', () async {
+        await executor.bulkCreate([
+          {'name': 'Alice', 'age': 25},
+          {'name': 'Bob', 'age': 30},
+        ]);
+
+        final rows = await executor.executeValues(const QueryConfig(), ['name']);
+
+        expect(rows.length, equals(2));
+        expect(rows[0].containsKey('name'), isTrue);
+        expect(rows[0].containsKey('age'), isFalse);
+      });
+
+      test('applies filters', () async {
+        await executor.bulkCreate([
+          {'name': 'Alice', 'age': 25},
+          {'name': 'Bob', 'age': 30},
+          {'name': 'Charlie', 'age': 25},
+        ]);
+
+        final config = QueryConfig(filters: [Q(const Comparison(ColumnRef('age'), ComparisonOp.eq, Value(25)))]);
+        final rows = await executor.executeValues(config, ['name']);
+
+        expect(rows.length, equals(2));
+      });
+
+      test('supports distinct', () async {
+        await executor.bulkCreate([
+          {'name': 'Alice', 'age': 25},
+          {'name': 'Bob', 'age': 25},
+          {'name': 'Charlie', 'age': 30},
+        ]);
+
+        final config = const QueryConfig(distinct: true);
+        final rows = await executor.executeValues(config, ['age']);
+
+        expect(rows.length, equals(2));
+        final ages = rows.map((r) => r['age']).toSet();
+        expect(ages, containsAll([25, 30]));
+      });
+
+      test('supports ordering', () async {
+        await executor.bulkCreate([
+          {'name': 'Charlie', 'age': 35},
+          {'name': 'Alice', 'age': 25},
+          {'name': 'Bob', 'age': 30},
+        ]);
+
+        final config = const QueryConfig(ordering: [OrderBy(ColumnRef('age'))]);
+        final rows = await executor.executeValues(config, ['name', 'age']);
+
+        expect(rows[0]['name'], equals('Alice'));
+        expect(rows[1]['name'], equals('Bob'));
+        expect(rows[2]['name'], equals('Charlie'));
+      });
+
+      test('supports limit', () async {
+        await executor.bulkCreate([
+          {'name': 'Alice', 'age': 25},
+          {'name': 'Bob', 'age': 30},
+          {'name': 'Charlie', 'age': 35},
+        ]);
+
+        final config = const QueryConfig(limit: 2, ordering: [OrderBy(ColumnRef('id'))]);
+        final rows = await executor.executeValues(config, ['name']);
+
+        expect(rows.length, equals(2));
+      });
+    });
+
+    group('executeValuesFlat()', () {
+      test('returns flat list of values', () async {
+        await executor.bulkCreate([
+          {'name': 'Alice', 'age': 25},
+          {'name': 'Bob', 'age': 30},
+        ]);
+
+        final names = await executor.executeValuesFlat<String>(const QueryConfig(), 'name');
+
+        expect(names, equals(['Alice', 'Bob']));
+      });
+
+      test('returns correct types', () async {
+        await executor.bulkCreate([
+          {'name': 'Alice', 'age': 25},
+          {'name': 'Bob', 'age': 30},
+        ]);
+
+        final ages = await executor.executeValuesFlat<int>(const QueryConfig(), 'age');
+
+        expect(ages, equals([25, 30]));
+        expect(ages.first, isA<int>());
+      });
+
+      test('applies filters', () async {
+        await executor.bulkCreate([
+          {'name': 'Alice', 'age': 25},
+          {'name': 'Bob', 'age': 30},
+          {'name': 'Charlie', 'age': 25},
+        ]);
+
+        final config = QueryConfig(filters: [Q(const Comparison(ColumnRef('age'), ComparisonOp.eq, Value(25)))]);
+        final names = await executor.executeValuesFlat<String>(config, 'name');
+
+        expect(names.length, equals(2));
+        expect(names, containsAll(['Alice', 'Charlie']));
+      });
+
+      test('supports distinct', () async {
+        await executor.bulkCreate([
+          {'name': 'Alice', 'age': 25},
+          {'name': 'Bob', 'age': 25},
+          {'name': 'Charlie', 'age': 30},
+        ]);
+
+        final config = const QueryConfig(distinct: true);
+        final ages = await executor.executeValuesFlat<int>(config, 'age');
+
+        expect(ages.length, equals(2));
+        expect(ages.toSet(), equals({25, 30}));
+      });
+
+      test('supports ordering', () async {
+        await executor.bulkCreate([
+          {'name': 'Charlie', 'age': 35},
+          {'name': 'Alice', 'age': 25},
+          {'name': 'Bob', 'age': 30},
+        ]);
+
+        final config = const QueryConfig(ordering: [OrderBy(ColumnRef('age'))]);
+        final ages = await executor.executeValuesFlat<int>(config, 'age');
+
+        expect(ages, equals([25, 30, 35]));
+      });
+
+      test('supports limit', () async {
+        await executor.bulkCreate([
+          {'name': 'Alice', 'age': 25},
+          {'name': 'Bob', 'age': 30},
+          {'name': 'Charlie', 'age': 35},
+        ]);
+
+        final config = const QueryConfig(limit: 2, ordering: [OrderBy(ColumnRef('id'))]);
+        final names = await executor.executeValuesFlat<String>(config, 'name');
+
+        expect(names.length, equals(2));
+        expect(names, equals(['Alice', 'Bob']));
+      });
+    });
+
     group('transaction()', () {
       test('commits on success', () async {
         await executor.transaction((tx) async {
