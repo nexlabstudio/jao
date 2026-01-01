@@ -219,6 +219,83 @@ void main() {
       expect(relation, isNotNull);
       expect(relation!.fieldName, equals('author'));
     });
+
+    test('getRelationByType returns null when type not found', () {
+      const meta = ModelMetadata(
+        modelType: _Post,
+        tableName: 'posts',
+        primaryKey: 'id',
+        fields: {},
+        relations: {
+          'author': RelationMeta(
+            fieldName: 'author',
+            columnName: 'author_id',
+            relatedModel: _User,
+            relatedColumn: 'id',
+          ),
+        },
+      );
+
+      final relation = meta.getRelationByType(_Publisher);
+      expect(relation, isNull);
+    });
+
+    test('toString returns formatted string', () {
+      const meta = ModelMetadata(
+        modelType: _User,
+        tableName: 'users',
+        primaryKey: 'id',
+        fields: {
+          'id': FieldMeta(fieldName: 'id', columnName: 'id', dartType: int),
+          'name': FieldMeta(fieldName: 'name', columnName: 'name', dartType: String),
+        },
+        relations: {
+          'posts': RelationMeta(
+            fieldName: 'posts',
+            columnName: 'user_id',
+            relatedModel: _Post,
+          ),
+        },
+      );
+
+      final str = meta.toString();
+      expect(str, contains('ModelMetadata'));
+      expect(str, contains('users'));
+      expect(str, contains('2 fields'));
+      expect(str, contains('1 relations'));
+    });
+  });
+
+  group('FieldMeta', () {
+    test('toString returns formatted string', () {
+      const field = FieldMeta(
+        fieldName: 'createdAt',
+        columnName: 'created_at',
+        dartType: DateTime,
+      );
+
+      final str = field.toString();
+      expect(str, contains('FieldMeta'));
+      expect(str, contains('createdAt'));
+      expect(str, contains('created_at'));
+      expect(str, contains('DateTime'));
+    });
+  });
+
+  group('RelationMeta', () {
+    test('toString returns formatted string', () {
+      const relation = RelationMeta(
+        fieldName: 'author',
+        columnName: 'author_id',
+        relatedModel: _User,
+        relatedColumn: 'id',
+      );
+
+      final str = relation.toString();
+      expect(str, contains('RelationMeta'));
+      expect(str, contains('author'));
+      expect(str, contains('author_id'));
+    });
   });
 
   group('ModelRegistry.resolveJoinPath', () {
@@ -338,6 +415,47 @@ void main() {
 
       expect(result[1].fromTable, equals('authors'));
       expect(result[1].toTable, equals('publishers'));
+    });
+
+    test('returns null when related model is not registered', () {
+      // Register Post with a relation to User, but don't register User
+      ModelRegistry.instance.register(
+        const ModelMetadata(
+          modelType: _Post,
+          tableName: 'posts',
+          primaryKey: 'id',
+          fields: {},
+          relations: {
+            'author': RelationMeta(
+              fieldName: 'author',
+              columnName: 'author_id',
+              relatedModel: _User,
+              relatedColumn: 'id',
+            ),
+          },
+        ),
+      );
+
+      // Should return null because _User is not registered
+      final result = ModelRegistry.instance.resolveJoinPath('posts', 'author');
+      expect(result, isNull);
+    });
+  });
+
+  group('ResolvedJoin', () {
+    test('toString returns formatted string', () {
+      const join = ResolvedJoin(
+        fromTable: 'posts',
+        fromColumn: 'author_id',
+        toTable: 'authors',
+        toColumn: 'id',
+      );
+
+      final str = join.toString();
+      expect(str, contains('JOIN'));
+      expect(str, contains('authors'));
+      expect(str, contains('posts'));
+      expect(str, contains('author_id'));
     });
   });
 }
