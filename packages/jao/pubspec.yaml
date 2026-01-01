@@ -1,6 +1,6 @@
 name: jao
 description: Just Another ORM for Dart. Because you didn't have enough options already.
-version: 0.2.2
+version: 0.2.3
 homepage: https://github.com/nexlabstudio/jao/tree/dev/packages/jao
 repository: https://github.com/nexlabstudio/jao
 issue_tracker: https://github.com/nexlabstudio/jao/issues
