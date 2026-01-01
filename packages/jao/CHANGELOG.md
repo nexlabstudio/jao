@@ -1,3 +1,12 @@
+## [0.2.3] - 2026-01-01
+
+### Added
+
+- `values()` method on QuerySet for selecting specific columns as raw maps
+- `valuesFlat<V>()` method on QuerySet for selecting a single column as a flat list
+- `ValuesQuerySet` and `ValuesListQuerySet` classes with full query chaining support
+- New executor methods: `executeValues()` and `executeValuesFlat<V>()`
+
 ## [0.2.2] - 2026-01-01
 
 ### Added
