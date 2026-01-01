@@ -186,6 +186,25 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
     });
   }
 
+  @override
+  Future<List<Map<String, dynamic>>> executeValues(QueryConfig config, List<String> fields) async {
+    final query = compiler.compileSelect(table: tableName, config: config, columns: fields);
+
+    return pool.withConnection((conn) async {
+      return conn.query(query.sql, query.parameters);
+    });
+  }
+
+  @override
+  Future<List<V>> executeValuesFlat<V>(QueryConfig config, String field) async {
+    final query = compiler.compileSelect(table: tableName, config: config, columns: [field]);
+
+    return pool.withConnection((conn) async {
+      final rows = await conn.query(query.sql, query.parameters);
+      return rows.map((row) => row[field] as V).toList();
+    });
+  }
+
   Future<R> transaction<R>(Future<R> Function(TransactionExecutor<T> tx) fn) async {
     return pool.withTransaction((tx) async {
       final txExecutor = TransactionExecutor<T>(
