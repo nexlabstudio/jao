@@ -1,3 +1,16 @@
+## [0.2.4] - 2026-01-01
+
+### Added
+
+- Common Table Expressions (CTE) support:
+  - `Cte` class for defining non-recursive CTEs
+  - `RecursiveCte` class for hierarchical/recursive queries
+  - `CteRef` and `CteColumnRef` for referencing CTE columns
+  - `CteQuery` interface for queries that can be used in CTEs
+  - `.with_()` method on QuerySet to attach CTEs
+  - `.fromCte()` method on QuerySet to select from a CTE
+  - SQL compiler generates `WITH` and `WITH RECURSIVE` clauses
+
 ## [0.2.3] - 2026-01-01
 
 ### Added
