@@ -19,3 +19,5 @@ export 'src/migrations/migration.dart';
 export 'src/migrations/generator.dart';
 export 'src/jao.dart';
 export 'src/utils/type_converters.dart';
+export 'src/meta/model_meta.dart';
+export 'src/meta/model_registry.dart';
