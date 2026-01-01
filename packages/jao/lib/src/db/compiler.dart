@@ -147,8 +147,8 @@ class SqlCompiler {
       buffer.write(config.ordering.map(_compileOrderBy).join(', '));
     }
 
-    if (config.limit case final limit? when config.offset != null) {
-      buffer.write(dialect.limitOffset(limit, config.offset));
+    if (config.limit != null || config.offset != null) {
+      buffer.write(dialect.limitOffset(config.limit, config.offset));
     }
 
     return buffer.toString();
