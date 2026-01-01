@@ -264,7 +264,7 @@ class SqlCompiler {
       FunctionCall e => _compileFunctionCall(e),
       F e => _compileF(e),
       Q e => compileExpression(e.expression),
-      _ => throw UnsupportedError('Unknown expression type: ${expr.runtimeType}'),
+      Case e => _compileCase(e),
     };
   }
 
@@ -344,6 +344,22 @@ class SqlCompiler {
       return dialect.quoteIdentifier(parts.first);
     }
     return '${dialect.quoteIdentifier(parts.first)}.${dialect.quoteIdentifier(parts.last)}';
+  }
+
+  String _compileCase(Case expr) {
+    final buffer = StringBuffer('CASE');
+    for (final when in expr.whens) {
+      buffer.write(' WHEN ');
+      buffer.write(compileExpression(when.condition));
+      buffer.write(' THEN ');
+      buffer.write(compileExpression(when.then));
+    }
+    if (expr.elseResult != null) {
+      buffer.write(' ELSE ');
+      buffer.write(compileExpression(expr.elseResult!));
+    }
+    buffer.write(' END');
+    return buffer.toString();
   }
 
   String _addParam(Object? value) {
