@@ -5,11 +5,29 @@ import 'package:meta/meta.dart';
 import 'expressions.dart';
 
 @immutable
-class QuerySet<T> {
+class QuerySet<T> implements CteQuery<T> {
   final QueryConfig config;
   final QueryExecutor<T>? _executor;
+  final String? _tableName;
 
-  const QuerySet({this.config = const QueryConfig(), QueryExecutor<T>? executor}) : _executor = executor;
+  const QuerySet({
+    this.config = const QueryConfig(),
+    QueryExecutor<T>? executor,
+    String? tableName,
+  })  : _executor = executor,
+        _tableName = tableName;
+
+  @override
+  CteQueryConfig get cteConfig => CteQueryConfig(
+        tableName: _tableName,
+        filters: config.filters,
+        excludes: config.excludes,
+        ordering: config.ordering,
+        limit: config.limit,
+        offset: config.offset,
+        distinct: config.distinct,
+        only: config.only,
+      );
 
   QuerySet<T> _copyWith({
     List<Q>? filters,
@@ -23,6 +41,8 @@ class QuerySet<T> {
     List<String>? defer,
     bool? distinct,
     Map<String, Expression>? annotations,
+    List<Object>? ctes,
+    String? fromCte,
   }) {
     return QuerySet<T>(
       config: config.copyWith(
@@ -37,8 +57,11 @@ class QuerySet<T> {
         defer: defer,
         distinct: distinct,
         annotations: annotations,
+        ctes: ctes,
+        fromCte: fromCte,
       ),
       executor: _executor,
+      tableName: _tableName,
     );
   }
 
@@ -88,6 +111,15 @@ class QuerySet<T> {
   QuerySet<T> annotate(Map<String, Expression> annotations) =>
       _copyWith(annotations: {...config.annotations, ...annotations});
   QuerySet<T> distinct() => _copyWith(distinct: true);
+  QuerySet<T> with_(List<Object> ctes) => _copyWith(ctes: [...config.ctes, ...ctes]);
+  QuerySet<T> fromCte(Object cte) {
+    final name = switch (cte) {
+      Cte c => c.name,
+      RecursiveCte c => c.name,
+      _ => throw ArgumentError('Expected Cte or RecursiveCte, got ${cte.runtimeType}'),
+    };
+    return _copyWith(fromCte: name);
+  }
 
   Future<List<T>> toList() async {
     return switch (_executor) {
@@ -347,6 +379,8 @@ class QueryConfig {
   final List<String> defer;
   final bool distinct;
   final Map<String, Expression> annotations;
+  final List<Object> ctes;
+  final String? fromCte;
 
   const QueryConfig({
     this.filters = const [],
@@ -360,6 +394,8 @@ class QueryConfig {
     this.defer = const [],
     this.distinct = false,
     this.annotations = const {},
+    this.ctes = const [],
+    this.fromCte,
   });
 
   QueryConfig copyWith({
@@ -374,6 +410,8 @@ class QueryConfig {
     List<String>? defer,
     bool? distinct,
     Map<String, Expression>? annotations,
+    List<Object>? ctes,
+    String? fromCte,
   }) {
     return QueryConfig(
       filters: filters ?? this.filters,
@@ -387,6 +425,8 @@ class QueryConfig {
       defer: defer ?? this.defer,
       distinct: distinct ?? this.distinct,
       annotations: annotations ?? this.annotations,
+      ctes: ctes ?? this.ctes,
+      fromCte: fromCte ?? this.fromCte,
     );
   }
 
@@ -399,6 +439,8 @@ class QueryConfig {
     if (limit != null) parts.add('limit: $limit');
     if (offset != null) parts.add('offset: $offset');
     if (distinct) parts.add('distinct: true');
+    if (ctes.isNotEmpty) parts.add('ctes: $ctes');
+    if (fromCte != null) parts.add('fromCte: $fromCte');
     return 'QueryConfig(${parts.join(', ')})';
   }
 }
