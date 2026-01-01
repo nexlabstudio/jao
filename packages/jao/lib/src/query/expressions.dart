@@ -242,3 +242,88 @@ class When {
   @override
   String toString() => 'WHEN $condition THEN $then';
 }
+
+/// Common Table Expression (CTE) - WITH clause in SQL.
+@immutable
+class Cte<T> {
+  final String name;
+  final CteQuery<T> query;
+
+  const Cte(this.name, this.query);
+
+  CteColumnRef col(String column) => CteColumnRef(name, column);
+
+  @override
+  String toString() => 'Cte($name)';
+}
+
+/// Recursive Common Table Expression.
+@immutable
+class RecursiveCte<T> {
+  final String name;
+  final CteQuery<T> base;
+  final CteQuery<T> Function(CteRef) recursive;
+
+  const RecursiveCte(this.name, {required this.base, required this.recursive});
+
+  CteColumnRef col(String column) => CteColumnRef(name, column);
+
+  @override
+  String toString() => 'RecursiveCte($name)';
+}
+
+/// A reference to a CTE, used in recursive CTE definitions.
+@immutable
+class CteRef {
+  final String name;
+
+  const CteRef(this.name);
+
+  CteColumnRef col(String column) => CteColumnRef(name, column);
+
+  @override
+  String toString() => 'CteRef($name)';
+}
+
+/// A reference to a column in a CTE.
+@immutable
+class CteColumnRef extends Expression {
+  final String cteName;
+  final String column;
+
+  const CteColumnRef(this.cteName, this.column);
+
+  @override
+  String toString() => '$cteName.$column';
+}
+
+/// Abstract interface for queries that can be used in CTEs.
+/// This allows both QuerySet and raw query configs to be used.
+abstract class CteQuery<T> {
+  /// Get the query configuration for this CTE query.
+  CteQueryConfig get cteConfig;
+}
+
+/// Configuration for a CTE query.
+@immutable
+class CteQueryConfig {
+  final String? tableName;
+  final List<Q> filters;
+  final List<Q> excludes;
+  final List<OrderBy> ordering;
+  final int? limit;
+  final int? offset;
+  final bool distinct;
+  final List<String> only;
+
+  const CteQueryConfig({
+    this.tableName,
+    this.filters = const [],
+    this.excludes = const [],
+    this.ordering = const [],
+    this.limit,
+    this.offset,
+    this.distinct = false,
+    this.only = const [],
+  });
+}

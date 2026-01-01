@@ -21,6 +21,11 @@ class SqlCompiler {
     reset();
     final buffer = StringBuffer();
 
+    if (config.ctes.isNotEmpty) {
+      buffer.write(_compileCtes(config.ctes));
+      buffer.write(' ');
+    }
+
     buffer.write('SELECT ');
     if (config.distinct) {
       buffer.write('DISTINCT ');
@@ -44,10 +49,11 @@ class SqlCompiler {
     }
 
     buffer.write(' FROM ');
-    buffer.write(dialect.quoteIdentifier(table));
+    final fromTable = config.fromCte ?? table;
+    buffer.write(dialect.quoteIdentifier(fromTable));
 
     for (final relation in config.selectRelated) {
-      buffer.write(_compileJoin(table, relation));
+      buffer.write(_compileJoin(fromTable, relation));
     }
 
     final whereClause = _compileWhere(config.filters, config.excludes);
@@ -64,6 +70,88 @@ class SqlCompiler {
     buffer.write(dialect.limitOffset(config.limit, config.offset));
 
     return CompiledQuery(buffer.toString(), parameters);
+  }
+
+  String _compileCtes(List<Object> ctes) {
+    final hasRecursive = ctes.any((c) => c is RecursiveCte);
+    final buffer = StringBuffer();
+
+    buffer.write('WITH ');
+    if (hasRecursive) {
+      buffer.write('RECURSIVE ');
+    }
+
+    final cteParts = <String>[];
+    for (final cte in ctes) {
+      cteParts.add(_compileCte(cte));
+    }
+    buffer.write(cteParts.join(', '));
+
+    return buffer.toString();
+  }
+
+  String _compileCte(Object cte) {
+    return switch (cte) {
+      Cte c => _compileSimpleCte(c),
+      RecursiveCte c => _compileRecursiveCte(c),
+      _ => throw ArgumentError('Expected Cte or RecursiveCte, got ${cte.runtimeType}'),
+    };
+  }
+
+  String _compileSimpleCte(Cte cte) {
+    final queryConfig = cte.query.cteConfig;
+    final innerQuery = _compileCteQuery(queryConfig);
+    return '${dialect.quoteIdentifier(cte.name)} AS ($innerQuery)';
+  }
+
+  String _compileRecursiveCte(RecursiveCte cte) {
+    final baseConfig = cte.base.cteConfig;
+    final baseQuery = _compileCteQuery(baseConfig);
+
+    // Build the recursive part by invoking the callback with a CteRef
+    final cteRef = CteRef(cte.name);
+    final recursiveConfig = cte.recursive(cteRef).cteConfig;
+    final recursiveQuery = _compileCteQuery(recursiveConfig);
+
+    return '${dialect.quoteIdentifier(cte.name)} AS ($baseQuery UNION ALL $recursiveQuery)';
+  }
+
+  String _compileCteQuery(CteQueryConfig config) {
+    final buffer = StringBuffer();
+
+    buffer.write('SELECT ');
+
+    if (config.distinct) {
+      buffer.write('DISTINCT ');
+    }
+
+    if (config.only.isNotEmpty) {
+      buffer.write(config.only.map((c) => dialect.quoteIdentifier(c)).join(', '));
+    } else {
+      buffer.write('*');
+    }
+
+    if (config.tableName != null) {
+      buffer.write(' FROM ');
+      buffer.write(dialect.quoteIdentifier(config.tableName!));
+    }
+
+    final whereClause = _compileWhere(config.filters, config.excludes);
+    if (whereClause.isNotEmpty) {
+      buffer.write(' WHERE ');
+      buffer.write(whereClause);
+    }
+
+    if (config.ordering.isNotEmpty) {
+      buffer.write(' ORDER BY ');
+      buffer.write(config.ordering.map(_compileOrderBy).join(', '));
+    }
+
+    if (config.limit != null || config.offset != null) {
+      buffer.write(dialect.limitOffset(config.limit, config.offset));
+    }
+
+    return buffer.toString();
   }
 
   CompiledQuery compileCount({required String table, required QueryConfig config}) {
@@ -281,7 +369,12 @@ class SqlCompiler {
       F e => _compileF(e),
       Q e => compileExpression(e.expression),
       Case e => _compileCase(e),
+      CteColumnRef e => _compileCteColumnRef(e),
     };
+  }
+
+  String _compileCteColumnRef(CteColumnRef expr) {
+    return '${dialect.quoteIdentifier(expr.cteName)}.${dialect.quoteIdentifier(expr.column)}';
   }
 
   String _compileColumnRef(ColumnRef expr) {

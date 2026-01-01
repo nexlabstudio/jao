@@ -758,9 +758,140 @@ void main() {
       expect(result.sql, contains('"authors"."publisher_id" = "publishers"."id"'));
     });
   });
+
+  group('CTE (Common Table Expressions)', () {
+    test('compiles simple CTE', () {
+      final activePollsCte = Cte(
+        'active_polls',
+        _TestCteQuery(
+            tableName: 'polls', filters: [Q(const Comparison(ColumnRef('status'), ComparisonOp.eq, Value('active')))]),
+      );
+
+      final config = QueryConfig(ctes: [activePollsCte], fromCte: 'active_polls');
+      final result = compiler.compileSelect(table: 'polls', config: config);
+
+      expect(result.sql, startsWith('WITH "active_polls" AS'));
+      expect(result.sql, contains('SELECT * FROM "polls"'));
+      expect(result.sql, contains('"status" = ?1'));
+      expect(result.sql, contains('FROM "active_polls"'));
+      expect(result.parameters, equals(['active']));
+    });
+
+    test('compiles CTE with multiple CTEs', () {
+      final activePollsCte = Cte(
+        'active_polls',
+        _TestCteQuery(
+            tableName: 'polls', filters: [Q(const Comparison(ColumnRef('status'), ComparisonOp.eq, Value('active')))]),
+      );
+      final recentChoicesCte = Cte(
+        'recent_choices',
+        _TestCteQuery(
+            tableName: 'choices', filters: [Q(const Comparison(ColumnRef('votes'), ComparisonOp.gte, Value(10)))]),
+      );
+
+      final config = QueryConfig(ctes: [activePollsCte, recentChoicesCte], fromCte: 'active_polls');
+      final result = compiler.compileSelect(table: 'polls', config: config);
+
+      expect(result.sql, startsWith('WITH'));
+      expect(result.sql, contains('"active_polls" AS'));
+      expect(result.sql, contains('"recent_choices" AS'));
+    });
+
+    test('compiles CTE without fromCte (CTE available but selecting from main table)', () {
+      final activePollsCte = Cte(
+        'active_polls',
+        _TestCteQuery(
+            tableName: 'polls', filters: [Q(const Comparison(ColumnRef('status'), ComparisonOp.eq, Value('active')))]),
+      );
+
+      final config = QueryConfig(ctes: [activePollsCte]);
+      final result = compiler.compileSelect(table: 'polls', config: config);
+
+      expect(result.sql, startsWith('WITH'));
+      expect(result.sql, contains('FROM "polls"')); // Main table, not CTE
+    });
+
+    test('compiles recursive CTE', () {
+      final categoryTree = RecursiveCte<Map<String, dynamic>>(
+        'category_tree',
+        base: _TestCteQuery(
+            tableName: 'categories',
+            filters: [Q(const Comparison(ColumnRef('parent_id'), ComparisonOp.isNull, Value(null)))]),
+        recursive: (cte) => _TestCteQuery(tableName: 'categories', filters: []),
+      );
+
+      final config = QueryConfig(ctes: [categoryTree], fromCte: 'category_tree');
+      final result = compiler.compileSelect(table: 'categories', config: config);
+
+      expect(result.sql, startsWith('WITH RECURSIVE'));
+      expect(result.sql, contains('"category_tree" AS'));
+      expect(result.sql, contains('UNION ALL'));
+    });
+
+    test('compiles CTE with ordering and limit', () {
+      final topUsersCte = Cte(
+        'top_users',
+        _TestCteQuery(
+          tableName: 'users',
+          ordering: [const OrderBy(ColumnRef('score'), ascending: false)],
+          limit: 10,
+        ),
+      );
+
+      final config = QueryConfig(ctes: [topUsersCte], fromCte: 'top_users');
+      final result = compiler.compileSelect(table: 'users', config: config);
+
+      expect(result.sql, contains('ORDER BY "score" DESC'));
+      expect(result.sql, contains('LIMIT 10'));
+    });
+
+    test('compiles CTE with distinct', () {
+      final uniqueStatusesCte = Cte(
+        'unique_statuses',
+        _TestCteQuery(tableName: 'polls', distinct: true, only: ['status']),
+      );
+
+      final config = QueryConfig(ctes: [uniqueStatusesCte], fromCte: 'unique_statuses');
+      final result = compiler.compileSelect(table: 'polls', config: config);
+
+      expect(result.sql, contains('SELECT DISTINCT'));
+    });
+
+    test('compiles CteColumnRef', () {
+      final result = compiler.compileExpression(const CteColumnRef('active_polls', 'id'));
+      expect(result, equals('"active_polls"."id"'));
+    });
+
+    test('CteRef.col creates CteColumnRef', () {
+      const cteRef = CteRef('my_cte');
+      final colRef = cteRef.col('name');
+      expect(colRef, isA<CteColumnRef>());
+      expect(colRef.cteName, equals('my_cte'));
+      expect(colRef.column, equals('name'));
+    });
+
+    test('Cte.col creates CteColumnRef', () {
+      final cte = Cte('my_cte', _TestCteQuery(tableName: 'users'));
+      final colRef = cte.col('email');
+      expect(colRef, isA<CteColumnRef>());
+      expect(colRef.cteName, equals('my_cte'));
+      expect(colRef.column, equals('email'));
+    });
+
+    test('RecursiveCte.col creates CteColumnRef', () {
+      final recursiveCte = RecursiveCte<Map<String, dynamic>>(
+        'tree',
+        base: _TestCteQuery(tableName: 'nodes'),
+        recursive: (cte) => _TestCteQuery(tableName: 'nodes'),
+      );
+      final colRef = recursiveCte.col('parent_id');
+      expect(colRef, isA<CteColumnRef>());
+      expect(colRef.cteName, equals('tree'));
+      expect(colRef.column, equals('parent_id'));
+    });
+  });
 }
 
-// Test model classes for type registration
 class _TestPost {}
 
 class _TestAuthor {}
@@ -768,3 +899,31 @@ class _TestAuthor {}
 class _TestBook {}
 
 class _TestPublisher {}
+
+class _TestCteQuery implements CteQuery<Map<String, dynamic>> {
+  final String? tableName;
+  final List<Q> filters;
+  final List<OrderBy> ordering;
+  final int? limit;
+  final bool distinct;
+  final List<String> only;
+
+  const _TestCteQuery({
+    this.tableName,
+    this.filters = const [],
+    this.ordering = const [],
+    this.limit,
+    this.distinct = false,
+    this.only = const [],
+  });
+
+  @override
+  CteQueryConfig get cteConfig => CteQueryConfig(
+        tableName: tableName,
+        filters: filters,
+        ordering: ordering,
+        limit: limit,
+        distinct: distinct,
+        only: only,
+      );
+}

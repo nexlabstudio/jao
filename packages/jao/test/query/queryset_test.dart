@@ -569,5 +569,120 @@ void main() {
       final str = config.toString();
       expect(str, equals('QueryConfig()'));
     });
+
+    test('ctes defaults to empty list', () {
+      const config = QueryConfig();
+      expect(config.ctes, isEmpty);
+    });
+
+    test('fromCte defaults to null', () {
+      const config = QueryConfig();
+      expect(config.fromCte, isNull);
+    });
+
+    test('copyWith preserves ctes and fromCte', () {
+      final cte = Cte('test_cte', _TestCteQuery());
+      final config = QueryConfig(ctes: [cte], fromCte: 'test_cte');
+
+      final copied = config.copyWith(limit: 10);
+
+      expect(copied.ctes, equals([cte]));
+      expect(copied.fromCte, equals('test_cte'));
+    });
+
+    test('toString shows ctes and fromCte', () {
+      final cte = Cte('test_cte', _TestCteQuery());
+      final config = QueryConfig(ctes: [cte], fromCte: 'test_cte');
+
+      final str = config.toString();
+      expect(str, contains('ctes'));
+      expect(str, contains('fromCte: test_cte'));
+    });
   });
+
+  group('QuerySet CTE methods', () {
+    test('with_() adds CTEs to config', () {
+      final cte = Cte('test_cte', _TestCteQuery());
+      final qs = QuerySet<Map<String, dynamic>>().with_([cte]);
+
+      expect(qs.config.ctes.length, equals(1));
+      expect(qs.config.ctes.first, equals(cte));
+    });
+
+    test('with_() can add multiple CTEs', () {
+      final cte1 = Cte('cte1', _TestCteQuery());
+      final cte2 = Cte('cte2', _TestCteQuery());
+      final qs = QuerySet<Map<String, dynamic>>().with_([cte1, cte2]);
+
+      expect(qs.config.ctes.length, equals(2));
+    });
+
+    test('with_() can be chained to add more CTEs', () {
+      final cte1 = Cte('cte1', _TestCteQuery());
+      final cte2 = Cte('cte2', _TestCteQuery());
+      final qs = QuerySet<Map<String, dynamic>>().with_([cte1]).with_([cte2]);
+
+      expect(qs.config.ctes.length, equals(2));
+    });
+
+    test('fromCte() sets fromCte in config using Cte', () {
+      final cte = Cte('my_cte', _TestCteQuery());
+      final qs = QuerySet<Map<String, dynamic>>().fromCte(cte);
+
+      expect(qs.config.fromCte, equals('my_cte'));
+    });
+
+    test('fromCte() sets fromCte in config using RecursiveCte', () {
+      final recursiveCte = RecursiveCte<Map<String, dynamic>>(
+        'tree',
+        base: _TestCteQuery(),
+        recursive: (cte) => _TestCteQuery(),
+      );
+      final qs = QuerySet<Map<String, dynamic>>().fromCte(recursiveCte);
+
+      expect(qs.config.fromCte, equals('tree'));
+    });
+
+    test('fromCte() throws for invalid type', () {
+      final qs = QuerySet<Map<String, dynamic>>();
+      expect(() => qs.fromCte('invalid'), throwsArgumentError);
+    });
+
+    test('with_() and fromCte() can be chained', () {
+      final cte = Cte('active_users', _TestCteQuery());
+      final qs = QuerySet<Map<String, dynamic>>()
+          .with_([cte])
+          .fromCte(cte)
+          .filter(Q(const Comparison(ColumnRef('status'), ComparisonOp.eq, Value('active'))));
+
+      expect(qs.config.ctes.length, equals(1));
+      expect(qs.config.fromCte, equals('active_users'));
+      expect(qs.config.filters.length, equals(1));
+    });
+
+    test('QuerySet implements CteQuery', () {
+      final qs = QuerySet<Map<String, dynamic>>(tableName: 'users');
+      expect(qs, isA<CteQuery<Map<String, dynamic>>>());
+    });
+
+    test('QuerySet.cteConfig returns correct config', () {
+      final q = Q(const Comparison(ColumnRef('status'), ComparisonOp.eq, Value('active')));
+      final qs = QuerySet<Map<String, dynamic>>(
+        tableName: 'users',
+        config: QueryConfig(filters: [q], distinct: true, limit: 10, only: ['id', 'name']),
+      );
+
+      final cteConfig = qs.cteConfig;
+      expect(cteConfig.tableName, equals('users'));
+      expect(cteConfig.filters.length, equals(1));
+      expect(cteConfig.distinct, isTrue);
+      expect(cteConfig.limit, equals(10));
+      expect(cteConfig.only, equals(['id', 'name']));
+    });
+  });
+}
+
+class _TestCteQuery implements CteQuery<Map<String, dynamic>> {
+  @override
+  CteQueryConfig get cteConfig => const CteQueryConfig(tableName: 'test_table');
 }
