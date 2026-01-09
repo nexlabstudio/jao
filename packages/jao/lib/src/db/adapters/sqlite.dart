@@ -153,7 +153,7 @@ class SqliteConnection implements DatabaseConnection {
           lastInsertId: _db.lastInsertRowId,
         );
       } finally {
-        stmt.close();
+        stmt.dispose();
       }
     } catch (e) {
       throw SqliteException('Query execution failed: $e', sql: sql, database: _path);
@@ -172,7 +172,7 @@ class SqliteConnection implements DatabaseConnection {
 
         return QueryResult(affectedRows: _db.updatedRows, lastInsertId: _db.lastInsertRowId);
       } finally {
-        stmt.close();
+        stmt.dispose();
       }
     } catch (e) {
       throw SqliteException('Query execution failed: $e', sql: sql, database: _path);
@@ -202,7 +202,7 @@ class SqliteConnection implements DatabaseConnection {
 
   @override
   Future<void> close() async {
-    _db.close();
+    _db.dispose();
     _isOpen = false;
   }
 
@@ -283,7 +283,7 @@ class SqliteTransaction implements Transaction {
           lastInsertId: _db.lastInsertRowId,
         );
       } finally {
-        stmt.close();
+        stmt.dispose();
       }
     } catch (e) {
       throw SqliteException('Transaction query failed: $e', sql: sql, database: _path);
@@ -485,7 +485,7 @@ class SqliteAdapter implements DatabaseAdapter {
     if (!file.existsSync()) {
       // Open and close to create the file
       final db = sqlite.sqlite3.open(config.database);
-      db.close();
+      db.dispose();
     }
   }
 
