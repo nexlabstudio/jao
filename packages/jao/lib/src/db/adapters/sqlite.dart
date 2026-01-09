@@ -123,75 +123,33 @@ class SqliteConnection implements DatabaseConnection {
       final convertedSql = _convertPlaceholders(sql);
       final convertedParams = _convertParams(params);
 
-      // Determine if this is a write operation
-      final isWrite = _isWriteOperation(sql);
+      final result = await _db.execute(convertedSql, convertedParams);
 
-      if (isWrite) {
-        // Use execute() for write operations, then check for RETURNING clause
-        final result = await _db.execute(convertedSql, convertedParams);
+      // Get affected rows and last insert ID
+      final changesResult = await _db.get('SELECT changes() as changes, last_insert_rowid() as last_id');
+      final affectedRows = changesResult['changes'] as int? ?? 0;
+      final lastInsertId = changesResult['last_id'] as int?;
 
-        // Get affected rows and last insert ID
-        final changesResult = await _db.get('SELECT changes() as changes, last_insert_rowid() as last_id');
-        final affectedRows = changesResult['changes'] as int? ?? 0;
-        final lastInsertId = changesResult['last_id'] as int?;
+      final rows = <Map<String, dynamic>>[];
+      final columns = result.columnNames;
 
-        // If the result has rows (from RETURNING clause), return them
-        final rows = <Map<String, dynamic>>[];
-        final columns = result.columnNames;
-
-        for (final row in result) {
-          final map = <String, dynamic>{};
-          for (final column in columns) {
-            map[column] = _convertValue(row[column]);
-          }
-          rows.add(map);
+      for (final row in result) {
+        final map = <String, dynamic>{};
+        for (final column in columns) {
+          map[column] = _convertValue(row[column]);
         }
-
-        return QueryResult(
-          rows: rows,
-          columns: columns,
-          affectedRows: affectedRows,
-          lastInsertId: lastInsertId,
-        );
-      } else {
-        // Use getAll() for read operations
-        final result = await _db.getAll(convertedSql, convertedParams);
-
-        final rows = <Map<String, dynamic>>[];
-        final columns = result.columnNames;
-
-        for (final row in result) {
-          final map = <String, dynamic>{};
-          for (final column in columns) {
-            map[column] = _convertValue(row[column]);
-          }
-          rows.add(map);
-        }
-
-        return QueryResult(
-          rows: rows,
-          columns: columns,
-          affectedRows: 0,
-          lastInsertId: null,
-        );
+        rows.add(map);
       }
+
+      return QueryResult(
+        rows: rows,
+        columns: columns,
+        affectedRows: affectedRows,
+        lastInsertId: lastInsertId,
+      );
     } catch (e) {
       throw SqliteException('Query execution failed: $e', sql: sql, database: _path);
     }
-  }
-
-  /// Check if the SQL statement is a write operation.
-  bool _isWriteOperation(String sql) {
-    final trimmed = sql.trimLeft().toUpperCase();
-    return trimmed.startsWith('INSERT') ||
-        trimmed.startsWith('UPDATE') ||
-        trimmed.startsWith('DELETE') ||
-        trimmed.startsWith('CREATE') ||
-        trimmed.startsWith('DROP') ||
-        trimmed.startsWith('ALTER') ||
-        trimmed.startsWith('TRUNCATE') ||
-        trimmed.startsWith('REPLACE') ||
-        trimmed.startsWith('PRAGMA') && trimmed.contains('='); // PRAGMA with assignment is a write
   }
 
   @override
