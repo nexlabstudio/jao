@@ -1,12 +1,12 @@
 /// SQLite database adapter.
 ///
 /// Provides SQLite-specific SQL generation and database operations
-/// using the `sqlite3` package.
+/// using the `sqlite_async` package for async operations.
 library;
 
 import 'dart:async';
 import 'dart:io';
-import 'package:sqlite3/sqlite3.dart' as sqlite;
+import 'package:sqlite_async/sqlite_async.dart' as sqlite_async;
 import '../connection.dart';
 
 /// SQLite SQL dialect.
@@ -88,9 +88,9 @@ class SqliteDialect implements SqlDialect {
   }
 }
 
-/// SQLite database connection implementation.
+/// SQLite database connection implementation using sqlite_async.
 class SqliteConnection implements DatabaseConnection {
-  final sqlite.Database _db;
+  final sqlite_async.SqliteDatabase _db;
   final String _path;
   bool _isOpen = true;
 
@@ -103,20 +103,13 @@ class SqliteConnection implements DatabaseConnection {
   static Future<SqliteConnection> connect(DatabaseConfig config) async {
     final path = config.database;
 
-    // Handle in-memory database
-    if (path == ':memory:') {
-      final db = sqlite.sqlite3.openInMemory();
-      return SqliteConnection._(db, path);
-    }
-
-    // Open file-based database
-    final db = sqlite.sqlite3.open(path);
+    final db = sqlite_async.SqliteDatabase(path: path);
 
     // Enable foreign keys
-    db.execute('PRAGMA foreign_keys = ON');
+    await db.execute('PRAGMA foreign_keys = ON');
 
-    // Enable WAL mode for better concurrency
-    db.execute('PRAGMA journal_mode = DELETE');
+    // Use DELETE journal mode (simpler than WAL for compatibility)
+    await db.execute('PRAGMA journal_mode = DELETE');
 
     return SqliteConnection._(db, path);
   }
@@ -127,34 +120,33 @@ class SqliteConnection implements DatabaseConnection {
   @override
   Future<QueryResult> execute(String sql, [List<Object?>? params]) async {
     try {
-      // Convert positional params to SQLite format
       final convertedSql = _convertPlaceholders(sql);
       final convertedParams = _convertParams(params);
 
-      final stmt = _db.prepare(convertedSql);
-      try {
-        final result = stmt.select(convertedParams);
+      final result = await _db.getAll(convertedSql, convertedParams);
 
-        final rows = <Map<String, dynamic>>[];
-        final columns = result.columnNames;
+      // Get affected rows and last insert ID
+      final changesResult = await _db.get('SELECT changes() as changes, last_insert_rowid() as last_id');
+      final affectedRows = changesResult['changes'] as int? ?? 0;
+      final lastInsertId = changesResult['last_id'] as int?;
 
-        for (final row in result) {
-          final map = <String, dynamic>{};
-          for (final column in columns) {
-            map[column] = _convertValue(row[column]);
-          }
-          rows.add(map);
+      final rows = <Map<String, dynamic>>[];
+      final columns = result.columnNames;
+
+      for (final row in result) {
+        final map = <String, dynamic>{};
+        for (final column in columns) {
+          map[column] = _convertValue(row[column]);
         }
-
-        return QueryResult(
-          rows: rows,
-          columns: columns,
-          affectedRows: _db.updatedRows,
-          lastInsertId: _db.lastInsertRowId,
-        );
-      } finally {
-        stmt.dispose();
+        rows.add(map);
       }
+
+      return QueryResult(
+        rows: rows,
+        columns: columns,
+        affectedRows: affectedRows,
+        lastInsertId: lastInsertId,
+      );
     } catch (e) {
       throw SqliteException('Query execution failed: $e', sql: sql, database: _path);
     }
@@ -166,14 +158,14 @@ class SqliteConnection implements DatabaseConnection {
       final convertedSql = _convertPlaceholders(sql);
       final convertedParams = _convertParams(params);
 
-      final stmt = _db.prepare(convertedSql);
-      try {
-        stmt.execute(convertedParams);
+      await _db.execute(convertedSql, convertedParams);
 
-        return QueryResult(affectedRows: _db.updatedRows, lastInsertId: _db.lastInsertRowId);
-      } finally {
-        stmt.dispose();
-      }
+      // Get affected rows and last insert ID
+      final changesResult = await _db.get('SELECT changes() as changes, last_insert_rowid() as last_id');
+      final affectedRows = changesResult['changes'] as int? ?? 0;
+      final lastInsertId = changesResult['last_id'] as int?;
+
+      return QueryResult(affectedRows: affectedRows, lastInsertId: lastInsertId);
     } catch (e) {
       throw SqliteException('Query execution failed: $e', sql: sql, database: _path);
     }
@@ -196,13 +188,12 @@ class SqliteConnection implements DatabaseConnection {
 
   @override
   Future<SqliteTransaction> beginTransaction() async {
-    _db.execute('BEGIN TRANSACTION');
     return SqliteTransaction._(_db, _path);
   }
 
   @override
   Future<void> close() async {
-    _db.dispose();
+    await _db.close();
     _isOpen = false;
   }
 
@@ -240,11 +231,16 @@ class SqliteConnection implements DatabaseConnection {
   }
 }
 
-/// SQLite transaction implementation.
+/// SQLite transaction implementation using sqlite_async.
+///
+/// Note: sqlite_async handles transactions differently - it uses
+/// writeTransaction() for atomic operations. This class wraps that
+/// behavior to match the Transaction interface.
 class SqliteTransaction implements Transaction {
-  final sqlite.Database _db;
+  final sqlite_async.SqliteDatabase _db;
   final String _path;
   bool _isActive = true;
+  final List<_PendingOperation> _pendingOperations = [];
 
   SqliteTransaction._(this._db, this._path);
 
@@ -257,50 +253,39 @@ class SqliteTransaction implements Transaction {
       throw StateError('Transaction is no longer active');
     }
 
-    try {
-      final convertedSql = _convertPlaceholders(sql);
-      final convertedParams = _convertParams(params);
+    // Queue the operation - it will be executed on commit
+    _pendingOperations.add(_PendingOperation(sql, params));
 
-      final stmt = _db.prepare(convertedSql);
-      try {
-        final result = stmt.select(convertedParams);
-
-        final rows = <Map<String, dynamic>>[];
-        final columns = result.columnNames;
-
-        for (final row in result) {
-          final map = <String, dynamic>{};
-          for (final column in columns) {
-            map[column] = row[column];
-          }
-          rows.add(map);
-        }
-
-        return QueryResult(
-          rows: rows,
-          columns: columns,
-          affectedRows: _db.updatedRows,
-          lastInsertId: _db.lastInsertRowId,
-        );
-      } finally {
-        stmt.dispose();
-      }
-    } catch (e) {
-      throw SqliteException('Transaction query failed: $e', sql: sql, database: _path);
-    }
+    // Return a placeholder result - actual result comes after commit
+    return QueryResult();
   }
 
   @override
   Future<void> commit() async {
     if (!_isActive) return;
-    _db.execute('COMMIT');
-    _isActive = false;
+
+    try {
+      await _db.writeTransaction((tx) async {
+        for (final op in _pendingOperations) {
+          final convertedSql = _convertPlaceholders(op.sql);
+          final convertedParams = _convertParams(op.params);
+          await tx.execute(convertedSql, convertedParams);
+        }
+      });
+    } catch (e) {
+      throw SqliteException('Transaction commit failed: $e', database: _path);
+    } finally {
+      _isActive = false;
+      _pendingOperations.clear();
+    }
   }
 
   @override
   Future<void> rollback() async {
     if (!_isActive) return;
-    _db.execute('ROLLBACK');
+    // sqlite_async handles rollback automatically on error
+    // Just clear pending operations
+    _pendingOperations.clear();
     _isActive = false;
   }
 
@@ -323,11 +308,18 @@ class SqliteTransaction implements Transaction {
   }
 }
 
+/// Pending operation in a transaction.
+class _PendingOperation {
+  final String sql;
+  final List<Object?>? params;
+
+  _PendingOperation(this.sql, this.params);
+}
+
 /// SQLite connection pool implementation.
 ///
-/// Note: SQLite is typically single-connection, but we provide a pool
-/// interface for API consistency. For WAL mode, multiple readers are
-/// supported but only one writer at a time.
+/// Note: sqlite_async handles concurrency internally with write queuing,
+/// so this pool is simpler than traditional connection pools.
 class SqliteConnectionPool implements ConnectionPool {
   final DatabaseConfig _config;
   SqliteConnection? _connection;
@@ -480,12 +472,11 @@ class SqliteAdapter implements DatabaseAdapter {
       return; // Nothing to create for in-memory
     }
 
-    // Creating a SQLite database just means creating the file
+    // Creating a SQLite database just means opening and closing it
     final file = File(config.database);
     if (!file.existsSync()) {
-      // Open and close to create the file
-      final db = sqlite.sqlite3.open(config.database);
-      db.dispose();
+      final db = sqlite_async.SqliteDatabase(path: config.database);
+      await db.close();
     }
   }
 
@@ -515,7 +506,7 @@ class SqliteAdapter implements DatabaseAdapter {
   @override
   Future<List<String>> getTables(DatabaseConnection conn) async {
     final result = await conn.query('''
-      SELECT name FROM sqlite_master 
+      SELECT name FROM sqlite_master
       WHERE type='table' AND name NOT LIKE 'sqlite_%'
       ORDER BY name
     ''');
@@ -526,7 +517,7 @@ class SqliteAdapter implements DatabaseAdapter {
   Future<bool> tableExists(DatabaseConnection conn, String table) async {
     final result = await conn.query(
       '''
-      SELECT COUNT(*) as count FROM sqlite_master 
+      SELECT COUNT(*) as count FROM sqlite_master
       WHERE type='table' AND name=?
     ''',
       [table],

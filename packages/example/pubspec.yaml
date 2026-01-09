@@ -6,11 +6,15 @@ publish_to: none
 environment:
   sdk: '>=3.6.0 <4.0.0'
 
-resolution: workspace
+# resolution: workspace
 
 dependencies:
   dart_frog: ^1.2.0
-  jao: ^0.2.2
+  jao:
+    git:
+      url: https://github.com/nexlabstudio/jao.git
+      ref: no-build-hooks
+      path: packages/jao
   jao_cli: ^0.2.0
 
 dev_dependencies:
