@@ -57,6 +57,31 @@ Authors.objects.filter(Authors.$.email.endsWith('@gmail.com'));
 Authors.objects.filter(Authors.$.name.iContains('john'));
 Authors.objects.filter(Authors.$.name.iStartsWith('dr.'));
 Authors.objects.filter(Authors.$.email.iEndsWith('@GMAIL.COM'));
+
+// Case-insensitive exact match
+Authors.objects.filter(Authors.$.name.iEq('john doe'));
+
+// Regular expression (database-dependent)
+Authors.objects.filter(Authors.$.email.regex(r'^[a-z]+@'));
+```
+
+### Boolean Lookups
+
+```dart
+Authors.objects.filter(Authors.$.isActive.isTrue());
+Authors.objects.filter(Authors.$.isDeleted.isFalse());
+```
+
+### Date Lookups
+
+```dart
+// Extract date parts
+Authors.objects.filter(Authors.$.createdAt.year(2024));
+Authors.objects.filter(Authors.$.createdAt.month(12));
+Authors.objects.filter(Authors.$.createdAt.day(25));
+
+// Compare date only (ignores time)
+Authors.objects.filter(Authors.$.createdAt.date(DateTime(2024, 1, 1)));
 ```
 
 ### Null Checks
@@ -328,6 +353,16 @@ final names = await Authors.objects
 // [{'name': 'John', 'email': 'john@example.com'}, ...]
 ```
 
+### Select Single Field as List
+
+```dart
+final emails = await Authors.objects
+  .filter(Authors.$.isActive.eq(true))
+  .valuesFlat<String>('email')
+  .toList();
+// ['alice@example.com', 'bob@example.com', ...]
+```
+
 ### Distinct Values
 
 ```dart
@@ -367,5 +402,7 @@ final topAuthors = await Authors.objects
 
 ## Next Steps
 
+- Learn about [Advanced Queries](/advanced-queries) — Transactions, CTEs, streaming
+- Explore [Functions & Expressions](/functions) — Aggregates, F expressions, Case/When
 - See all available [Field Types](/fields)
 - Manage schema with [Migrations](/migrations)
