@@ -17,7 +17,8 @@ All field types support these options:
 | `unique` | `bool` | Add UNIQUE constraint (default: false) |
 | `index` | `bool` | Create database index (default: false) |
 | `defaultValue` | varies | Default value when not provided |
-| `dbColumn` | `String` | Custom column name in database |
+| `column` | `String` | Custom column name in database |
+| `helpText` | `String` | Documentation/description for the field |
 
 ## Primary Key Fields
 
@@ -50,6 +51,21 @@ late int id;
 | PostgreSQL | `BIGSERIAL PRIMARY KEY` |
 | SQLite | `INTEGER PRIMARY KEY AUTOINCREMENT` |
 | MySQL | `BIGINT AUTO_INCREMENT PRIMARY KEY` |
+
+### UuidPrimaryKey
+
+UUID as primary key with automatic generation.
+
+```dart
+@UuidPrimaryKey()
+late String id;
+```
+
+| Database | Column Type |
+|----------|-------------|
+| PostgreSQL | `UUID PRIMARY KEY DEFAULT gen_random_uuid()` |
+| SQLite | `VARCHAR(36) PRIMARY KEY` |
+| MySQL | `VARCHAR(36) PRIMARY KEY` |
 
 ## String Fields
 
@@ -104,6 +120,24 @@ late String email;
 ```
 
 **Database Type:** `VARCHAR(254)`
+
+### UrlField
+
+String with URL validation. Default maximum length is 2048 characters.
+
+```dart
+@UrlField()
+late String website;
+
+@UrlField(maxLength: 500)
+late String shortUrl;
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `maxLength` | `int` | 2048 | Maximum URL length |
+
+**Database Type:** `VARCHAR(n)`
 
 ## Numeric Fields
 
@@ -282,10 +316,14 @@ UUID string.
 @UuidField()
 late String uuid;
 
-// As primary key
-@UuidField(primaryKey: true)
-late String id;
+// Auto-generate UUID on creation
+@UuidField(autoGenerate: true)
+late String trackingId;
 ```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `autoGenerate` | `bool` | false | Auto-generate UUID on creation |
 
 **Database Type:** `UUID` (PostgreSQL) / `VARCHAR(36)` (SQLite, MySQL)
 
@@ -313,6 +351,38 @@ late List<int> fileData;
 ```
 
 **Database Type:** `BYTEA` (PostgreSQL) / `BLOB` (SQLite) / `LONGBLOB` (MySQL)
+
+### EnumField
+
+Store Dart enums in the database.
+
+```dart
+enum Status { pending, active, completed, cancelled }
+
+@Model()
+class Order {
+  @AutoField()
+  late int id;
+
+  // Store as string (default)
+  @EnumField<Status>()
+  late Status status;
+
+  // Store as integer index
+  @EnumField<Status>(storeAsInt: true)
+  late Status priority;
+}
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `storeAsInt` | `bool` | false | Store enum index instead of name |
+
+**Database Type:** `VARCHAR` (default) or `INTEGER` (with `storeAsInt: true`)
+
+<Info>
+When using `storeAsInt: false` (default), the enum value name is stored (e.g., "pending", "active"). This is more readable and safer when reordering enum values.
+</Info>
 
 ## Relationship Fields
 
@@ -364,9 +434,11 @@ Same options as ForeignKey, but enforces uniqueness.
 |------------|-----------|------------|--------|-------|
 | `@AutoField()` | `int` | `SERIAL` | `INTEGER AUTOINCREMENT` | `INT AUTO_INCREMENT` |
 | `@BigAutoField()` | `int` | `BIGSERIAL` | `INTEGER AUTOINCREMENT` | `BIGINT AUTO_INCREMENT` |
+| `@UuidPrimaryKey()` | `String` | `UUID` | `VARCHAR(36)` | `VARCHAR(36)` |
 | `@CharField(maxLength: n)` | `String` | `VARCHAR(n)` | `VARCHAR(n)` | `VARCHAR(n)` |
 | `@TextField()` | `String` | `TEXT` | `TEXT` | `TEXT` |
 | `@EmailField()` | `String` | `VARCHAR(254)` | `VARCHAR(254)` | `VARCHAR(254)` |
+| `@UrlField()` | `String` | `VARCHAR(2048)` | `VARCHAR(2048)` | `VARCHAR(2048)` |
 | `@IntegerField()` | `int` | `INTEGER` | `INTEGER` | `INT` |
 | `@BigIntegerField()` | `int` | `BIGINT` | `INTEGER` | `BIGINT` |
 | `@SmallIntegerField()` | `int` | `SMALLINT` | `INTEGER` | `SMALLINT` |
@@ -381,6 +453,7 @@ Same options as ForeignKey, but enforces uniqueness.
 | `@UuidField()` | `String` | `UUID` | `VARCHAR(36)` | `VARCHAR(36)` |
 | `@JsonField()` | `dynamic` | `JSONB` | `TEXT` | `JSON` |
 | `@BinaryField()` | `List<int>` | `BYTEA` | `BLOB` | `LONGBLOB` |
+| `@EnumField<T>()` | `T` | `VARCHAR` | `VARCHAR` | `VARCHAR` |
 | `@ForeignKey()` | `int` | `INTEGER REFERENCES` | `INTEGER REFERENCES` | `INT REFERENCES` |
 | `@OneToOneField()` | `int` | `INTEGER UNIQUE REFERENCES` | `INTEGER UNIQUE REFERENCES` | `INT UNIQUE REFERENCES` |
 
