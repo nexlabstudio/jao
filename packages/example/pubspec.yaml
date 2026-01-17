@@ -22,3 +22,10 @@ dev_dependencies:
   jao_generator: ^0.2.1
   test: ^1.24.0
   lints: ^6.0.0
+
+dependency_overrides:
+  jao:
+    git:
+      url: https://github.com/nexlabstudio/jao.git
+      ref: no-build-hooks
+      path: packages/jao
