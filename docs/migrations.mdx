@@ -40,6 +40,15 @@ Detects changes in your models and creates a new migration file:
 - Generates `up()` and `down()` methods automatically
 - Creates timestamped migration file in `lib/migrations/`
 
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `-n, --name=` | Custom migration name |
+| `-p, --path=` | Custom migrations directory |
+| `--empty` | Create empty migration file |
+| `--dry-run` | Preview without creating file |
+
 <Info>
 Always run `dart run build_runner build` before `jao makemigrations` to ensure model schemas are up to date.
 </Info>
@@ -51,6 +60,13 @@ jao migrate
 ```
 
 Runs all pending migrations in order.
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `-n, --dry-run` | Preview SQL without executing |
+| `-v, --verbose` | Show detailed output |
 
 ### Check Status
 
@@ -70,6 +86,14 @@ jao rollback
 jao rollback --step=3
 ```
 
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `-s, --step=` | Number of migrations to rollback (default: 1) |
+| `-n, --dry-run` | Preview SQL without executing |
+| `-v, --verbose` | Show detailed output |
+
 ### Reset
 
 ```bash
@@ -77,6 +101,13 @@ jao reset
 ```
 
 Rollback all migrations (returns database to initial state).
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `-f, --force` | Skip confirmation prompt |
+| `-n, --dry-run` | Preview SQL without executing |
 
 <Warning>
 `jao reset` is destructive. All tables and data will be dropped.
@@ -90,6 +121,13 @@ jao refresh
 
 Rollback all migrations and re-run them. Useful during development.
 
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `-f, --force` | Skip confirmation prompt |
+| `-n, --dry-run` | Preview SQL without executing |
+
 ### Show SQL
 
 ```bash
@@ -97,6 +135,22 @@ jao sql
 ```
 
 Displays the SQL that would be executed by pending migrations without running them.
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `-m, --migration=` | Show SQL for specific migration |
+| `-a, --all` | Show SQL for all migrations |
+| `--down` | Show rollback SQL instead of forward |
+
+### Create Empty Migration
+
+```bash
+jao make --name=add_soft_deletes
+```
+
+Creates an empty migration file for manual editing.
 
 ## Migration File Structure
 
@@ -125,6 +179,55 @@ class Migration001CreateAuthors extends Migration {
   @override
   void down(MigrationBuilder builder) {
     builder.dropTable('authors');
+  }
+}
+```
+
+### Auto-Reverse Migrations
+
+For simple operations, JAO can auto-generate the `down()` method:
+
+```dart
+class Migration002AddSlug extends Migration {
+  @override
+  String get name => '002_add_slug';
+
+  @override
+  bool get autoReverse => true;  // Auto-generate down() from up()
+
+  @override
+  void up(MigrationBuilder builder) {
+    builder.addColumn('posts', 'slug', (c) {
+      c.string(length: 100, nullable: true);
+    });
+    builder.createIndex('posts', ['slug'], unique: true);
+  }
+
+  // down() is auto-generated!
+}
+```
+
+### Migration Dependencies
+
+Ensure migrations run in correct order:
+
+```dart
+class Migration003AddForeignKey extends Migration {
+  @override
+  String get name => '003_add_foreign_key';
+
+  @override
+  List<String> get dependencies => ['001_create_authors', '002_create_posts'];
+
+  @override
+  void up(MigrationBuilder builder) {
+    builder.addForeignKey('posts', 'author_id', 'authors', 'id',
+      onDelete: 'CASCADE');
+  }
+
+  @override
+  void down(MigrationBuilder builder) {
+    builder.dropConstraint('posts', 'posts_author_id_fkey');
   }
 }
 ```
@@ -175,6 +278,12 @@ t.integer('status',
 
 ```dart
 builder.dropTable('users');
+```
+
+### Rename Table
+
+```dart
+builder.renameTable('users', 'accounts');
 ```
 
 ### Add Column
@@ -236,6 +345,70 @@ For operations not covered by the builder:
 
 ```dart
 builder.raw('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
+```
+
+### Raw SQL with Reverse
+
+Provide both forward and reverse SQL:
+
+```dart
+builder.rawSql(
+  'ALTER TABLE users ADD CONSTRAINT positive_age CHECK (age >= 0)',
+  'ALTER TABLE users DROP CONSTRAINT positive_age',
+);
+```
+
+### Soft Deletes
+
+Add standard soft delete columns:
+
+```dart
+builder.createTable('posts', (t) {
+  t.id();
+  t.string('title', length: 200);
+  t.softDeletes();  // Adds is_deleted (bool) and deleted_at (timestamp)
+});
+```
+
+### Unique Index
+
+```dart
+builder.createIndex('users', ['email'], unique: true);
+// Or within table definition:
+builder.createTable('users', (t) {
+  t.string('email', length: 254);
+  t.uniqueIndex(['email']);
+});
+```
+
+### Drop Constraint
+
+```dart
+builder.dropConstraint('posts', 'posts_author_id_fkey');
+```
+
+### Custom Dart Migration
+
+For complex migrations that need Dart code:
+
+```dart
+builder.runDart(
+  // Forward migration
+  (connection) async {
+    final users = await connection.query('SELECT * FROM users');
+    for (final user in users.rows) {
+      final slug = generateSlug(user['name']);
+      await connection.execute(
+        'UPDATE users SET slug = ? WHERE id = ?',
+        [slug, user['id']],
+      );
+    }
+  },
+  // Reverse migration
+  (connection) async {
+    await connection.execute('UPDATE users SET slug = NULL');
+  },
+);
 ```
 
 ## Registering Migrations
