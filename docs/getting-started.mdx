@@ -128,7 +128,7 @@ This generates a `models.g.dart` file with:
 Edit `lib/config/database.dart`:
 
 <Tabs>
-  <TabItem label="SQLite">
+  <TabItem label="SQLite" value="sqlite">
 ```dart
 import 'package:jao/jao.dart';
 
@@ -136,7 +136,7 @@ final databaseConfig = DatabaseConfig.sqlite('database.db');
 const databaseAdapter = SqliteAdapter();
 ```
   </TabItem>
-  <TabItem label="PostgreSQL">
+  <TabItem label="PostgreSQL" value="postgres">
 ```dart
 import 'package:jao/jao.dart';
 
@@ -150,7 +150,7 @@ final databaseConfig = DatabaseConfig.postgres(
 const databaseAdapter = PostgresAdapter();
 ```
   </TabItem>
-  <TabItem label="MySQL">
+  <TabItem label="MySQL" value="mysql">
 ```dart
 import 'package:jao/jao.dart';
 
