@@ -59,12 +59,20 @@
           "href": "/models"
         },
         {
+          "title": "Fields",
+          "href": "/fields"
+        },
+        {
           "title": "Queries",
           "href": "/queries"
         },
         {
-          "title": "Fields",
-          "href": "/fields"
+          "title": "Advanced Queries",
+          "href": "/advanced-queries"
+        },
+        {
+          "title": "Functions",
+          "href": "/functions"
         },
         {
           "title": "Migrations",
