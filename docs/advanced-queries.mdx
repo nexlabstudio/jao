@@ -1,0 +1,469 @@
+---
+title: Advanced Queries
+description: Transactions, CTEs, streaming, and advanced query techniques
+---
+
+# Advanced Queries
+
+This guide covers advanced query features including transactions, Common Table Expressions (CTEs), streaming results, and query optimization techniques.
+
+## Transactions
+
+JAO supports database transactions for atomic operations. Transactions auto-commit on success and auto-rollback on any exception.
+
+### Using the Connection Pool
+
+Use `Jao.instance.pool.withTransaction()` for low-level transaction control:
+
+```dart
+await Jao.instance.pool.withTransaction((tx) async {
+  // All operations here are in a single transaction
+  await tx.execute(
+    'INSERT INTO authors (name, email) VALUES (?, ?)',
+    ['Alice', 'alice@example.com'],
+  );
+  await tx.execute(
+    'INSERT INTO authors (name, email) VALUES (?, ?)',
+    ['Bob', 'bob@example.com'],
+  );
+  // Auto-commits on success, auto-rolls back on error
+});
+```
+
+### Using ModelExecutor
+
+For model-based transactions, use the executor's `transaction()` method:
+
+```dart
+final executor = Jao.instance.executor<Author>()!;
+
+await executor.transaction((tx) async {
+  await tx.create({'name': 'Alice', 'email': 'alice@example.com'});
+  await tx.create({'name': 'Bob', 'email': 'bob@example.com'});
+  // Auto-commits on success
+});
+```
+
+### Transaction with Rollback
+
+If any operation throws, the entire transaction is rolled back:
+
+```dart
+final executor = Jao.instance.executor<Author>()!;
+
+try {
+  await executor.transaction((tx) async {
+    await tx.create({'name': 'Alice', 'email': 'alice@example.com'});
+    throw Exception('Something went wrong');
+    // This line never executes
+    await tx.create({'name': 'Bob', 'email': 'bob@example.com'});
+  });
+} catch (e) {
+  // Transaction was rolled back - Alice was NOT created
+  print('Transaction failed: $e');
+}
+```
+
+### Query Within Transaction
+
+You can query data within the same transaction to see uncommitted changes:
+
+```dart
+final executor = Jao.instance.executor<Author>()!;
+
+await executor.transaction((tx) async {
+  await tx.create({'name': 'Alice', 'email': 'alice@example.com'});
+
+  // Query within the transaction sees the new record
+  final authors = await tx.query(const QueryConfig());
+  print('Count in transaction: ${authors.length}'); // Includes Alice
+});
+```
+
+### Transaction Operations
+
+The `TransactionExecutor` supports these operations:
+
+```dart
+await executor.transaction((tx) async {
+  // Create single record
+  final author = await tx.create({'name': 'Alice', 'email': 'alice@example.com'});
+
+  // Bulk create multiple records
+  await tx.bulkCreate([
+    {'name': 'Bob', 'email': 'bob@example.com'},
+    {'name': 'Charlie', 'email': 'charlie@example.com'},
+  ]);
+
+  // Query records
+  final authors = await tx.query(QueryConfig(
+    filters: [Q(Authors.$.isActive.eq(true))],
+  ));
+
+  // Update records
+  await tx.update(
+    QueryConfig(filters: [Q(Authors.$.name.eq('Alice'))]),
+    {'isActive': true},
+  );
+
+  // Delete records
+  await tx.delete(
+    QueryConfig(filters: [Q(Authors.$.isActive.eq(false))]),
+  );
+});
+```
+
+<Warning>
+TransactionExecutor does not support streaming, raw queries, or aggregates. Use these operations outside transactions or use the low-level pool API.
+</Warning>
+
+## Connection Pool
+
+JAO manages database connections via a connection pool.
+
+### Configuration
+
+```dart
+final databaseConfig = DatabaseConfig.postgres(
+  database: 'myapp',
+  username: 'postgres',
+  password: 'password',
+  minConnections: 2,    // Minimum pool size
+  maxConnections: 10,   // Maximum pool size
+  connectTimeout: Duration(seconds: 30),
+  queryTimeout: Duration(seconds: 60),
+);
+```
+
+### Pool Status
+
+```dart
+final pool = Jao.instance.pool;
+print('Available: ${pool.available}');
+print('In use: ${pool.inUse}');
+print('Total size: ${pool.size}');
+```
+
+### Manual Connection Management
+
+For advanced use cases, you can manually acquire and release connections:
+
+```dart
+final pool = Jao.instance.pool;
+
+// Auto-managed connection
+final result = await pool.withConnection((conn) async {
+  return await conn.query('SELECT * FROM authors WHERE id = ?', [1]);
+});
+
+// Or manually manage (use with caution)
+final conn = await pool.acquire();
+try {
+  final result = await conn.query('SELECT * FROM authors');
+  // process result...
+} finally {
+  await pool.release(conn);
+}
+```
+
+## Streaming Results
+
+For large datasets, stream results instead of loading everything into memory.
+
+### Stream All Results
+
+```dart
+final stream = Authors.objects
+  .filter(Authors.$.isActive.eq(true))
+  .stream();
+
+await for (final author in stream) {
+  print(author.name);
+}
+```
+
+### Chunked Results
+
+Process results in batches:
+
+```dart
+final chunks = Authors.objects.all().chunked(100);
+
+await for (final batch in chunks) {
+  // batch is a List<Author> with up to 100 items
+  for (final author in batch) {
+    await processAuthor(author);
+  }
+}
+```
+
+## Common Table Expressions (CTEs)
+
+CTEs allow you to define temporary result sets for complex queries.
+
+### Basic CTE
+
+```dart
+// Define a CTE for active authors
+final activeAuthors = Cte<Author>(
+  'active_authors',
+  Authors.objects.filter(Authors.$.isActive.eq(true)),
+);
+
+// Use the CTE in a query
+final results = await Posts.objects
+  .with_([activeAuthors])
+  .filter(Posts.$.authorId.inList(
+    activeAuthors.ref(Authors.$.id)
+  ))
+  .toList();
+```
+
+### Recursive CTE
+
+For hierarchical data like category trees:
+
+```dart
+final categoryTree = RecursiveCte<Category>(
+  'category_tree',
+  // Base case: root categories
+  baseQuery: Categories.objects.filter(Categories.$.parentId.isNull()),
+  // Recursive case: children of current level
+  recursiveQuery: (cteRef) => Categories.objects.filter(
+    Categories.$.parentId.inList(cteRef.column('id'))
+  ),
+);
+
+final allCategories = await Categories.objects
+  .fromCte(categoryTree)
+  .toList();
+```
+
+## Query Optimization
+
+### Select Related (JOINs)
+
+Fetch related objects in a single query:
+
+```dart
+// Without selectRelated: N+1 queries
+final posts = await Posts.objects.all().toList();
+for (final post in posts) {
+  final author = await Authors.objects.get(post.authorId); // Extra query!
+}
+
+// With selectRelated: Single query with JOIN
+final posts = await Posts.objects
+  .selectRelated('author')
+  .toList();
+// post.author is already loaded
+```
+
+Multiple relations:
+
+```dart
+final posts = await Posts.objects
+  .selectRelated('author', 'category', 'editor')
+  .toList();
+```
+
+### Prefetch Related
+
+For one-to-many or many-to-many relationships:
+
+```dart
+final authors = await Authors.objects
+  .prefetchRelated('posts')
+  .toList();
+// author.posts is pre-loaded
+```
+
+### Select Only Specific Fields
+
+```dart
+// Only fetch name and email columns
+final authors = await Authors.objects
+  .only(['name', 'email'])
+  .toList();
+```
+
+### Defer Heavy Fields
+
+```dart
+// Load everything except the large 'bio' field
+final authors = await Authors.objects
+  .defer(['bio'])
+  .toList();
+```
+
+## Values Queries
+
+Get results as Maps instead of model instances.
+
+### Values (Multiple Fields)
+
+```dart
+final results = await Authors.objects
+  .filter(Authors.$.isActive.eq(true))
+  .values(['id', 'name', 'email'])
+  .toList();
+
+// results = [
+//   {'id': 1, 'name': 'Alice', 'email': 'alice@example.com'},
+//   {'id': 2, 'name': 'Bob', 'email': 'bob@example.com'},
+// ]
+```
+
+### Values Flat (Single Field)
+
+```dart
+final names = await Authors.objects
+  .filter(Authors.$.isActive.eq(true))
+  .valuesFlat<String>('name')
+  .toList();
+
+// names = ['Alice', 'Bob', 'Charlie']
+```
+
+## Additional Query Methods
+
+### Single Result
+
+Get exactly one result (throws if zero or multiple):
+
+```dart
+final author = await Authors.objects
+  .filter(Authors.$.email.eq('alice@example.com'))
+  .single();
+```
+
+### First or Throw
+
+Get first result or throw if none:
+
+```dart
+final author = await Authors.objects
+  .filter(Authors.$.isActive.eq(true))
+  .orderBy(Authors.$.createdAt.desc())
+  .firstOrThrow();
+```
+
+### Unordered
+
+Remove any ordering:
+
+```dart
+final authors = await Authors.objects
+  .orderBy(Authors.$.name.asc())
+  .unordered()  // Removes the ordering
+  .toList();
+```
+
+### Slice Notation
+
+```dart
+// Get records 10-20
+final page = await Authors.objects
+  .orderBy(Authors.$.id.asc())
+  .slice(10, 20)
+  .toList();
+
+// Using index operator (single record at position)
+final fifth = await Authors.objects
+  .orderBy(Authors.$.id.asc())[4]
+  .first();
+```
+
+## Annotations (Computed Fields)
+
+Add computed columns to your query:
+
+```dart
+final results = await Authors.objects
+  .annotate({
+    'post_count': Count(Posts.$.id),
+    'latest_post': Max(Posts.$.createdAt),
+  })
+  .toList();
+
+// Access via: result['post_count'], result['latest_post']
+```
+
+## Raw SQL
+
+For complex queries not supported by the ORM:
+
+```dart
+final results = await Authors.objects.raw(
+  '''
+  SELECT a.*, COUNT(p.id) as post_count
+  FROM authors a
+  LEFT JOIN posts p ON p.author_id = a.id
+  WHERE a.is_active = ?
+  GROUP BY a.id
+  HAVING COUNT(p.id) > ?
+  ''',
+  [true, 5],
+);
+```
+
+<Warning>
+Raw SQL bypasses type safety and may not be portable across databases. Use sparingly.
+</Warning>
+
+## Get or Create / Update or Create
+
+### Get or Create
+
+```dart
+final (author, created) = await Authors.objects.getOrCreate(
+  condition: Authors.$.email.eq('alice@example.com'),
+  defaults: {
+    'name': 'Alice',
+    'age': 30,
+    'isActive': true,
+  },
+);
+
+if (created) {
+  print('New author created');
+} else {
+  print('Found existing author');
+}
+```
+
+### Update or Create
+
+```dart
+final (author, created) = await Authors.objects.updateOrCreate(
+  condition: Authors.$.email.eq('alice@example.com'),
+  defaults: {
+    'name': 'Alice Updated',
+    'age': 31,
+  },
+);
+// If exists: updates and returns (author, false)
+// If not exists: creates and returns (author, true)
+```
+
+## Ordering Options
+
+### Null Positioning
+
+```dart
+// Nulls first
+Authors.objects.orderBy(Authors.$.deletedAt.asc().nullsFirst());
+
+// Nulls last
+Authors.objects.orderBy(Authors.$.deletedAt.asc().nullsLast());
+```
+
+### Multiple Columns
+
+```dart
+Authors.objects.orderBy(
+  Authors.$.isActive.desc(),
+  Authors.$.name.asc(),
+  Authors.$.createdAt.desc(),
+);
+```
