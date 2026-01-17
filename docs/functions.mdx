@@ -1,0 +1,387 @@
+---
+title: Functions & Expressions
+description: Database functions, F expressions, and conditional logic
+---
+
+# Functions & Expressions
+
+JAO provides a comprehensive set of database functions and expressions for complex queries.
+
+## F Expressions
+
+Use `F` to reference field values in expressions:
+
+```dart
+// Compare fields to each other
+Authors.objects.filter(Authors.$.age.gtF(F('minAge')));
+
+// Arithmetic with fields
+await Posts.objects
+  .filter(Posts.$.id.eq(1))
+  .update({'viewCount': F('viewCount') + 1});
+
+// Field arithmetic in annotations
+Authors.objects.annotate({
+  'age_in_months': F('age') * 12,
+});
+```
+
+### Arithmetic Operators
+
+```dart
+F('field') + value   // Addition
+F('field') - value   // Subtraction
+F('field') * value   // Multiplication
+F('field') / value   // Division
+F('field') % value   // Modulo
+```
+
+### Field-to-Field Comparisons
+
+```dart
+// Where updated_at is after created_at
+Authors.objects.filter(
+  Authors.$.updatedAt.gtField(Authors.$.createdAt)
+);
+```
+
+## Aggregate Functions
+
+Use in `aggregate()` or `annotate()`:
+
+```dart
+final stats = await Authors.objects.aggregate({
+  'total': Count.all(),
+  'avg_age': Avg(Authors.$.age.col),
+  'max_age': Max(Authors.$.age.col),
+  'min_age': Min(Authors.$.age.col),
+  'sum_age': Sum(Authors.$.age.col),
+});
+```
+
+### Count
+
+```dart
+Count.all()                    // COUNT(*)
+Count(Authors.$.id)            // COUNT(id)
+Count(Authors.$.id, distinct: true)  // COUNT(DISTINCT id)
+```
+
+### Sum, Avg, Min, Max
+
+```dart
+Sum(Authors.$.age.col)
+Avg(Authors.$.age.col)
+Min(Authors.$.createdAt.col)
+Max(Authors.$.createdAt.col)
+```
+
+### Statistical Functions
+
+```dart
+StdDev(Authors.$.age.col)     // Standard deviation
+Variance(Authors.$.age.col)   // Variance
+```
+
+### String Aggregation
+
+```dart
+// Concatenate all names with comma separator
+StringAgg(Authors.$.name.col, ', ')
+```
+
+### Array Aggregation (PostgreSQL)
+
+```dart
+ArrayAgg(Authors.$.name.col)
+ArrayAgg(Authors.$.name.col, distinct: true)
+```
+
+### JSON Aggregation
+
+```dart
+JsonAgg(Authors.$.name.col)
+```
+
+## Conditional Functions
+
+### Coalesce
+
+Return first non-null value:
+
+```dart
+Coalesce([Authors.$.nickname.col, Authors.$.name.col])
+
+// With default value
+Coalesce.withDefault(Authors.$.nickname.col, 'Anonymous')
+```
+
+### NullIf
+
+Return null if values are equal:
+
+```dart
+NullIf(Authors.$.status.col, Value('inactive'))
+```
+
+### Greatest / Least
+
+```dart
+Greatest([Authors.$.score1.col, Authors.$.score2.col, Authors.$.score3.col])
+Least([Authors.$.price1.col, Authors.$.price2.col])
+```
+
+### Case / When
+
+Conditional expressions:
+
+```dart
+Case(
+  [
+    When(Authors.$.age.lt(18), then: Value('minor')),
+    When(Authors.$.age.lt(65), then: Value('adult')),
+  ],
+  orElse: Value('senior'),
+)
+```
+
+Usage in annotation:
+
+```dart
+final results = await Authors.objects
+  .annotate({
+    'age_group': Case(
+      [
+        When(Authors.$.age.lt(18), then: Value('minor')),
+        When(Authors.$.age.lt(65), then: Value('adult')),
+      ],
+      orElse: Value('senior'),
+    ),
+  })
+  .toList();
+```
+
+## String Functions
+
+### Length
+
+```dart
+Length(Authors.$.name.col)
+```
+
+### Case Conversion
+
+```dart
+Lower(Authors.$.name.col)
+Upper(Authors.$.name.col)
+```
+
+### Trim
+
+```dart
+Trim(Authors.$.name.col)
+```
+
+### Substring
+
+```dart
+Substr(Authors.$.name.col, 1, 10)  // Start at 1, length 10
+```
+
+### Concatenation
+
+```dart
+Concat([
+  Authors.$.firstName.col,
+  Value(' '),
+  Authors.$.lastName.col,
+])
+```
+
+### Replace
+
+```dart
+Replace(Authors.$.bio.col, 'old', 'new')
+```
+
+## Date/Time Functions
+
+### Current Date/Time
+
+```dart
+CurrentDate()   // Current date only
+Now()           // Current timestamp
+```
+
+### Extract Parts
+
+```dart
+Extract.year(Authors.$.createdAt.col)
+Extract.month(Authors.$.createdAt.col)
+Extract.day(Authors.$.createdAt.col)
+Extract.hour(Authors.$.createdAt.col)
+Extract.minute(Authors.$.createdAt.col)
+Extract.second(Authors.$.createdAt.col)
+
+// Generic extract
+Extract('dow', Authors.$.createdAt.col)  // Day of week
+```
+
+### Date Truncation
+
+```dart
+DateTrunc('month', Authors.$.createdAt.col)
+DateTrunc('year', Authors.$.createdAt.col)
+DateTrunc('day', Authors.$.createdAt.col)
+```
+
+### Usage Example
+
+```dart
+// Group by month
+final monthlyStats = await Authors.objects
+  .annotate({
+    'month': DateTrunc('month', Authors.$.createdAt.col),
+    'count': Count.all(),
+  })
+  .values(['month', 'count'])
+  .toList();
+```
+
+## Math Functions
+
+### Absolute Value
+
+```dart
+Abs(Authors.$.balance.col)
+```
+
+### Rounding
+
+```dart
+Round(Authors.$.price.col)        // Round to integer
+Round(Authors.$.price.col, 2)     // Round to 2 decimal places
+Floor(Authors.$.price.col)        // Round down
+Ceil(Authors.$.price.col)         // Round up
+```
+
+### Power and Roots
+
+```dart
+Power(Authors.$.base.col, 2)      // Square
+Sqrt(Authors.$.value.col)         // Square root
+```
+
+### Logarithms
+
+```dart
+Ln(Authors.$.value.col)           // Natural logarithm
+Log(Authors.$.value.col)          // Base-10 logarithm
+```
+
+## Using Functions in Queries
+
+### In Filters
+
+```dart
+Authors.objects.filter(
+  Length(Authors.$.name.col).gt(10)
+);
+
+Authors.objects.filter(
+  Extract.year(Authors.$.createdAt.col).eq(2024)
+);
+```
+
+### In Annotations
+
+```dart
+final results = await Authors.objects
+  .annotate({
+    'name_length': Length(Authors.$.name.col),
+    'created_year': Extract.year(Authors.$.createdAt.col),
+    'full_name': Concat([Authors.$.firstName.col, Value(' '), Authors.$.lastName.col]),
+  })
+  .toList();
+```
+
+### In Order By
+
+```dart
+Authors.objects.orderBy(
+  Length(Authors.$.name.col).desc()
+);
+```
+
+### In Updates
+
+```dart
+await Authors.objects
+  .filter(Authors.$.id.eq(1))
+  .update({
+    'name': Upper(Authors.$.name.col),
+    'viewCount': F('viewCount') + 1,
+  });
+```
+
+## Function Reference
+
+### Aggregate Functions
+
+| Function | Description |
+|----------|-------------|
+| `Count(expr)` | Count rows |
+| `Count.all()` | COUNT(*) |
+| `Sum(expr)` | Sum of values |
+| `Avg(expr)` | Average value |
+| `Min(expr)` | Minimum value |
+| `Max(expr)` | Maximum value |
+| `StdDev(expr)` | Standard deviation |
+| `Variance(expr)` | Variance |
+| `StringAgg(expr, sep)` | Concatenate strings |
+| `ArrayAgg(expr)` | Aggregate into array |
+| `JsonAgg(expr)` | Aggregate into JSON |
+
+### Conditional Functions
+
+| Function | Description |
+|----------|-------------|
+| `Coalesce(exprs)` | First non-null |
+| `NullIf(a, b)` | Null if equal |
+| `Greatest(exprs)` | Maximum value |
+| `Least(exprs)` | Minimum value |
+| `Case/When` | Conditional logic |
+
+### String Functions
+
+| Function | Description |
+|----------|-------------|
+| `Length(expr)` | String length |
+| `Lower(expr)` | Lowercase |
+| `Upper(expr)` | Uppercase |
+| `Trim(expr)` | Remove whitespace |
+| `Substr(expr, start, len)` | Substring |
+| `Concat(exprs)` | Concatenate |
+| `Replace(expr, from, to)` | Replace text |
+
+### Date/Time Functions
+
+| Function | Description |
+|----------|-------------|
+| `CurrentDate()` | Current date |
+| `Now()` | Current timestamp |
+| `Extract(part, expr)` | Extract date part |
+| `DateTrunc(prec, expr)` | Truncate date |
+
+### Math Functions
+
+| Function | Description |
+|----------|-------------|
+| `Abs(expr)` | Absolute value |
+| `Round(expr, places)` | Round |
+| `Floor(expr)` | Round down |
+| `Ceil(expr)` | Round up |
+| `Power(base, exp)` | Exponentiation |
+| `Sqrt(expr)` | Square root |
+| `Ln(expr)` | Natural log |
+| `Log(expr)` | Base-10 log |
