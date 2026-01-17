@@ -1,0 +1,102 @@
+---
+title: JAO - Django-inspired ORM for Dart
+description: A type-safe, model-first ORM for Dart backend development
+---
+
+# JAO
+
+A type-safe, model-first ORM for Dart backend development. Built for PostgreSQL, SQLite, and MySQL. Works seamlessly with Dart Frog, Shelf, or any Dart server framework.
+
+> **JAO** (Just Another ORM) — Because writing raw SQL shouldn't be your only option.
+
+<Info>
+JAO brings Django's elegant query API to Dart, giving you type-safe queries, lazy QuerySets, and a powerful migrations CLI.
+</Info>
+
+## Why JAO?
+
+**The problem:** Dart's backend ecosystem lacks a Django-style ORM. You're stuck with raw SQL strings, manual result mapping, and runtime errors waiting to happen.
+
+**The solution:** JAO brings Django's elegant query API to Dart.
+
+```dart
+// Before: Raw SQL, manual mapping, runtime errors
+final result = await db.query(
+  'SELECT * FROM authors WHERE age >= ? AND is_active = ? ORDER BY name LIMIT ?',
+  [18, true, 10]
+);
+final authors = result.map((row) => Author.fromMap(row)).toList();
+
+// After: Type-safe, chainable, IDE autocomplete
+final authors = await Authors.objects
+  .filter(Authors.$.age.gte(18) & Authors.$.isActive.eq(true))
+  .orderBy(Authors.$.name.asc())
+  .limit(10)
+  .toList();
+```
+
+## Features
+
+- **Type-safe queries** — Catch errors at compile time, not runtime
+- **Lazy QuerySets** — Chain filters without hitting the DB until needed
+- **Django-style API** — Familiar patterns: `filter()`, `exclude()`, `orderBy()`
+- **Cross-database** — PostgreSQL, SQLite, MySQL with zero code changes
+- **Django-style CLI** — `jao makemigrations`, `jao migrate`, `jao rollback`
+- **Code generation** — Define models once, get queries and serialization for free
+- **Framework agnostic** — Works with Dart Frog, Shelf, or any Dart backend
+
+## Quick Install
+
+```bash
+# Add dependencies
+dart pub add jao
+dart pub add --dev build_runner jao_generator
+
+# Install CLI globally
+dart pub global activate jao_cli
+
+# Initialize project
+jao init
+```
+
+## Packages
+
+| Package | Description | pub.dev |
+|---------|-------------|---------|
+| [jao](https://pub.dev/packages/jao) | Core ORM library | [![pub](https://img.shields.io/pub/v/jao.svg)](https://pub.dev/packages/jao) |
+| [jao_cli](https://pub.dev/packages/jao_cli) | CLI for migrations | [![pub](https://img.shields.io/pub/v/jao_cli.svg)](https://pub.dev/packages/jao_cli) |
+| [jao_generator](https://pub.dev/packages/jao_generator) | Code generator | [![pub](https://img.shields.io/pub/v/jao_generator.svg)](https://pub.dev/packages/jao_generator) |
+
+## Database Support
+
+| Database | Adapter | Status |
+|----------|---------|--------|
+| PostgreSQL | `PostgresAdapter()` | Stable |
+| SQLite | `SqliteAdapter()` | Stable |
+| MySQL | `MySqlAdapter()` | Stable |
+
+## Next Steps
+
+<Cards>
+  <Card title="Getting Started" href="/getting-started">
+    Set up JAO in your project step by step
+  </Card>
+  <Card title="Models" href="/models">
+    Learn how to define models with field annotations
+  </Card>
+  <Card title="Queries" href="/queries">
+    Master the Django-style query API
+  </Card>
+  <Card title="Migrations" href="/migrations">
+    Manage database schema with CLI commands
+  </Card>
+</Cards>
+
+## Community
+
+- [GitHub Issues](https://github.com/nexlabstudio/jao/issues) — Bug reports and feature requests
+- [GitHub Discussions](https://github.com/nexlabstudio/jao/discussions) — Questions and ideas
+
+## License
+
+MIT License — see [LICENSE](https://github.com/nexlabstudio/jao/blob/dev/LICENSE) for details.

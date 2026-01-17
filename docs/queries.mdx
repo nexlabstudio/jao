@@ -1,0 +1,371 @@
+---
+title: Query API
+description: Django-style query API for type-safe database operations
+---
+
+# Query API
+
+JAO provides a Django-style query API with lazy QuerySets and type-safe field accessors.
+
+## QuerySets
+
+QuerySets are lazy — they don't hit the database until you explicitly request data.
+
+```dart
+// This doesn't execute any SQL yet
+final queryset = Authors.objects
+  .filter(Authors.$.isActive.eq(true))
+  .orderBy(Authors.$.name.asc())
+  .limit(10);
+
+// SQL is executed when you call toList(), first(), count(), etc.
+final authors = await queryset.toList();
+```
+
+## Filtering
+
+### Basic Comparisons
+
+```dart
+// Exact match
+Authors.objects.filter(Authors.$.name.eq('John'));
+
+// Not equal
+Authors.objects.filter(Authors.$.status.ne('banned'));
+
+// Greater than / less than
+Authors.objects.filter(Authors.$.age.gt(18));
+Authors.objects.filter(Authors.$.age.gte(18));  // greater than or equal
+Authors.objects.filter(Authors.$.age.lt(65));
+Authors.objects.filter(Authors.$.age.lte(65));  // less than or equal
+
+// Between (inclusive)
+Authors.objects.filter(Authors.$.age.between(18, 65));
+```
+
+### String Lookups
+
+```dart
+// Contains
+Authors.objects.filter(Authors.$.name.contains('John'));
+
+// Starts with / ends with
+Authors.objects.filter(Authors.$.name.startsWith('Dr.'));
+Authors.objects.filter(Authors.$.email.endsWith('@gmail.com'));
+
+// Case-insensitive versions
+Authors.objects.filter(Authors.$.name.iContains('john'));
+Authors.objects.filter(Authors.$.name.iStartsWith('dr.'));
+Authors.objects.filter(Authors.$.email.iEndsWith('@GMAIL.COM'));
+```
+
+### Null Checks
+
+```dart
+// Is null
+Authors.objects.filter(Authors.$.bio.isNull());
+
+// Is not null
+Authors.objects.filter(Authors.$.bio.isNotNull());
+```
+
+### In List
+
+```dart
+Authors.objects.filter(
+  Authors.$.status.inList(['active', 'pending', 'review'])
+);
+```
+
+## Boolean Logic
+
+### AND (Chained Filters)
+
+Multiple `filter()` calls are ANDed together:
+
+```dart
+Authors.objects
+  .filter(Authors.$.age.gte(18))
+  .filter(Authors.$.isActive.eq(true));
+
+// Equivalent SQL: WHERE age >= 18 AND is_active = true
+```
+
+### AND Operator (`&`)
+
+```dart
+Authors.objects.filter(
+  Authors.$.age.gte(18) & Authors.$.isActive.eq(true)
+);
+```
+
+### OR Operator (`|`)
+
+```dart
+Authors.objects.filter(
+  Authors.$.age.lt(18) | Authors.$.age.gte(65)
+);
+
+// SQL: WHERE age < 18 OR age >= 65
+```
+
+### NOT Operator (`~`)
+
+```dart
+Authors.objects.filter(~Authors.$.name.eq('Admin'));
+
+// SQL: WHERE NOT (name = 'Admin')
+```
+
+### Complex Queries
+
+Combine operators for complex logic:
+
+```dart
+Authors.objects.filter(
+  (Authors.$.age.gte(18) & Authors.$.isActive.eq(true)) |
+  Authors.$.role.eq('admin')
+);
+
+// SQL: WHERE (age >= 18 AND is_active = true) OR role = 'admin'
+```
+
+## Exclude
+
+Exclude records matching a condition:
+
+```dart
+Authors.objects.exclude(Authors.$.status.eq('banned'));
+
+// Equivalent to:
+Authors.objects.filter(~Authors.$.status.eq('banned'));
+```
+
+## Ordering
+
+### Ascending
+
+```dart
+Authors.objects.orderBy(Authors.$.name.asc());
+```
+
+### Descending
+
+```dart
+Authors.objects.orderBy(Authors.$.createdAt.desc());
+```
+
+### Multiple Columns
+
+```dart
+Authors.objects.orderBy(
+  Authors.$.isActive.desc(),
+  Authors.$.name.asc(),
+);
+```
+
+## Pagination
+
+### Limit and Offset
+
+```dart
+// Get first 10 records
+Authors.objects.limit(10);
+
+// Skip first 20, get next 10
+Authors.objects.offset(20).limit(10);
+```
+
+### Slice
+
+```dart
+// Get records 20-30 (equivalent to offset(20).limit(10))
+Authors.objects.slice(20, 30);
+```
+
+## Retrieving Records
+
+### Get All
+
+```dart
+final authors = await Authors.objects.all().toList();
+```
+
+### Get First / Last
+
+```dart
+final first = await Authors.objects
+  .orderBy(Authors.$.name.asc())
+  .first();
+
+final last = await Authors.objects
+  .orderBy(Authors.$.name.asc())
+  .last();
+```
+
+<Warning>
+`first()` and `last()` throw an exception if no records exist. Use `firstOrNull()` and `lastOrNull()` for safe access.
+</Warning>
+
+### Get by Primary Key
+
+```dart
+final author = await Authors.objects.get(1);
+
+// Returns null if not found
+final author = await Authors.objects.getOrNull(999);
+```
+
+### Check Existence
+
+```dart
+final hasAdmins = await Authors.objects
+  .filter(Authors.$.role.eq('admin'))
+  .exists();
+```
+
+### Count
+
+```dart
+final count = await Authors.objects.count();
+
+final activeCount = await Authors.objects
+  .filter(Authors.$.isActive.eq(true))
+  .count();
+```
+
+## CRUD Operations
+
+### Create
+
+```dart
+final author = await Authors.objects.create({
+  'name': 'John Doe',
+  'email': 'john@example.com',
+  'age': 30,
+});
+```
+
+### Bulk Create
+
+```dart
+final authors = await Authors.objects.bulkCreate([
+  {'name': 'Alice', 'email': 'alice@example.com', 'age': 25},
+  {'name': 'Bob', 'email': 'bob@example.com', 'age': 35},
+]);
+```
+
+### Get or Create
+
+```dart
+final (author, created) = await Authors.objects.getOrCreate(
+  condition: Authors.$.email.eq('john@example.com'),
+  defaults: {'name': 'John', 'age': 30},
+);
+
+if (created) {
+  print('New author created');
+} else {
+  print('Existing author found');
+}
+```
+
+### Update
+
+```dart
+// Update matching records
+final updatedCount = await Authors.objects
+  .filter(Authors.$.isActive.eq(false))
+  .update({'isActive': true});
+
+print('Updated $updatedCount records');
+```
+
+### Delete
+
+```dart
+// Delete matching records
+final deletedCount = await Authors.objects
+  .filter(Authors.$.email.endsWith('@spam.com'))
+  .delete();
+
+print('Deleted $deletedCount records');
+```
+
+## Aggregations
+
+```dart
+final stats = await Authors.objects.aggregate({
+  'count': Count.all(),
+  'avg_age': Avg(Authors.$.age.col),
+  'max_age': Max(Authors.$.age.col),
+  'min_age': Min(Authors.$.age.col),
+  'total_age': Sum(Authors.$.age.col),
+});
+
+print(stats);
+// {'count': 150, 'avg_age': 34.5, 'max_age': 89, 'min_age': 18, 'total_age': 5175}
+```
+
+### Available Aggregations
+
+| Function | Description |
+|----------|-------------|
+| `Count.all()` | Count all records |
+| `Avg(column)` | Average value |
+| `Max(column)` | Maximum value |
+| `Min(column)` | Minimum value |
+| `Sum(column)` | Sum of values |
+
+## Values and Distinct
+
+### Select Specific Fields
+
+```dart
+final names = await Authors.objects
+  .values(['name', 'email'])
+  .toList();
+// [{'name': 'John', 'email': 'john@example.com'}, ...]
+```
+
+### Distinct Values
+
+```dart
+final uniqueStatuses = await Authors.objects
+  .values(['status'])
+  .distinct()
+  .toList();
+```
+
+## Raw SQL
+
+For complex queries not supported by the API:
+
+```dart
+final results = await Authors.objects.raw(
+  'SELECT * FROM authors WHERE age > ? AND created_at > ?',
+  [25, DateTime(2024, 1, 1)],
+);
+```
+
+<Warning>
+Use raw SQL sparingly. It bypasses type safety and may not be portable across databases.
+</Warning>
+
+## Chaining Example
+
+```dart
+// Complex query combining multiple operations
+final topAuthors = await Authors.objects
+  .filter(Authors.$.isActive.eq(true))
+  .filter(Authors.$.age.between(25, 45))
+  .exclude(Authors.$.role.eq('guest'))
+  .orderBy(Authors.$.createdAt.desc())
+  .limit(10)
+  .toList();
+```
+
+## Next Steps
+
+- See all available [Field Types](/fields)
+- Manage schema with [Migrations](/migrations)

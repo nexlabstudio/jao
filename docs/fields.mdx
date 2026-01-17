@@ -1,0 +1,391 @@
+---
+title: Field Types
+description: Complete reference of all field annotations
+---
+
+# Field Types
+
+JAO provides field annotations that map Dart types to database columns with validation and constraints.
+
+## Common Options
+
+All field types support these options:
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `nullable` | `bool` | Allow NULL values (default: false) |
+| `unique` | `bool` | Add UNIQUE constraint (default: false) |
+| `index` | `bool` | Create database index (default: false) |
+| `defaultValue` | varies | Default value when not provided |
+| `dbColumn` | `String` | Custom column name in database |
+
+## Primary Key Fields
+
+### AutoField
+
+Auto-incrementing integer primary key.
+
+```dart
+@AutoField()
+late int id;
+```
+
+| Database | Column Type |
+|----------|-------------|
+| PostgreSQL | `SERIAL PRIMARY KEY` |
+| SQLite | `INTEGER PRIMARY KEY AUTOINCREMENT` |
+| MySQL | `INT AUTO_INCREMENT PRIMARY KEY` |
+
+### BigAutoField
+
+Large auto-incrementing primary key for tables exceeding 2 billion rows.
+
+```dart
+@BigAutoField()
+late int id;
+```
+
+| Database | Column Type |
+|----------|-------------|
+| PostgreSQL | `BIGSERIAL PRIMARY KEY` |
+| SQLite | `INTEGER PRIMARY KEY AUTOINCREMENT` |
+| MySQL | `BIGINT AUTO_INCREMENT PRIMARY KEY` |
+
+## String Fields
+
+### CharField
+
+Fixed maximum length string.
+
+```dart
+@CharField(maxLength: 100)
+late String name;
+
+// With options
+@CharField(
+  maxLength: 100,
+  nullable: true,
+  unique: true,
+  defaultValue: 'Unknown',
+)
+late String? title;
+```
+
+| Option | Type | Required | Description |
+|--------|------|----------|-------------|
+| `maxLength` | `int` | Yes | Maximum character length |
+
+**Database Type:** `VARCHAR(n)`
+
+### TextField
+
+Unlimited length string.
+
+```dart
+@TextField()
+late String content;
+
+@TextField(nullable: true)
+late String? bio;
+```
+
+**Database Type:** `TEXT`
+
+### EmailField
+
+String with email validation. Limited to 254 characters (RFC 5321).
+
+```dart
+@EmailField()
+late String email;
+
+@EmailField(unique: true)
+late String email;
+```
+
+**Database Type:** `VARCHAR(254)`
+
+## Numeric Fields
+
+### IntegerField
+
+Standard 32-bit integer.
+
+```dart
+@IntegerField()
+late int count;
+
+// With validation
+@IntegerField(min: 0, max: 100)
+late int percentage;
+```
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `min` | `int` | Minimum allowed value |
+| `max` | `int` | Maximum allowed value |
+
+**Database Type:** `INTEGER`
+
+### BigIntegerField
+
+64-bit integer for large numbers.
+
+```dart
+@BigIntegerField()
+late int bigNumber;
+```
+
+**Database Type:** `BIGINT`
+
+### SmallIntegerField
+
+16-bit integer for small numbers (-32768 to 32767).
+
+```dart
+@SmallIntegerField()
+late int smallNumber;
+```
+
+**Database Type:** `SMALLINT`
+
+### PositiveIntegerField
+
+Integer with automatic `min: 0` validation.
+
+```dart
+@PositiveIntegerField()
+late int viewCount;
+```
+
+**Database Type:** `INTEGER` with CHECK constraint
+
+### FloatField
+
+Floating-point number.
+
+```dart
+@FloatField()
+late double rating;
+```
+
+**Database Type:** `REAL` / `DOUBLE`
+
+### DecimalField
+
+Fixed-precision decimal for financial data.
+
+```dart
+@DecimalField(maxDigits: 10, decimalPlaces: 2)
+late double price;
+```
+
+| Option | Type | Required | Description |
+|--------|------|----------|-------------|
+| `maxDigits` | `int` | Yes | Total number of digits |
+| `decimalPlaces` | `int` | Yes | Digits after decimal point |
+
+**Database Type:** `DECIMAL(maxDigits, decimalPlaces)` / `NUMERIC`
+
+## Boolean Fields
+
+### BooleanField
+
+True/false value.
+
+```dart
+@BooleanField()
+late bool isActive;
+
+@BooleanField(defaultValue: true)
+late bool isPublished;
+
+@BooleanField(defaultValue: false)
+late bool isDeleted;
+```
+
+**Database Type:** `BOOLEAN`
+
+<Info>
+JAO handles database-specific boolean representations automatically. PostgreSQL returns `bool`, while SQLite returns `0`/`1`.
+</Info>
+
+## Date and Time Fields
+
+### DateTimeField
+
+Date and time with timezone.
+
+```dart
+@DateTimeField()
+late DateTime scheduledAt;
+
+// Auto-set on creation
+@DateTimeField(autoNowAdd: true)
+late DateTime createdAt;
+
+// Auto-set on every save
+@DateTimeField(autoNow: true)
+late DateTime updatedAt;
+```
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `autoNowAdd` | `bool` | Set to current time on creation |
+| `autoNow` | `bool` | Update to current time on every save |
+
+**Database Type:** `TIMESTAMPTZ` / `DATETIME`
+
+### DateField
+
+Date only (no time component).
+
+```dart
+@DateField()
+late DateTime birthDate;
+
+@DateField(autoNowAdd: true)
+late DateTime createdDate;
+```
+
+**Database Type:** `DATE`
+
+### TimeField
+
+Time of day.
+
+```dart
+@TimeField()
+late Duration startTime;
+```
+
+**Database Type:** `TIME`
+
+### DurationField
+
+Time duration/interval.
+
+```dart
+@DurationField()
+late Duration sessionLength;
+```
+
+**Database Type:** `INTERVAL` (PostgreSQL) / `BIGINT` (SQLite, MySQL - stored as microseconds)
+
+## Specialized Fields
+
+### UuidField
+
+UUID string.
+
+```dart
+@UuidField()
+late String uuid;
+
+// As primary key
+@UuidField(primaryKey: true)
+late String id;
+```
+
+**Database Type:** `UUID` (PostgreSQL) / `VARCHAR(36)` (SQLite, MySQL)
+
+### JsonField
+
+JSON data stored as JSONB.
+
+```dart
+@JsonField()
+late dynamic metadata;
+
+@JsonField(nullable: true)
+late Map<String, dynamic>? settings;
+```
+
+**Database Type:** `JSONB` (PostgreSQL) / `TEXT` (SQLite, MySQL)
+
+### BinaryField
+
+Binary/blob data.
+
+```dart
+@BinaryField()
+late List<int> fileData;
+```
+
+**Database Type:** `BYTEA` (PostgreSQL) / `BLOB` (SQLite) / `LONGBLOB` (MySQL)
+
+## Relationship Fields
+
+### ForeignKey
+
+Many-to-one relationship.
+
+```dart
+@ForeignKey(Author, onDelete: OnDelete.cascade)
+late int authorId;
+
+// With custom column name
+@ForeignKey(Category, onDelete: OnDelete.setNull, dbColumn: 'cat_id')
+late int? categoryId;
+```
+
+| Option | Type | Required | Description |
+|--------|------|----------|-------------|
+| model | `Type` | Yes | Referenced model class |
+| `onDelete` | `OnDelete` | Yes | Delete behavior |
+
+#### OnDelete Options
+
+| Value | Description |
+|-------|-------------|
+| `OnDelete.cascade` | Delete related records when parent is deleted |
+| `OnDelete.setNull` | Set foreign key to NULL (field must be nullable) |
+| `OnDelete.restrict` | Prevent deletion if references exist |
+| `OnDelete.noAction` | Database default behavior |
+
+**Database Type:** `INTEGER REFERENCES table(id)`
+
+### OneToOneField
+
+One-to-one relationship.
+
+```dart
+@OneToOneField(User, onDelete: OnDelete.cascade)
+late int userId;
+```
+
+Same options as ForeignKey, but enforces uniqueness.
+
+**Database Type:** `INTEGER UNIQUE REFERENCES table(id)`
+
+## Field Type Summary
+
+| Annotation | Dart Type | PostgreSQL | SQLite | MySQL |
+|------------|-----------|------------|--------|-------|
+| `@AutoField()` | `int` | `SERIAL` | `INTEGER AUTOINCREMENT` | `INT AUTO_INCREMENT` |
+| `@BigAutoField()` | `int` | `BIGSERIAL` | `INTEGER AUTOINCREMENT` | `BIGINT AUTO_INCREMENT` |
+| `@CharField(maxLength: n)` | `String` | `VARCHAR(n)` | `VARCHAR(n)` | `VARCHAR(n)` |
+| `@TextField()` | `String` | `TEXT` | `TEXT` | `TEXT` |
+| `@EmailField()` | `String` | `VARCHAR(254)` | `VARCHAR(254)` | `VARCHAR(254)` |
+| `@IntegerField()` | `int` | `INTEGER` | `INTEGER` | `INT` |
+| `@BigIntegerField()` | `int` | `BIGINT` | `INTEGER` | `BIGINT` |
+| `@SmallIntegerField()` | `int` | `SMALLINT` | `INTEGER` | `SMALLINT` |
+| `@PositiveIntegerField()` | `int` | `INTEGER` | `INTEGER` | `INT UNSIGNED` |
+| `@FloatField()` | `double` | `REAL` | `REAL` | `DOUBLE` |
+| `@DecimalField()` | `double` | `DECIMAL` | `REAL` | `DECIMAL` |
+| `@BooleanField()` | `bool` | `BOOLEAN` | `INTEGER` | `TINYINT(1)` |
+| `@DateTimeField()` | `DateTime` | `TIMESTAMPTZ` | `TEXT` | `DATETIME` |
+| `@DateField()` | `DateTime` | `DATE` | `TEXT` | `DATE` |
+| `@TimeField()` | `Duration` | `TIME` | `TEXT` | `TIME` |
+| `@DurationField()` | `Duration` | `INTERVAL` | `INTEGER` | `BIGINT` |
+| `@UuidField()` | `String` | `UUID` | `VARCHAR(36)` | `VARCHAR(36)` |
+| `@JsonField()` | `dynamic` | `JSONB` | `TEXT` | `JSON` |
+| `@BinaryField()` | `List<int>` | `BYTEA` | `BLOB` | `LONGBLOB` |
+| `@ForeignKey()` | `int` | `INTEGER REFERENCES` | `INTEGER REFERENCES` | `INT REFERENCES` |
+| `@OneToOneField()` | `int` | `INTEGER UNIQUE REFERENCES` | `INTEGER UNIQUE REFERENCES` | `INT UNIQUE REFERENCES` |
+
+## Next Steps
+
+- Learn how to define [Models](/models)
+- Master the [Query API](/queries)
+- Manage schema with [Migrations](/migrations)

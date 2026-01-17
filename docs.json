@@ -1,0 +1,91 @@
+{
+  "$schema": "https://docs.page/schema.json",
+  "name": "JAO",
+  "description": "A Django-inspired ORM for Dart",
+  "logo": {
+    "light": "https://raw.githubusercontent.com/nexlabstudio/jao/dev/assets/logo.png",
+    "dark": "https://raw.githubusercontent.com/nexlabstudio/jao/dev/assets/logo.png"
+  },
+  "favicon": "https://raw.githubusercontent.com/nexlabstudio/jao/dev/assets/favicon.ico",
+  "theme": {
+    "primary": "#0175C2"
+  },
+  "social": {
+    "x": "nexlabstudio",
+    "github": "nexlabstudio/jao"
+  },
+  "header": {
+    "showName": true,
+    "showThemeToggle": true,
+    "showGitHubCard": true,
+    "links": [
+      {
+        "title": "pub.dev",
+        "href": "https://pub.dev/packages/jao"
+      }
+    ]
+  },
+  "anchors": [
+    {
+      "title": "pub.dev",
+      "icon": "cube",
+      "href": "https://pub.dev/packages/jao"
+    },
+    {
+      "title": "GitHub",
+      "icon": "github",
+      "href": "https://github.com/nexlabstudio/jao"
+    }
+  ],
+  "sidebar": [
+    {
+      "group": "Overview",
+      "pages": [
+        {
+          "title": "Home",
+          "href": "/"
+        },
+        {
+          "title": "Getting Started",
+          "href": "/getting-started"
+        }
+      ]
+    },
+    {
+      "group": "Guide",
+      "pages": [
+        {
+          "title": "Models",
+          "href": "/models"
+        },
+        {
+          "title": "Queries",
+          "href": "/queries"
+        },
+        {
+          "title": "Fields",
+          "href": "/fields"
+        },
+        {
+          "title": "Migrations",
+          "href": "/migrations"
+        }
+      ]
+    }
+  ],
+  "search": {
+    "docsearch": {
+      "appId": "",
+      "apiKey": "",
+      "indexName": "jao"
+    }
+  },
+  "content": {
+    "headerDepth": 3,
+    "zoomImages": true,
+    "automaticallyInferNextPrevious": true
+  },
+  "variables": {
+    "version": "0.2.0"
+  }
+}

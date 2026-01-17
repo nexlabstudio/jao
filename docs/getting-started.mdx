@@ -1,0 +1,293 @@
+---
+title: Getting Started
+description: Set up JAO in your Dart project
+---
+
+# Getting Started
+
+This guide will walk you through setting up JAO in your Dart project.
+
+## Installation
+
+### 1. Add Dependencies
+
+Add JAO to your `pubspec.yaml`:
+
+```yaml
+dependencies:
+  jao: ^{{version}}
+
+dev_dependencies:
+  build_runner: ^2.4.0
+  jao_generator: ^{{version}}
+```
+
+Or use the command line:
+
+```bash
+dart pub add jao
+dart pub add --dev build_runner jao_generator
+```
+
+### 2. Install the CLI
+
+Install the JAO CLI globally:
+
+```bash
+dart pub global activate jao_cli
+```
+
+### 3. Initialize Project
+
+Run the init command to set up your project structure:
+
+```bash
+jao init
+```
+
+This creates:
+- `jao.yaml` — Paths configuration
+- `lib/config/database.dart` — Database configuration
+- `lib/migrations/` — Migrations directory
+- `bin/migrate.dart` — Migration CLI entry point
+
+## Define Your First Model
+
+Create a model file (e.g., `lib/models/models.dart`):
+
+```dart
+import 'package:jao/jao.dart';
+
+part 'models.g.dart';
+
+@Model()
+class Author {
+  @AutoField()
+  late int id;
+
+  @CharField(maxLength: 100)
+  late String name;
+
+  @EmailField(unique: true)
+  late String email;
+
+  @IntegerField(min: 0)
+  late int age;
+
+  @BooleanField(defaultValue: true)
+  late bool isActive;
+
+  @TextField(nullable: true)
+  late String? bio;
+
+  @DateTimeField(autoNowAdd: true)
+  late DateTime createdAt;
+
+  @DateTimeField(autoNow: true)
+  late DateTime updatedAt;
+}
+
+@Model()
+class Post {
+  @AutoField()
+  late int id;
+
+  @CharField(maxLength: 200)
+  late String title;
+
+  @TextField()
+  late String content;
+
+  @ForeignKey(Author, onDelete: OnDelete.cascade)
+  late int authorId;
+
+  @BooleanField(defaultValue: false)
+  late bool isPublished;
+
+  @DateTimeField(autoNowAdd: true)
+  late DateTime createdAt;
+}
+```
+
+## Generate Code
+
+Run the build runner to generate the query classes:
+
+```bash
+dart run build_runner build
+```
+
+This generates a `models.g.dart` file with:
+- `Authors` — Manager class for Author queries
+- `Authors.$` — Field accessors for type-safe filtering
+- `Posts` — Manager class for Post queries
+- `Posts.$` — Field accessors for type-safe filtering
+
+## Configure Database
+
+Edit `lib/config/database.dart`:
+
+<Tabs>
+  <TabItem label="SQLite">
+```dart
+import 'package:jao/jao.dart';
+
+final databaseConfig = DatabaseConfig.sqlite('database.db');
+const databaseAdapter = SqliteAdapter();
+```
+  </TabItem>
+  <TabItem label="PostgreSQL">
+```dart
+import 'package:jao/jao.dart';
+
+final databaseConfig = DatabaseConfig.postgres(
+  database: 'myapp',
+  username: 'postgres',
+  password: 'password',
+  host: 'localhost',
+  port: 5432,
+);
+const databaseAdapter = PostgresAdapter();
+```
+  </TabItem>
+  <TabItem label="MySQL">
+```dart
+import 'package:jao/jao.dart';
+
+final databaseConfig = DatabaseConfig.mysql(
+  database: 'myapp',
+  username: 'root',
+  password: 'password',
+  host: 'localhost',
+  port: 3306,
+);
+const databaseAdapter = MySqlAdapter();
+```
+  </TabItem>
+</Tabs>
+
+## Register Model Schemas
+
+Update `bin/migrate.dart` to register your model schemas:
+
+```dart
+import 'dart:io';
+import 'package:jao_cli/jao_cli.dart';
+import 'package:your_app/models/models.dart';
+
+import '../lib/config/database.dart';
+import '../lib/migrations/migrations.dart';
+
+void main(List<String> args) async {
+  final config = MigrationRunnerConfig(
+    database: databaseConfig,
+    adapter: databaseAdapter,
+    migrations: allMigrations,
+    modelSchemas: [
+      Authors.schema,
+      Posts.schema,
+    ],
+  );
+
+  final cli = JaoCli(config);
+  exit(await cli.run(args));
+}
+```
+
+## Create & Run Migrations
+
+Generate migrations from your models:
+
+```bash
+jao makemigrations
+```
+
+Apply the migrations:
+
+```bash
+jao migrate
+```
+
+## Initialize at Runtime
+
+Call `Jao.configure()` once at application startup:
+
+```dart
+import 'package:jao/jao.dart';
+import 'lib/config/database.dart';
+
+Future<void> main() async {
+  await Jao.configure(
+    adapter: databaseAdapter,
+    config: databaseConfig,
+  );
+
+  // Start your server...
+}
+```
+
+## Query Your Data
+
+Now you can use type-safe queries:
+
+```dart
+import 'package:your_app/models/models.dart';
+
+// Get all authors
+final authors = await Authors.objects.all().toList();
+
+// Filter with type-safe field accessors
+final activeAdults = await Authors.objects
+  .filter(Authors.$.age.gte(18))
+  .filter(Authors.$.isActive.eq(true))
+  .orderBy(Authors.$.name.asc())
+  .toList();
+
+// Create a new author
+final author = await Authors.objects.create({
+  'name': 'John Doe',
+  'email': 'john@example.com',
+  'age': 30,
+});
+
+// Update authors
+await Authors.objects
+  .filter(Authors.$.id.eq(1))
+  .update({'name': 'Jane Doe'});
+
+// Delete authors
+await Authors.objects
+  .filter(Authors.$.isActive.eq(false))
+  .delete();
+```
+
+## Framework Integration
+
+JAO is framework-agnostic. Here's how to integrate with Dart Frog:
+
+```dart
+// main.dart
+import 'package:dart_frog/dart_frog.dart';
+import 'package:jao/jao.dart';
+import 'config/database.dart';
+
+Future<HttpServer> run(Handler handler, InternetAddress ip, int port) async {
+  await Jao.configure(adapter: databaseAdapter, config: databaseConfig);
+  return serve(handler, ip, port);
+}
+
+// routes/authors/index.dart
+import 'package:your_app/models/models.dart';
+
+Future<Response> onRequest(RequestContext context) async {
+  final authors = await Authors.objects.all().toList();
+  return Response.json(body: authors.map((a) => Authors.toRow(a)).toList());
+}
+```
+
+## Next Steps
+
+- Learn about [Models](/models) and field annotations
+- Master the [Query API](/queries)
+- Explore all [Field Types](/fields)
+- Manage schema with [Migrations](/migrations)

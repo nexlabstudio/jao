@@ -1,0 +1,304 @@
+---
+title: Models
+description: Define database models with field annotations
+---
+
+# Models
+
+Models in JAO are Dart classes annotated with `@Model()`. Each field is annotated with a field type that maps to a database column.
+
+## Basic Model
+
+```dart
+import 'package:jao/jao.dart';
+
+part 'user.g.dart';
+
+@Model()
+class User {
+  @AutoField()
+  late int id;
+
+  @CharField(maxLength: 100)
+  late String name;
+
+  @EmailField()
+  late String email;
+
+  @BooleanField(defaultValue: true)
+  late bool isActive;
+
+  @DateTimeField(autoNowAdd: true)
+  late DateTime createdAt;
+}
+```
+
+<Info>
+Always include `part 'filename.g.dart';` to enable code generation. The generated file contains the manager class and field accessors.
+</Info>
+
+## Generated Code
+
+After running `dart run build_runner build`, JAO generates:
+
+- **`Users`** — Manager class for database operations
+- **`Users.$`** — Field accessor for type-safe queries
+- **`Users.schema`** — Schema definition for migrations
+- **`Users.toRow()`** — Convert model to Map
+- **`Users.fromRow()`** — Convert Map to model
+
+## Model Annotation Options
+
+```dart
+@Model(
+  tableName: 'custom_users',  // Custom table name (default: snake_case of class name)
+)
+class User {
+  // ...
+}
+```
+
+## Field Options
+
+All field types support these common options:
+
+```dart
+@CharField(
+  maxLength: 100,
+  nullable: true,           // Allow NULL values
+  unique: true,             // Add UNIQUE constraint
+  index: true,              // Create index on this column
+  defaultValue: 'N/A',      // Default value
+  dbColumn: 'custom_name',  // Custom column name in database
+)
+late String? name;
+```
+
+### Nullable Fields
+
+Use nullable Dart types with `nullable: true`:
+
+```dart
+@TextField(nullable: true)
+late String? bio;
+```
+
+### Default Values
+
+Provide default values that are set when not explicitly provided:
+
+```dart
+@BooleanField(defaultValue: true)
+late bool isActive;
+
+@IntegerField(defaultValue: 0)
+late int viewCount;
+```
+
+### Unique Constraints
+
+Enforce uniqueness at the database level:
+
+```dart
+@EmailField(unique: true)
+late String email;
+```
+
+### Database Indexes
+
+Add indexes for frequently queried columns:
+
+```dart
+@CharField(maxLength: 100, index: true)
+late String slug;
+```
+
+## Relationships
+
+### Foreign Key
+
+Define a many-to-one relationship:
+
+```dart
+@Model()
+class Post {
+  @AutoField()
+  late int id;
+
+  @CharField(maxLength: 200)
+  late String title;
+
+  @ForeignKey(Author, onDelete: OnDelete.cascade)
+  late int authorId;
+}
+```
+
+#### OnDelete Options
+
+| Option | Description |
+|--------|-------------|
+| `OnDelete.cascade` | Delete related records |
+| `OnDelete.setNull` | Set foreign key to NULL |
+| `OnDelete.restrict` | Prevent deletion if references exist |
+| `OnDelete.noAction` | Database default behavior |
+
+### One-to-One
+
+Define a one-to-one relationship:
+
+```dart
+@Model()
+class UserProfile {
+  @AutoField()
+  late int id;
+
+  @OneToOneField(User, onDelete: OnDelete.cascade)
+  late int userId;
+
+  @TextField(nullable: true)
+  late String? bio;
+}
+```
+
+## Auto Timestamps
+
+JAO provides automatic timestamp handling:
+
+```dart
+@Model()
+class Post {
+  @AutoField()
+  late int id;
+
+  @CharField(maxLength: 200)
+  late String title;
+
+  // Set automatically when record is created
+  @DateTimeField(autoNowAdd: true)
+  late DateTime createdAt;
+
+  // Updated automatically on every save
+  @DateTimeField(autoNow: true)
+  late DateTime updatedAt;
+}
+```
+
+## Primary Keys
+
+### Auto-increment Primary Key
+
+```dart
+@AutoField()
+late int id;
+```
+
+### Big Auto-increment Primary Key
+
+For tables that may exceed 2 billion rows:
+
+```dart
+@BigAutoField()
+late int id;
+```
+
+### UUID Primary Key
+
+```dart
+@UuidField(primaryKey: true)
+late String id;
+```
+
+## Complete Example
+
+```dart
+import 'package:jao/jao.dart';
+
+part 'models.g.dart';
+
+@Model()
+class Author {
+  @AutoField()
+  late int id;
+
+  @CharField(maxLength: 100)
+  late String name;
+
+  @EmailField(unique: true)
+  late String email;
+
+  @IntegerField(min: 0)
+  late int age;
+
+  @BooleanField(defaultValue: true)
+  late bool isActive;
+
+  @TextField(nullable: true)
+  late String? bio;
+
+  @DateTimeField(autoNowAdd: true)
+  late DateTime createdAt;
+
+  @DateTimeField(autoNow: true)
+  late DateTime updatedAt;
+}
+
+@Model()
+class Post {
+  @AutoField()
+  late int id;
+
+  @CharField(maxLength: 200)
+  late String title;
+
+  @TextField()
+  late String content;
+
+  @CharField(maxLength: 100, index: true)
+  late String slug;
+
+  @ForeignKey(Author, onDelete: OnDelete.cascade)
+  late int authorId;
+
+  @BooleanField(defaultValue: false)
+  late bool isPublished;
+
+  @IntegerField(defaultValue: 0)
+  late int viewCount;
+
+  @DateTimeField(autoNowAdd: true)
+  late DateTime createdAt;
+
+  @DateTimeField(autoNow: true)
+  late DateTime updatedAt;
+}
+
+@Model()
+class Tag {
+  @AutoField()
+  late int id;
+
+  @CharField(maxLength: 50, unique: true)
+  late String name;
+
+  @CharField(maxLength: 50, index: true)
+  late String slug;
+}
+```
+
+## Best Practices
+
+<Warning>
+Always run `dart run build_runner build` after modifying models to regenerate the query classes.
+</Warning>
+
+1. **Use meaningful names** — Model names should be singular nouns (Author, not Authors)
+2. **Add indexes** — Index columns used in WHERE clauses or ORDER BY
+3. **Use appropriate field types** — Use `EmailField` for emails, `UuidField` for UUIDs, etc.
+4. **Set nullable explicitly** — Be explicit about which fields can be NULL
+5. **Use auto timestamps** — Use `autoNowAdd` and `autoNow` for created/updated tracking
+
+## Next Steps
+
+- Learn the [Query API](/queries) to fetch and manipulate data
+- See all available [Field Types](/fields)
+- Manage schema changes with [Migrations](/migrations)

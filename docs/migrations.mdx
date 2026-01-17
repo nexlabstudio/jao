@@ -1,0 +1,390 @@
+---
+title: Migrations
+description: Manage database schema with CLI commands
+---
+
+# Migrations
+
+JAO provides a Django-style migrations system that automatically detects model changes and generates migration files.
+
+## CLI Installation
+
+Install the JAO CLI globally:
+
+```bash
+dart pub global activate jao_cli
+```
+
+## CLI Commands
+
+### Initialize Project
+
+```bash
+jao init
+```
+
+Creates the project structure:
+- `jao.yaml` — Configuration file
+- `lib/config/database.dart` — Database settings
+- `lib/migrations/` — Migrations directory
+- `bin/migrate.dart` — Migration runner entry point
+
+### Generate Migrations
+
+```bash
+jao makemigrations
+```
+
+Detects changes in your models and creates a new migration file:
+- Compares current model schemas with previous migration state
+- Generates `up()` and `down()` methods automatically
+- Creates timestamped migration file in `lib/migrations/`
+
+<Info>
+Always run `dart run build_runner build` before `jao makemigrations` to ensure model schemas are up to date.
+</Info>
+
+### Apply Migrations
+
+```bash
+jao migrate
+```
+
+Runs all pending migrations in order.
+
+### Check Status
+
+```bash
+jao status
+```
+
+Shows which migrations have been applied and which are pending.
+
+### Rollback
+
+```bash
+# Rollback last migration
+jao rollback
+
+# Rollback last N migrations
+jao rollback --step=3
+```
+
+### Reset
+
+```bash
+jao reset
+```
+
+Rollback all migrations (returns database to initial state).
+
+<Warning>
+`jao reset` is destructive. All tables and data will be dropped.
+</Warning>
+
+### Refresh
+
+```bash
+jao refresh
+```
+
+Rollback all migrations and re-run them. Useful during development.
+
+### Show SQL
+
+```bash
+jao sql
+```
+
+Displays the SQL that would be executed by pending migrations without running them.
+
+## Migration File Structure
+
+Generated migrations look like this:
+
+```dart
+import 'package:jao/jao.dart';
+
+class Migration001CreateAuthors extends Migration {
+  @override
+  String get name => '001_create_authors';
+
+  @override
+  void up(MigrationBuilder builder) {
+    builder.createTable('authors', (t) {
+      t.id();
+      t.string('name', length: 100);
+      t.string('email', length: 254, unique: true);
+      t.integer('age');
+      t.boolean('is_active', defaultValue: true);
+      t.text('bio', nullable: true);
+      t.timestamps();
+    });
+  }
+
+  @override
+  void down(MigrationBuilder builder) {
+    builder.dropTable('authors');
+  }
+}
+```
+
+## Migration Builder API
+
+### Create Table
+
+```dart
+builder.createTable('users', (t) {
+  t.id();                                    // Auto-increment primary key
+  t.bigId();                                 // Big auto-increment primary key
+  t.string('name', length: 100);             // VARCHAR
+  t.text('bio');                             // TEXT
+  t.integer('age');                          // INTEGER
+  t.bigInteger('big_number');                // BIGINT
+  t.smallInteger('small_number');            // SMALLINT
+  t.float('rating');                         // REAL/FLOAT
+  t.decimal('price', precision: 10, scale: 2); // DECIMAL
+  t.boolean('is_active');                    // BOOLEAN
+  t.dateTime('scheduled_at');                // TIMESTAMPTZ
+  t.date('birth_date');                      // DATE
+  t.time('start_time');                      // TIME
+  t.uuid('uuid');                            // UUID
+  t.json('metadata');                        // JSONB
+  t.binary('file_data');                     // BYTEA/BLOB
+  t.timestamps();                            // created_at and updated_at
+});
+```
+
+### Column Options
+
+```dart
+t.string('email',
+  length: 254,
+  nullable: true,
+  unique: true,
+  defaultValue: 'unknown@example.com',
+);
+
+t.integer('status',
+  nullable: false,
+  defaultValue: 0,
+);
+```
+
+### Drop Table
+
+```dart
+builder.dropTable('users');
+```
+
+### Add Column
+
+```dart
+builder.addColumn('users', 'phone', (c) {
+  c.string(length: 20, nullable: true);
+});
+```
+
+### Drop Column
+
+```dart
+builder.dropColumn('users', 'phone');
+```
+
+### Rename Column
+
+```dart
+builder.renameColumn('users', 'old_name', 'new_name');
+```
+
+### Alter Column
+
+```dart
+builder.alterColumn('users', 'name', (c) {
+  c.string(length: 200);  // Change max length
+});
+```
+
+### Add Index
+
+```dart
+builder.addIndex('users', ['email']);
+builder.addIndex('posts', ['author_id', 'created_at']);
+```
+
+### Drop Index
+
+```dart
+builder.dropIndex('users', 'users_email_idx');
+```
+
+### Add Foreign Key
+
+```dart
+builder.addForeignKey(
+  'posts',           // Table
+  'author_id',       // Column
+  'authors',         // Referenced table
+  'id',              // Referenced column
+  onDelete: 'CASCADE',
+);
+```
+
+### Raw SQL
+
+For operations not covered by the builder:
+
+```dart
+builder.raw('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
+```
+
+## Registering Migrations
+
+Update `lib/migrations/migrations.dart`:
+
+```dart
+import 'package:jao/jao.dart';
+
+import '001_create_authors.dart';
+import '002_create_posts.dart';
+import '003_add_slug_to_posts.dart';
+
+final List<Migration> allMigrations = [
+  Migration001CreateAuthors(),
+  Migration002CreatePosts(),
+  Migration003AddSlugToPosts(),
+];
+```
+
+## Configuration
+
+### jao.yaml
+
+```yaml
+# Path configuration
+models_path: lib/models
+migrations_path: lib/migrations
+config_path: lib/config
+
+# Database (can also be configured in database.dart)
+database:
+  adapter: sqlite
+  name: app.db
+```
+
+### bin/migrate.dart
+
+```dart
+import 'dart:io';
+import 'package:jao_cli/jao_cli.dart';
+import 'package:your_app/models/models.dart';
+
+import '../lib/config/database.dart';
+import '../lib/migrations/migrations.dart';
+
+void main(List<String> args) async {
+  final config = MigrationRunnerConfig(
+    database: databaseConfig,
+    adapter: databaseAdapter,
+    migrations: allMigrations,
+    modelSchemas: [
+      Authors.schema,
+      Posts.schema,
+      Tags.schema,
+    ],
+  );
+
+  final cli = JaoCli(config);
+  exit(await cli.run(args));
+}
+```
+
+## Best Practices
+
+### 1. Never Edit Applied Migrations
+
+Once a migration has been applied (especially in production), never modify it. Create a new migration instead.
+
+### 2. Keep Migrations Small
+
+Each migration should do one thing. This makes rollbacks safer and debugging easier.
+
+### 3. Test Rollbacks
+
+Always verify that `down()` correctly reverses `up()`:
+
+```bash
+jao migrate
+jao rollback
+jao migrate
+```
+
+### 4. Use Transactions
+
+Migrations run in transactions by default. If one operation fails, the entire migration is rolled back.
+
+### 5. Review Generated SQL
+
+Before applying to production:
+
+```bash
+jao sql
+```
+
+### 6. Back Up Before Production Migrations
+
+Always back up your production database before running migrations.
+
+## Workflow Example
+
+```bash
+# 1. Modify your models
+# Edit lib/models/models.dart
+
+# 2. Regenerate code
+dart run build_runner build
+
+# 3. Generate migration
+jao makemigrations
+
+# 4. Review the migration file
+# Check lib/migrations/
+
+# 5. Preview SQL
+jao sql
+
+# 6. Apply migration
+jao migrate
+
+# 7. Verify
+jao status
+```
+
+## Troubleshooting
+
+### Migration State Out of Sync
+
+If the migration table gets out of sync:
+
+```bash
+# Check current state
+jao status
+
+# Manually mark migration as applied (use with caution)
+# Edit the jao_migrations table directly
+```
+
+### Conflicting Migrations
+
+If two developers create migrations with the same number:
+
+1. Rollback to before the conflict
+2. Rename one migration file
+3. Update `migrations.dart`
+4. Re-apply migrations
+
+## Next Steps
+
+- Learn how to define [Models](/models)
+- Master the [Query API](/queries)
+- See all [Field Types](/fields)
