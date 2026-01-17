@@ -52,10 +52,87 @@ After running `dart run build_runner build`, JAO generates:
 ```dart
 @Model(
   tableName: 'custom_users',  // Custom table name (default: snake_case of class name)
+  abstract: false,            // Abstract model (won't create table)
+  ordering: ['name'],         // Default ordering for queries
+  uniqueTogether: [['email', 'tenantId']],  // Multi-column unique constraints
+  indexTogether: [['status', 'createdAt']], // Multi-column indexes
+  appLabel: 'users',          // Namespace for the model
 )
 class User {
   // ...
 }
+```
+
+### Model Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `tableName` | `String` | Custom table name (default: snake_case of class) |
+| `abstract` | `bool` | If true, no table is created (for inheritance) |
+| `ordering` | `List<String>` | Default ORDER BY for queries |
+| `uniqueTogether` | `List<List<String>>` | Multi-column unique constraints |
+| `indexTogether` | `List<List<String>>` | Multi-column indexes |
+| `appLabel` | `String` | Namespace/category for the model |
+
+### Multi-Column Unique Constraint
+
+Ensure combinations of fields are unique:
+
+```dart
+@Model(
+  uniqueTogether: [
+    ['email', 'tenantId'],  // Same email can exist in different tenants
+    ['slug', 'categoryId'], // Slug unique within category
+  ],
+)
+class Article {
+  @AutoField()
+  late int id;
+
+  @EmailField()
+  late String email;
+
+  @IntegerField()
+  late int tenantId;
+
+  @CharField(maxLength: 100)
+  late String slug;
+
+  @ForeignKey(Category, onDelete: OnDelete.cascade)
+  late int categoryId;
+}
+```
+
+### Multi-Column Index
+
+Create composite indexes for common query patterns:
+
+```dart
+@Model(
+  indexTogether: [
+    ['status', 'createdAt'],  // For filtering by status + date range
+    ['authorId', 'isPublished'], // For author's published posts
+  ],
+)
+class Post {
+  // ...
+}
+```
+
+### Default Ordering
+
+Set default query ordering:
+
+```dart
+@Model(
+  ordering: ['-createdAt', 'name'],  // Prefix with - for descending
+)
+class Post {
+  // ...
+}
+
+// Queries will automatically order by createdAt DESC, name ASC
+final posts = await Posts.objects.all().toList();
 ```
 
 ## Field Options
@@ -204,7 +281,7 @@ late int id;
 ### UUID Primary Key
 
 ```dart
-@UuidField(primaryKey: true)
+@UuidPrimaryKey()
 late String id;
 ```
 
