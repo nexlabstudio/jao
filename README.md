@@ -1,21 +1,52 @@
-# JAO
+# JAO - Django-inspired ORM for Dart
 
 [![Tests](https://github.com/nexlabstudio/jao/actions/workflows/test.yml/badge.svg?branch=dev)](https://github.com/nexlabstudio/jao/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/nexlabstudio/jao/branch/dev/graph/badge.svg)](https://codecov.io/gh/nexlabstudio/jao)
+[![pub package](https://img.shields.io/pub/v/jao.svg)](https://pub.dev/packages/jao)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Just Another ORM** - *We know there are many, but this is the one that works the way you expect.*
+A type-safe, model-first ORM for Dart backend development. Built for PostgreSQL, SQLite, and MySQL. Works seamlessly with Dart Frog, Shelf, or any Dart server framework.
 
-A Django-inspired ORM for Dart. Framework-agnostic, type-safe, with a powerful QuerySet API.
+> **JAO** (Just Another ORM) — Because writing raw SQL shouldn't be your only option.
+
+---
+
+## Why JAO?
+
+**The problem:** Dart's backend ecosystem lacks a Django style ORM. You're stuck with raw SQL strings, manual result mapping, and runtime errors waiting to happen.
+
+**The solution:** JAO brings Django's elegant query API to Dart.
+
+```dart
+// ❌ Before: Raw SQL, manual mapping, runtime errors
+final result = await db.query(
+  'SELECT * FROM authors WHERE age >= ? AND is_active = ? ORDER BY name LIMIT ?',
+  [18, true, 10]
+);
+final authors = result.map((row) => Author.fromMap(row)).toList();
+
+// ✅ After: Type-safe, chainable, IDE autocomplete
+final authors = await Authors.objects
+  .filter(Authors.$.age.gte(18) & Authors.$.isActive.eq(true))
+  .orderBy(Authors.$.name.asc())
+  .limit(10)
+  .toList();
+```
+
+---
 
 ## Features
 
-- **Django-style API**: Familiar patterns for Django developers
-- **Type-safe queries**: Compile-time checking for field names and types
-- **Lazy QuerySets**: Queries don't execute until evaluated
-- **Chainable API**: Build complex queries fluently
-- **Database agnostic**: PostgreSQL, MySQL, SQLite adapters
-- **No middleware required**: Works directly in your routes/handlers
-- **Django-style CLI**: `jao makemigrations`, `jao migrate`
+- **Type-safe queries** — Catch errors at compile time, not runtime
+- **Lazy QuerySets** — Chain filters without hitting the DB until needed
+- **Django-style API** — Familiar patterns: `filter()`, `exclude()`, `orderBy()`
+- **Cross-database** — PostgreSQL, SQLite, MySQL with zero code changes
+- **Django-style CLI** — `jao makemigrations`, `jao migrate`, `jao rollback`
+- **Code generation** — Define models once, get queries and serialization for free
+- **Framework agnostic** — Works with Dart Frog, Shelf, or any Dart backend
+- **No middleware required** — Query directly in your route handlers
+
+---
 
 ## Quick Start
 
@@ -36,10 +67,10 @@ jao init
 ```
 
 This creates:
-- `jao.yaml` - Paths configuration
-- `lib/config/database.dart` - Database configuration (single source of truth)
-- `lib/migrations/` - Migrations directory
-- `bin/migrate.dart` - Migration CLI entry point
+- `jao.yaml` — Paths configuration
+- `lib/config/database.dart` — Database configuration
+- `lib/migrations/` — Migrations directory
+- `bin/migrate.dart` — Migration CLI entry point
 
 ### 3. Define Models
 
@@ -105,7 +136,7 @@ dart run build_runner build
 
 ### 5. Configure Database
 
-Edit `lib/config/database.dart` to configure your database:
+Edit `lib/config/database.dart`:
 
 ```dart
 import 'package:jao/jao.dart';
@@ -114,7 +145,7 @@ import 'package:jao/jao.dart';
 final databaseConfig = DatabaseConfig.sqlite('database.db');
 const databaseAdapter = SqliteAdapter();
 
-// PostgreSQL:
+// PostgreSQL
 // final databaseConfig = DatabaseConfig.postgres(
 //   database: 'myapp',
 //   username: 'postgres',
@@ -122,7 +153,7 @@ const databaseAdapter = SqliteAdapter();
 // );
 // const databaseAdapter = PostgresAdapter();
 
-// MySQL:
+// MySQL
 // final databaseConfig = DatabaseConfig.mysql(
 //   database: 'myapp',
 //   username: 'root',
@@ -133,7 +164,7 @@ const databaseAdapter = SqliteAdapter();
 
 ### 6. Register Model Schemas
 
-After code generation, register your model schemas in `bin/migrate.dart`:
+In `bin/migrate.dart`:
 
 ```dart
 import 'dart:io';
@@ -151,7 +182,6 @@ void main(List<String> args) async {
     modelSchemas: [
       Authors.schema,
       Posts.schema,
-      // Add all your model schemas here
     ],
   );
 
@@ -164,27 +194,28 @@ void main(List<String> args) async {
 
 ```bash
 jao makemigrations
-
 jao migrate
 ```
 
-### 8. Initialize Database (once at startup)
+### 8. Initialize Database
+
+Call once at application startup:
 
 ```dart
 import 'package:jao/jao.dart';
 import 'lib/config/database.dart';
 
-Future<void> initializeDatabase() async {
+Future<void> main() async {
   await Jao.configure(
     adapter: databaseAdapter,
     config: databaseConfig,
   );
+  
+  // Start your server...
 }
 ```
 
 ### 9. Query Your Data
-
-No middleware needed - just query directly in your handlers:
 
 ```dart
 import 'package:your_app/models/models.dart';
@@ -220,6 +251,8 @@ Future<Response> onRequest(RequestContext context) async {
   return Response.json(body: authors);
 }
 ```
+
+---
 
 ## Query API
 
@@ -263,20 +296,28 @@ Authors.objects.filter(
   Authors.$.age.gte(18) & Authors.$.isActive.eq(true)
 );
 
-// OR
+// OR (| operator)
 Authors.objects.filter(
   Authors.$.age.lt(18) | Authors.$.age.gte(65)
 );
 
-// NOT
+// NOT (~ operator)
 Authors.objects.filter(~Authors.$.name.eq('Admin'));
+
+// Complex queries
+Authors.objects.filter(
+  (Authors.$.age.gte(18) & Authors.$.isActive.eq(true)) |
+  Authors.$.role.eq('admin')
+);
 ```
 
 ### Ordering & Pagination
 
 ```dart
-// Ascending/Descending
+// Ascending
 Authors.objects.orderBy(Authors.$.name.asc());
+
+// Descending
 Authors.objects.orderBy(Authors.$.createdAt.desc());
 
 // Multiple columns
@@ -287,6 +328,8 @@ Authors.objects.orderBy(
 
 // Pagination
 Authors.objects.offset(20).limit(10);
+
+// Slice
 Authors.objects.slice(20, 30);
 ```
 
@@ -297,7 +340,9 @@ final stats = await Authors.objects.aggregate({
   'count': Count.all(),
   'avg_age': Avg(Authors.$.age.col),
   'max_age': Max(Authors.$.age.col),
+  'min_age': Min(Authors.$.age.col),
 });
+// stats = {'count': 150, 'avg_age': 34.5, 'max_age': 89, 'min_age': 18}
 ```
 
 ### CRUD Operations
@@ -310,8 +355,25 @@ final author = await Authors.objects.create({
   'age': 30,
 });
 
+// Bulk create
+final authors = await Authors.objects.bulkCreate([
+  {'name': 'Alice', 'email': 'alice@example.com', 'age': 25},
+  {'name': 'Bob', 'email': 'bob@example.com', 'age': 35},
+]);
+
 // Get by primary key
 final author = await Authors.objects.get(1);
+
+// Get or null
+final author = await Authors.objects.getOrNull(999);
+
+// First / Last
+final first = await Authors.objects.orderBy(Authors.$.name.asc()).first();
+final last = await Authors.objects.orderBy(Authors.$.name.asc()).last();
+
+// Exists / Count
+final hasAdmins = await Authors.objects.filter(Authors.$.role.eq('admin')).exists();
+final count = await Authors.objects.count();
 
 // Get or create
 final (author, created) = await Authors.objects.getOrCreate(
@@ -320,55 +382,199 @@ final (author, created) = await Authors.objects.getOrCreate(
 );
 
 // Update
-await Authors.objects
+final updatedCount = await Authors.objects
   .filter(Authors.$.isActive.eq(false))
   .update({'isActive': true});
 
 // Delete
-await Authors.objects
+final deletedCount = await Authors.objects
   .filter(Authors.$.email.endsWith('@spam.com'))
   .delete();
 ```
 
+---
+
 ## Field Types
 
-| Annotation | Dart Type | Description |
-|------------|-----------|-------------|
-| `@AutoField()` | `int` | Auto-increment primary key |
-| `@BigAutoField()` | `int` | Big auto-increment primary key |
-| `@CharField(maxLength: n)` | `String` | VARCHAR(n) |
-| `@TextField()` | `String` | TEXT |
-| `@EmailField()` | `String` | Email with validation |
-| `@IntegerField()` | `int` | INTEGER |
-| `@BigIntegerField()` | `int` | BIGINT |
-| `@FloatField()` | `double` | FLOAT |
-| `@DecimalField()` | `double` | DECIMAL |
-| `@BooleanField()` | `bool` | BOOLEAN |
-| `@DateField()` | `DateTime` | DATE |
-| `@DateTimeField()` | `DateTime` | TIMESTAMP |
-| `@DateTimeField(autoNowAdd: true)` | `DateTime` | Auto-set on create |
-| `@DateTimeField(autoNow: true)` | `DateTime` | Auto-set on every save |
-| `@DurationField()` | `Duration` | INTERVAL |
-| `@UuidField()` | `String` | UUID |
-| `@JsonField()` | `dynamic` | JSONB |
-| `@ForeignKey(Model)` | `int` | Foreign key relationship |
+| Annotation | Dart Type | Database Type | Description |
+|------------|-----------|---------------|-------------|
+| `@AutoField()` | `int` | SERIAL | Auto-increment primary key |
+| `@BigAutoField()` | `int` | BIGSERIAL | Big auto-increment primary key |
+| `@CharField(maxLength: n)` | `String` | VARCHAR(n) | Limited-length string |
+| `@TextField()` | `String` | TEXT | Unlimited-length string |
+| `@EmailField()` | `String` | VARCHAR(254) | Email with validation |
+| `@IntegerField()` | `int` | INTEGER | Standard integer |
+| `@BigIntegerField()` | `int` | BIGINT | Large integer |
+| `@SmallIntegerField()` | `int` | SMALLINT | Small integer |
+| `@PositiveIntegerField()` | `int` | INTEGER | Positive integer (min: 0) |
+| `@FloatField()` | `double` | REAL | Floating point |
+| `@DecimalField(decimalPlaces: n)` | `double` | DECIMAL | Fixed precision decimal |
+| `@BooleanField()` | `bool` | BOOLEAN | True/False |
+| `@DateField()` | `DateTime` | DATE | Date only |
+| `@DateTimeField()` | `DateTime` | TIMESTAMPTZ | Date and time with timezone |
+| `@DateTimeField(autoNowAdd: true)` | `DateTime` | TIMESTAMPTZ | Auto-set on create |
+| `@DateTimeField(autoNow: true)` | `DateTime` | TIMESTAMPTZ | Auto-set on every save |
+| `@DurationField()` | `Duration` | INTERVAL | Time duration |
+| `@TimeField()` | `Duration` | TIME | Time of day |
+| `@UuidField()` | `String` | UUID | UUID string |
+| `@JsonField()` | `dynamic` | JSONB | JSON data |
+| `@BinaryField()` | `List<int>` | BYTEA | Binary data |
+| `@ForeignKey(Model)` | `int` | INTEGER | Foreign key relationship |
+| `@OneToOneField(Model)` | `int` | INTEGER | One-to-one relationship |
+
+### Field Options
+
+All fields support these common options:
+
+```dart
+@CharField(
+  maxLength: 100,
+  nullable: true,        // Allow NULL values
+  unique: true,          // Add UNIQUE constraint
+  index: true,           // Create index
+  defaultValue: 'N/A',   // Default value
+  dbColumn: 'custom_name', // Custom column name
+)
+late String? name;
+```
+
+---
 
 ## CLI Commands
 
 ```bash
-jao init            # Initialize project structure
-jao makemigrations  # Auto-detect model changes and create migration
-jao migrate         # Run pending migrations
-jao status          # Show migration status
-jao rollback        # Rollback last migration
-jao reset           # Rollback all migrations
-jao refresh         # Reset and re-run all migrations
+jao init              # Initialize project structure
+jao makemigrations    # Auto-detect model changes and create migration
+jao migrate           # Run pending migrations
+jao status            # Show migration status
+jao rollback          # Rollback last migration
+jao rollback --step=3 # Rollback last 3 migrations
+jao reset             # Rollback all migrations
+jao refresh           # Reset and re-run all migrations
+jao sql               # Show SQL for pending migrations
 ```
+
+---
+
+## Database Support
+
+| Database | Adapter | Status |
+|----------|---------|--------|
+| PostgreSQL | `PostgresAdapter()` | ✅ Full support |
+| SQLite | `SqliteAdapter()` | ✅ Full support |
+| MySQL | `MySqlAdapter()` | ✅ Full support |
+
+JAO handles database-specific differences automatically:
+- DateTime handling (PostgreSQL returns `DateTime`, SQLite returns strings)
+- Boolean handling (PostgreSQL returns `bool`, SQLite returns `0`/`1`)
+- Parameter placeholders (`$1` vs `?` vs `?1`)
+
+---
 
 ## Framework Integration
 
-JAO is framework-agnostic. Call `Jao.configure()` once at application startup before handling requests.
+JAO is framework-agnostic. Here's how to integrate with popular frameworks:
+
+### Dart Frog
+
+```dart
+// main.dart
+import 'package:dart_frog/dart_frog.dart';
+import 'package:jao/jao.dart';
+import 'config/database.dart';
+
+Future<HttpServer> run(Handler handler, InternetAddress ip, int port) async {
+  await Jao.configure(adapter: databaseAdapter, config: databaseConfig);
+  return serve(handler, ip, port);
+}
+
+// routes/authors/index.dart
+import 'package:your_app/models/models.dart';
+
+Future<Response> onRequest(RequestContext context) async {
+  final authors = await Authors.objects.all().toList();
+  return Response.json(body: authors.map((a) => Authors.toRow(a)).toList());
+}
+```
+
+### Shelf
+
+```dart
+import 'package:shelf/shelf.dart';
+import 'package:shelf/shelf_io.dart' as io;
+import 'package:jao/jao.dart';
+import 'config/database.dart';
+import 'models/models.dart';
+
+void main() async {
+  await Jao.configure(adapter: databaseAdapter, config: databaseConfig);
+
+  final handler = Pipeline()
+    .addMiddleware(logRequests())
+    .addHandler(_router);
+
+  await io.serve(handler, 'localhost', 8080);
+}
+
+Response _router(Request request) {
+  // Query your data directly
+  return Response.ok('Hello!');
+}
+```
+
+---
+
+## Comparison
+
+| Feature | JAO | Drift | Floor |
+|---------|:---:|:-----:|:-----:|
+| Django-style API | ✅ | ❌ | ❌ |
+| Type-safe queries | ✅ | ✅ | ✅ |
+| Lazy QuerySets | ✅ | ❌ | ❌ |
+| Chainable filters | ✅ | ⚠️ | ⚠️ |
+| PostgreSQL | ✅ | ✅ | ❌ |
+| MySQL | ✅ | ✅ | ❌ |
+| SQLite | ✅ | ✅ | ✅ |
+| Migrations CLI | ✅ | ❌ | ❌ |
+| Auto-detect migrations | ✅ | ❌ | ❌ |
+| Raw SQL escape hatch | ✅ | ✅ | ✅ |
+| Code generation | ✅ | ✅ | ✅ |
+| No annotations on queries | ✅ | ❌ | ❌ |
+
+---
+
+## Community
+
+- [GitHub Issues](https://github.com/nexlabstudio/jao/issues) — Bug reports and feature requests
+- [GitHub Discussions](https://github.com/nexlabstudio/jao/discussions) — Questions and ideas
+
+---
+
+## Contributing
+
+Contributions are welcome! Please read our [contributing guide](CONTRIBUTING.md) before submitting a PR.
+
+```bash
+# Clone the repo
+git clone https://github.com/nexlabstudio/jao.git
+
+# Install dependencies
+cd jao && dart pub get
+cd jao_cli && dart pub get
+cd jao_generator && dart pub get
+
+# Run tests
+dart test
+```
+
+---
+
+## Credits
+
+Built by [Nexlab Studio](https://nexlabstudio.com)
+
+---
 
 ## License
 
-MIT
+MIT License — see [LICENSE](LICENSE) for details.
