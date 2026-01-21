@@ -1,0 +1,107 @@
+name: JAO
+description: A Django-inspired ORM for Dart
+tagline: Django-inspired ORM for Dart
+url: https://jao.nexlab.studio
+
+# Branding
+logo:
+  light: images/logo-light.svg
+  dark: images/logo-dark.svg
+favicon: images/favicon.svg
+
+# Content settings
+content:
+  dir: docs/
+
+# Navigation
+nav:
+  - label: Guide
+    href: /
+  - label: pub.dev
+    href: https://pub.dev/packages/jao
+    external: true
+  - label: GitHub
+    href: https://github.com/nexlabstudio/jao
+    external: true
+
+# Sidebar
+sidebar:
+  - group: Overview
+    pages:
+      - slug: ''
+        label: Home
+      - slug: getting-started
+        label: Getting Started
+
+  - group: Guide
+    pages:
+      - slug: models
+        label: Models
+      - slug: fields
+        label: Fields
+      - slug: queries
+        label: Queries
+      - slug: advanced-queries
+        label: Advanced Queries
+      - slug: functions
+        label: Functions
+      - slug: migrations
+        label: Migrations
+        
+# Table of contents
+toc:
+  enabled: true
+  minDepth: 2
+  maxDepth: 3
+
+# Theme
+theme:
+  colors:
+    primary: "#0175C2"
+  darkMode:
+    enabled: true
+    default: system
+
+# Code blocks
+code:
+  theme:
+    light: github-light
+    dark: github-dark
+  copyButton: true
+  lineNumbers: false
+
+# Search
+search:
+  enabled: true
+  provider: pagefind
+  placeholder: Search docs...
+  hotkey: "/"
+
+# Header
+header:
+  showName: true
+  showThemeToggle: true
+  showSearch: true
+  showSocial: true
+
+# Social links
+social:
+  github: https://github.com/nexlabstudio/jao
+  pubdev: https://pub.dev/packages/jao
+
+
+# Build
+build:
+  sitemap:
+    enabled: true
+    changefreq: weekly
+    priority: 0.7
+
+# Integrations
+integrations:
+  editLink:
+    enabled: true
+    repo: https://github.com/nexlabstudio/jao
+    branch: dev
+    path: docs/
+    text: Edit this page on GitHub

@@ -36,3 +36,5 @@ apps/landing/config.js
 .dart_frog/
 *.g.dart
 *.db
+.stardust/
+dist/
