@@ -13,15 +13,6 @@ favicon: /images/favicon.svg
 content:
   dir: docs/
 
-# Navigation
-nav:
-  - label: pub.dev
-    href: https://pub.dev/packages/jao
-    external: true
-  - label: GitHub
-    href: https://github.com/nexlabstudio/jao
-    external: true
-
 # Sidebar
 sidebar:
   - group: Overview
