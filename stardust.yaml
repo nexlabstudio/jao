@@ -15,8 +15,6 @@ content:
 
 # Navigation
 nav:
-  - label: Guide
-    href: /
   - label: pub.dev
     href: https://pub.dev/packages/jao
     external: true
