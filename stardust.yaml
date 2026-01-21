@@ -72,7 +72,7 @@ code:
 
 # Search
 search:
-  enabled: true
+  enabled: false
   provider: pagefind
   placeholder: Search docs...
   hotkey: "/"
