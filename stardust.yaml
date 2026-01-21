@@ -5,9 +5,9 @@ url: https://jao.nexlab.studio
 
 # Branding
 logo:
-  light: images/logo-light.svg
-  dark: images/logo-dark.svg
-favicon: images/favicon.svg
+  light: /images/logo-light.svg
+  dark: /images/logo-dark.svg
+favicon: /images/favicon.svg
 
 # Content settings
 content:
