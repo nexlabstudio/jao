@@ -77,9 +77,9 @@ search:
 
 # Header
 header:
-  showName: true
+  showName: false
   showThemeToggle: true
-  showSearch: true
+  showSearch: false
   showSocial: true
 
 # Social links
