@@ -397,7 +397,13 @@ late int authorId;
 // With custom column name
 @ForeignKey(Category, onDelete: OnDelete.setNull, dbColumn: 'cat_id')
 late int? categoryId;
+
+// FK to a model with UUID primary key
+@ForeignKey(Organization, onDelete: OnDelete.cascade)
+late String orgId;
 ```
+
+The FK field type is automatically resolved from the related model's primary key type. If the related model uses `@UuidPrimaryKey()`, the FK field should be `String`. If it uses `@AutoField()` or `@BigAutoField()`, use `int`.
 
 | Option | Type | Required | Description |
 |--------|------|----------|-------------|
@@ -413,7 +419,7 @@ late int? categoryId;
 | `OnDelete.restrict` | Prevent deletion if references exist |
 | `OnDelete.noAction` | Database default behavior |
 
-**Database Type:** `INTEGER REFERENCES table(id)`
+**Database Type:** Matches the related model's primary key type (e.g. `INTEGER REFERENCES` for int PKs, `UUID REFERENCES` for UUID PKs)
 
 ### OneToOneField
 
@@ -424,9 +430,9 @@ One-to-one relationship.
 late int userId;
 ```
 
-Same options as ForeignKey, but enforces uniqueness.
+Same options as ForeignKey, but enforces uniqueness. The field type is resolved from the related model's primary key, just like ForeignKey.
 
-**Database Type:** `INTEGER UNIQUE REFERENCES table(id)`
+**Database Type:** Matches the related model's primary key type with a UNIQUE constraint
 
 ## Field Type Summary
 
@@ -454,8 +460,8 @@ Same options as ForeignKey, but enforces uniqueness.
 | `@JsonField()` | `dynamic` | `JSONB` | `TEXT` | `JSON` |
 | `@BinaryField()` | `List<int>` | `BYTEA` | `BLOB` | `LONGBLOB` |
 | `@EnumField<T>()` | `T` | `VARCHAR` | `VARCHAR` | `VARCHAR` |
-| `@ForeignKey()` | `int` | `INTEGER REFERENCES` | `INTEGER REFERENCES` | `INT REFERENCES` |
-| `@OneToOneField()` | `int` | `INTEGER UNIQUE REFERENCES` | `INTEGER UNIQUE REFERENCES` | `INT UNIQUE REFERENCES` |
+| `@ForeignKey()` | `int` or `String` | `REFERENCES` (type matches related PK) | `REFERENCES` | `REFERENCES` |
+| `@OneToOneField()` | `int` or `String` | `UNIQUE REFERENCES` (type matches related PK) | `UNIQUE REFERENCES` | `UNIQUE REFERENCES` |
 
 ## Next Steps
 
