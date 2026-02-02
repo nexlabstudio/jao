@@ -94,10 +94,8 @@ Future<Response> _updateChoice(RequestContext context, int pollId) async {
     }
 
     final choiceId = data['id'] as int;
-    final choices = await Choices.objects
-        .filter(Choices.$.id.eq(choiceId))
-        .filter(Choices.$.pollId.eq(pollId))
-        .toList();
+    final choices =
+        await Choices.objects.filter(Choices.$.id.eq(choiceId)).filter(Choices.$.pollId.eq(pollId)).toList();
 
     if (choices.isEmpty) {
       return Response.json(
