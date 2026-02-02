@@ -131,10 +131,11 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
         case 'ManyToManyField':
           final toField = value.getField('to');
           String? relatedModel;
+          DartType? relatedDartType;
           if (toField != null) {
-            final toType = toField.toTypeValue();
-            if (toType != null) {
-              relatedModel = toType.getDisplayString();
+            relatedDartType = toField.toTypeValue();
+            if (relatedDartType != null) {
+              relatedModel = relatedDartType.getDisplayString();
             }
           }
           final toColumn = value.getField('toColumn')?.toStringValue() ?? 'id';
@@ -145,10 +146,11 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
             'ManyToManyField' => _RelationType.manyToMany,
             _ => _RelationType.foreignKey,
           };
+          final (pkType, pkFieldRef, pkDbType) = _resolvePkType(relatedDartType);
           return _FieldAnnotationInfo(
-            'int',
-            'IntFieldRef',
-            'integer',
+            pkType,
+            pkFieldRef,
+            pkDbType,
             annotation.toSource(),
             relation: relatedModel != null && relatedTable != null
                 ? _RelationInfo(
@@ -170,6 +172,34 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
       }
     }
     return null;
+  }
+
+  /// Resolves the primary key type of a related model by inspecting its fields.
+  (String, String, String) _resolvePkType(DartType? relatedType) {
+    const defaultPk = ('int', 'IntFieldRef', 'integer');
+
+    if (relatedType == null || relatedType.element is! ClassElement) {
+      return defaultPk;
+    }
+
+    final classElement = relatedType.element as ClassElement;
+    for (final field in classElement.fields) {
+      if (field.isStatic || field.isSynthetic) continue;
+      for (final annotation in field.metadata.annotations) {
+        final value = annotation.computeConstantValue();
+        if (value == null) continue;
+        final typeName = value.type?.getDisplayString();
+        switch (typeName) {
+          case 'AutoField':
+            return ('int', 'IntFieldRef', 'integer');
+          case 'BigAutoField':
+            return ('int', 'IntFieldRef', 'bigInt');
+          case 'UuidPrimaryKey':
+            return ('String', 'StringFieldRef', 'uuid');
+        }
+      }
+    }
+    return defaultPk;
   }
 
   _FieldInfo? _inferFieldType(FieldElement field) {

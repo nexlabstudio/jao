@@ -1,3 +1,15 @@
+## [0.2.2] - 2026-02-02
+
+### Fixed
+
+- Foreign key field type now resolves from the related model's primary key type instead of being hardcoded to `int`
+- `@ForeignKey` and `@OneToOneField` to a model with `@UuidPrimaryKey` now correctly generates `String`/`StringFieldRef` instead of `int`/`IntFieldRef`
+
+### Added
+
+- `_resolvePkType` helper for inspecting related model PK annotations at generation time
+- Tests for FK type resolution with `@UuidPrimaryKey` and `@AutoField` targets
+
 ## [0.2.1] - 2026-01-01
 
 ### Added
