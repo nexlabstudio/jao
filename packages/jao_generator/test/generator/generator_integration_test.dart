@@ -654,6 +654,78 @@ class Article {
       );
     });
 
+    test('Generator handles @ForeignKey to model with @UuidPrimaryKey', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/models.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class Organization {
+  @UuidPrimaryKey()
+  late String id;
+  late String name;
+}
+
+@Model()
+class Employee {
+  @AutoField()
+  late int id;
+  @ForeignKey(Organization)
+  late String orgId;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/models.jao.dart': decodedMatches(
+            allOf([
+              contains("final orgId = const StringFieldRef('org_id')"),
+              contains("RelationMeta("),
+              contains("relatedModel: Organization"),
+            ]),
+          ),
+        },
+      );
+    });
+
+    test('Generator handles @ForeignKey to model with @AutoField', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/models.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class Author {
+  @AutoField()
+  late int id;
+  late String name;
+}
+
+@Model()
+class Post {
+  @AutoField()
+  late int id;
+  @ForeignKey(Author)
+  late int authorId;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/models.jao.dart': decodedMatches(
+            allOf([
+              contains("final authorId = const IntFieldRef('author_id')"),
+              contains("RelationMeta("),
+              contains("relatedModel: Author"),
+            ]),
+          ),
+        },
+      );
+    });
+
     test('Generator handles nullable int and double fields', () async {
       await testBuilder(
         builder,
@@ -821,6 +893,10 @@ class TimeField {
 
 class UuidField {
   const UuidField();
+}
+
+class UuidPrimaryKey extends UuidField {
+  const UuidPrimaryKey();
 }
 
 class JsonField {
