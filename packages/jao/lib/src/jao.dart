@@ -11,6 +11,7 @@ class ModelRegistration<T> {
   final Map<String, dynamic> Function(T) toRow;
   final List<String> autoNowAddFields;
   final List<String> autoNowFields;
+  final List<String> autoGenerateUuidFields;
 
   const ModelRegistration({
     required this.tableName,
@@ -19,6 +20,7 @@ class ModelRegistration<T> {
     required this.toRow,
     this.autoNowAddFields = const [],
     this.autoNowFields = const [],
+    this.autoGenerateUuidFields = const [],
   });
 }
 
@@ -72,6 +74,7 @@ class Jao {
         toRow: reg.toRow,
         autoNowAddFields: reg.autoNowAddFields,
         autoNowFields: reg.autoNowFields,
+        autoGenerateUuidFields: reg.autoGenerateUuidFields,
       );
 
       _executors[T] = executor;

@@ -46,6 +46,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
             autoIncrement: fieldAnnotation.autoIncrement,
             autoNowAdd: fieldAnnotation.autoNowAdd,
             autoNow: fieldAnnotation.autoNow,
+            autoGenerateUuid: fieldAnnotation.autoGenerateUuid,
             relation: fieldAnnotation.relation,
           ),
         );
@@ -162,7 +163,23 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
                 : null,
           );
         case 'UuidField':
-          return _FieldAnnotationInfo('String', 'StringFieldRef', 'uuid', annotation.toSource());
+          final autoGenerate = value.getField('autoGenerate')?.toBoolValue() ?? false;
+          return _FieldAnnotationInfo(
+            'String',
+            'StringFieldRef',
+            'uuid',
+            annotation.toSource(),
+            autoGenerateUuid: autoGenerate,
+          );
+        case 'UuidPrimaryKey':
+          return _FieldAnnotationInfo(
+            'String',
+            'StringFieldRef',
+            'uuid',
+            annotation.toSource(),
+            primaryKey: true,
+            autoGenerateUuid: true,
+          );
         case 'JsonField':
           return _FieldAnnotationInfo('dynamic', 'FieldRef', 'jsonb', annotation.toSource());
         case 'BinaryField':
@@ -295,6 +312,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
 
     final autoNowAddFields = fields.where((f) => f.autoNowAdd).map((f) => _toSnakeCase(f.name)).toList();
     final autoNowFields = fields.where((f) => f.autoNow).map((f) => _toSnakeCase(f.name)).toList();
+    final autoGenerateUuidFields = fields.where((f) => f.autoGenerateUuid).map((f) => _toSnakeCase(f.name)).toList();
 
     buffer.writeln('class ${className}s {');
     buffer.writeln('  ${className}s._();');
@@ -317,6 +335,9 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     }
     if (autoNowFields.isNotEmpty) {
       buffer.writeln("        autoNowFields: [${autoNowFields.map((f) => "'$f'").join(', ')}],");
+    }
+    if (autoGenerateUuidFields.isNotEmpty) {
+      buffer.writeln("        autoGenerateUuidFields: [${autoGenerateUuidFields.map((f) => "'$f'").join(', ')}],");
     }
     buffer.writeln('      ));');
     buffer.writeln('    }');
@@ -513,6 +534,7 @@ class _FieldInfo {
   final bool autoIncrement;
   final bool autoNowAdd;
   final bool autoNow;
+  final bool autoGenerateUuid;
   final _RelationInfo? relation;
 
   _FieldInfo({
@@ -526,6 +548,7 @@ class _FieldInfo {
     this.autoIncrement = false,
     this.autoNowAdd = false,
     this.autoNow = false,
+    this.autoGenerateUuid = false,
     this.relation,
   });
 }
@@ -555,6 +578,7 @@ class _FieldAnnotationInfo {
   final bool autoIncrement;
   final bool autoNowAdd;
   final bool autoNow;
+  final bool autoGenerateUuid;
   final _RelationInfo? relation;
 
   _FieldAnnotationInfo(
@@ -566,6 +590,7 @@ class _FieldAnnotationInfo {
     this.autoIncrement = false,
     this.autoNowAdd = false,
     this.autoNow = false,
+    this.autoGenerateUuid = false,
     this.relation,
   });
 }

@@ -4,6 +4,7 @@ import 'dart:async';
 import '../query/queryset.dart';
 import '../query/expressions.dart';
 import '../model/manager.dart';
+import '../utils/uuid.dart';
 import 'connection.dart';
 import 'compiler.dart';
 
@@ -16,6 +17,7 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
   final Map<String, dynamic> Function(T model) toRow;
   final List<String> autoNowAddFields;
   final List<String> autoNowFields;
+  final List<String> autoGenerateUuidFields;
 
   ModelExecutor({
     required this.pool,
@@ -26,13 +28,21 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
     required this.toRow,
     this.autoNowAddFields = const [],
     this.autoNowFields = const [],
+    this.autoGenerateUuidFields = const [],
   });
 
   String _currentTimestamp() => DateTime.now().toUtc().toIso8601String();
 
-  Map<String, Object?> _injectCreateTimestamps(Map<String, Object?> values) {
+  Map<String, Object?> _injectCreateValues(Map<String, Object?> values) {
     final result = Map<String, Object?>.from(values);
     final now = _currentTimestamp();
+
+    for (final field in autoGenerateUuidFields) {
+      if (!result.containsKey(field) || result[field] == null) {
+        result[field] = generateUuidV4();
+      }
+    }
+
     for (final field in autoNowAddFields) {
       if (!result.containsKey(field)) {
         result[field] = now;
@@ -124,7 +134,7 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
 
   @override
   Future<T> create(Map<String, Object?> values) async {
-    final valuesWithTimestamps = _injectCreateTimestamps(values);
+    final valuesWithTimestamps = _injectCreateValues(values);
 
     final query = compiler.compileInsert(
       table: tableName,
@@ -159,7 +169,7 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
   @override
   Future<List<T>> bulkCreate(List<Map<String, Object?>> objects) async {
     if (objects.isEmpty) return [];
-    final objectsWithTimestamps = objects.map(_injectCreateTimestamps).toList();
+    final objectsWithTimestamps = objects.map(_injectCreateValues).toList();
 
     final query = compiler.compileBulkInsert(
       table: tableName,
