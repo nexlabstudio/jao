@@ -692,6 +692,73 @@ void main() {
         expect(author.createdAt?.year, equals(2020));
       });
     });
+
+    group('autoGenerateUuid fields', () {
+      late ConnectionPool uuidPool;
+      late ModelExecutor<Map<String, dynamic>> uuidExecutor;
+
+      setUp(() async {
+        final config = DatabaseConfig.sqliteMemory();
+        uuidPool = await adapter.createPool(config);
+
+        await uuidPool.withConnection((conn) async {
+          await conn.execute('''
+            CREATE TABLE documents (
+              id TEXT PRIMARY KEY,
+              title TEXT NOT NULL
+            )
+          ''');
+        });
+
+        uuidExecutor = ModelExecutor<Map<String, dynamic>>(
+          pool: uuidPool,
+          compiler: compiler,
+          tableName: 'documents',
+          pkField: 'id',
+          fromRow: (row) => row,
+          toRow: (model) => model,
+          autoGenerateUuidFields: ['id'],
+        );
+      });
+
+      tearDown(() async {
+        await uuidPool.close();
+      });
+
+      test('auto-generates UUID on create when not provided', () async {
+        final doc = await uuidExecutor.create({'title': 'Test Document'});
+
+        expect(doc['id'], isNotNull);
+        expect(doc['id'], isA<String>());
+        expect((doc['id'] as String).length, equals(36));
+        expect(doc['id'], matches(RegExp(r'^[0-9a-f-]{36}$')));
+      });
+
+      test('does not override explicit UUID values', () async {
+        final explicitId = '550e8400-e29b-41d4-a716-446655440000';
+        final doc = await uuidExecutor.create({'id': explicitId, 'title': 'Test Document'});
+
+        expect(doc['id'], equals(explicitId));
+      });
+
+      test('generates unique UUIDs for each record', () async {
+        final doc1 = await uuidExecutor.create({'title': 'Document 1'});
+        final doc2 = await uuidExecutor.create({'title': 'Document 2'});
+
+        expect(doc1['id'], isNot(equals(doc2['id'])));
+      });
+
+      test('auto-generates UUID in bulkCreate', () async {
+        final docs = await uuidExecutor.bulkCreate([
+          {'title': 'Document 1'},
+          {'title': 'Document 2'},
+        ]);
+
+        expect(docs[0]['id'], isNotNull);
+        expect(docs[1]['id'], isNotNull);
+        expect(docs[0]['id'], isNot(equals(docs[1]['id'])));
+      });
+    });
   });
 
   group('Manager', () {
