@@ -840,6 +840,124 @@ void main() {
         expect(articles[1]['status'], equals('published'));
       });
     });
+
+    group('nullable foreign keys', () {
+      late ConnectionPool fkPool;
+      late ModelExecutor<Map<String, dynamic>> userExecutor;
+      late ModelExecutor<Map<String, dynamic>> bookExecutor;
+
+      setUp(() async {
+        final config = DatabaseConfig.sqliteMemory();
+        fkPool = await adapter.createPool(config);
+
+        await fkPool.withConnection((conn) async {
+          await conn.execute('''
+            CREATE TABLE users (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL
+            )
+          ''');
+          await conn.execute('''
+            CREATE TABLE books (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              title TEXT NOT NULL,
+              creator_id INTEGER NULL REFERENCES users(id)
+            )
+          ''');
+        });
+
+        userExecutor = ModelExecutor<Map<String, dynamic>>(
+          pool: fkPool,
+          compiler: compiler,
+          tableName: 'users',
+          pkField: 'id',
+          fromRow: (row) => row,
+          toRow: (model) => model,
+        );
+
+        bookExecutor = ModelExecutor<Map<String, dynamic>>(
+          pool: fkPool,
+          compiler: compiler,
+          tableName: 'books',
+          pkField: 'id',
+          fromRow: (row) => row,
+          toRow: (model) => model,
+        );
+      });
+
+      tearDown(() async {
+        await fkPool.close();
+      });
+
+      test('can create record with null FK value', () async {
+        final book = await bookExecutor.create({
+          'title': 'Orphan Book',
+          'creator_id': null,
+        });
+
+        expect(book['id'], isNotNull);
+        expect(book['title'], equals('Orphan Book'));
+        expect(book['creator_id'], isNull);
+      });
+
+      test('can create record with valid FK value', () async {
+        final user = await userExecutor.create({'name': 'John'});
+        final book = await bookExecutor.create({
+          'title': 'Johns Book',
+          'creator_id': user['id'],
+        });
+
+        expect(book['creator_id'], equals(user['id']));
+      });
+
+      test('can create record without FK field (defaults to null)', () async {
+        final book = await bookExecutor.create({
+          'title': 'Another Orphan Book',
+        });
+
+        expect(book['id'], isNotNull);
+        expect(book['creator_id'], isNull);
+      });
+
+      test('can update FK from value to null', () async {
+        final user = await userExecutor.create({'name': 'Jane'});
+        final book = await bookExecutor.create({
+          'title': 'Janes Book',
+          'creator_id': user['id'],
+        });
+
+        expect(book['creator_id'], equals(user['id']));
+
+        // Update to null
+        final config = QueryConfig(
+          filters: [Q(Comparison(ColumnRef('id'), ComparisonOp.eq, Value(book['id'])))],
+        );
+        await bookExecutor.update(config, {'creator_id': null});
+
+        final updated = await bookExecutor.execute(config);
+        expect(updated.first['creator_id'], isNull);
+      });
+
+      test('can update FK from null to value', () async {
+        final book = await bookExecutor.create({
+          'title': 'Orphan Book',
+          'creator_id': null,
+        });
+
+        expect(book['creator_id'], isNull);
+
+        final user = await userExecutor.create({'name': 'New Owner'});
+
+        // Update to user
+        final config = QueryConfig(
+          filters: [Q(Comparison(ColumnRef('id'), ComparisonOp.eq, Value(book['id'])))],
+        );
+        await bookExecutor.update(config, {'creator_id': user['id']});
+
+        final updated = await bookExecutor.execute(config);
+        expect(updated.first['creator_id'], equals(user['id']));
+      });
+    });
   });
 
   group('Manager', () {
