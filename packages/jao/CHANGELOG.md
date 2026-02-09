@@ -1,4 +1,4 @@
-## [Unrealesed] - 2026-02-09
+## [Unreleased] - 2026-02-09
 
 ### Added
 
@@ -6,6 +6,16 @@
   - `fieldDefToDbType` now handles `EnumField` annotation
   - Returns `FieldType.integer` when `storeAsInt: true`
   - Returns `FieldType.varchar` for string-based storage (default)
+- Auto-detection of nullability changes in `_generateTableDiff`:
+  - Compares model field nullability with database column nullability
+  - Generates `AlterColumn` operations when nullability differs
+  - Skips primary key fields (SQLite reports PK as nullable even when NOT NULL)
+- `AlterColumn` migration code generation:
+  - Generates `builder.alterColumn()` calls with proper modifiers
+  - Supports nullability changes (`col.nullable()` / `col.notNullable()`)
+  - Supports type changes, default values, and column renames
+  - Generates reverse operations in `down()` for nullability changes
+  - Note: Works with PostgreSQL/MySQL; SQLite requires manual table recreation
 
 ## [0.2.5] - 2026-02-09
 

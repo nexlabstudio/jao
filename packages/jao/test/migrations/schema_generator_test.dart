@@ -711,6 +711,112 @@ void main() {
           expect(createTables.length, equals(2));
         });
       });
+
+      test('generates AlterColumn for nullability change (non-nullable to nullable)', () async {
+        await pool.withConnection((conn) async {
+          // Create table with a NOT NULL column
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS nullable_test (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL
+            )
+          ''');
+
+          // Model with nullable=true for name
+          const schema = ModelSchema(
+            className: 'NullableTest',
+            tableName: 'nullable_test',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(name: 'name', columnName: 'name', dbType: FieldType.text, nullable: true),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          expect(operations.any((op) => op is AlterColumn), isTrue);
+          final alterColumn = operations.whereType<AlterColumn>().first;
+          expect(alterColumn.modification.table, equals('nullable_test'));
+          expect(alterColumn.modification.column, equals('name'));
+          expect(alterColumn.modification.nullable, isTrue);
+        });
+      });
+
+      test('generates AlterColumn for nullability change (nullable to non-nullable)', () async {
+        await pool.withConnection((conn) async {
+          // Create table with a nullable column (no NOT NULL)
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS notnull_test (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              description TEXT
+            )
+          ''');
+
+          // Model with nullable=false for description
+          const schema = ModelSchema(
+            className: 'NotNullTest',
+            tableName: 'notnull_test',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(name: 'description', columnName: 'description', dbType: FieldType.text, nullable: false),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          expect(operations.any((op) => op is AlterColumn), isTrue);
+          final alterColumn = operations.whereType<AlterColumn>().first;
+          expect(alterColumn.modification.table, equals('notnull_test'));
+          expect(alterColumn.modification.column, equals('description'));
+          expect(alterColumn.modification.nullable, isFalse);
+        });
+      });
+
+      test('does not generate AlterColumn for PK fields (SQLite quirk)', () async {
+        await pool.withConnection((conn) async {
+          // Create table - SQLite reports INTEGER PRIMARY KEY as nullable=true in PRAGMA
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS pk_null_test (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL
+            )
+          ''');
+
+          // Model with PK marked as non-nullable (which is correct)
+          const schema = ModelSchema(
+            className: 'PkNullTest',
+            tableName: 'pk_null_test',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+                // nullable defaults to false
+              ),
+              ModelFieldSchema(name: 'name', columnName: 'name', dbType: FieldType.text),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          // Should not detect a nullability change for PK
+          expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+        });
+      });
     });
 
     group('generateMigrationFile()', () {
@@ -820,6 +926,181 @@ void main() {
         final content = generator.generateMigrationFile('CreateLogsTable', operations);
 
         expect(content, contains('useCurrent: true'));
+      });
+
+      test('generates DropTable operation', () {
+        final operations = [const DropTable('old_table')];
+
+        final content = generator.generateMigrationFile('DropOldTable', operations);
+
+        expect(content, contains("builder.dropTable('old_table')"));
+      });
+
+      test('generates RenameTable operation', () {
+        final operations = [const RenameTable('old_name', 'new_name')];
+
+        final content = generator.generateMigrationFile('RenameOldTable', operations);
+
+        expect(content, contains("builder.renameTable('old_name', 'new_name')"));
+        // Reverse should swap the names
+        expect(content, contains("builder.renameTable('new_name', 'old_name')"));
+      });
+
+      test('generates DropColumn operation', () {
+        final operations = [const DropColumn('users', 'deprecated_field')];
+
+        final content = generator.generateMigrationFile('DropDeprecatedField', operations);
+
+        expect(content, contains("builder.dropColumn('users', 'deprecated_field')"));
+      });
+
+      test('generates RenameColumn operation', () {
+        final operations = [const RenameColumn('users', 'old_col', 'new_col')];
+
+        final content = generator.generateMigrationFile('RenameUserColumn', operations);
+
+        expect(content, contains("builder.renameColumn('users', 'old_col', 'new_col')"));
+        // Reverse should swap the names
+        expect(content, contains("builder.renameColumn('users', 'new_col', 'old_col')"));
+      });
+
+      test('generates AlterColumn with nullable change', () {
+        final operations = [
+          AlterColumn(ColumnModification(table: 'users', column: 'bio', nullable: true)),
+        ];
+
+        final content = generator.generateMigrationFile('MakeBioNullable', operations);
+
+        expect(content, contains("builder.alterColumn('users', 'bio', (col) {"));
+        expect(content, contains('col.nullable();'));
+        // Reverse should use notNullable
+        expect(content, contains('col.notNullable();'));
+      });
+
+      test('generates AlterColumn with notNullable change', () {
+        final operations = [
+          AlterColumn(ColumnModification(table: 'users', column: 'email', nullable: false)),
+        ];
+
+        final content = generator.generateMigrationFile('MakeEmailRequired', operations);
+
+        expect(content, contains("builder.alterColumn('users', 'email', (col) {"));
+        expect(content, contains('col.notNullable();'));
+        // Reverse should use nullable
+        expect(content, contains('col.nullable();'));
+      });
+
+      test('generates AlterColumn with type change', () {
+        final operations = [
+          AlterColumn(ColumnModification(table: 'products', column: 'price', type: FieldType.decimal)),
+        ];
+
+        final content = generator.generateMigrationFile('ChangePrice', operations);
+
+        expect(content, contains("builder.alterColumn('products', 'price', (col) {"));
+        expect(content, contains('col.setType(FieldType.decimal)'));
+      });
+
+      test('generates AlterColumn with default value', () {
+        final operations = [
+          AlterColumn(ColumnModification(table: 'settings', column: 'is_active', defaultValue: 'true')),
+        ];
+
+        final content = generator.generateMigrationFile('SetDefaultActive', operations);
+
+        expect(content, contains("builder.alterColumn('settings', 'is_active', (col) {"));
+        expect(content, contains("col.defaultValue('true')"));
+      });
+
+      test('generates AlterColumn with drop default', () {
+        final operations = [
+          AlterColumn(ColumnModification(table: 'settings', column: 'theme', dropDefault: true)),
+        ];
+
+        final content = generator.generateMigrationFile('DropThemeDefault', operations);
+
+        expect(content, contains("builder.alterColumn('settings', 'theme', (col) {"));
+        expect(content, contains('col.dropDefault()'));
+      });
+
+      test('generates AlterColumn with rename', () {
+        final operations = [
+          AlterColumn(ColumnModification(table: 'users', column: 'name', rename: 'full_name')),
+        ];
+
+        final content = generator.generateMigrationFile('RenameNameColumn', operations);
+
+        expect(content, contains("builder.alterColumn('users', 'name', (col) {"));
+        expect(content, contains("col.renameTo('full_name')"));
+      });
+
+      test('generates DropIndex operation', () {
+        final operations = [const DropIndex('idx_users_email')];
+
+        final content = generator.generateMigrationFile('DropEmailIndex', operations);
+
+        expect(content, contains("builder.dropIndex('idx_users_email')"));
+      });
+
+      test('generates AddForeignKey operation', () {
+        final operations = [
+          const AddForeignKey(
+            'posts',
+            ForeignKeyDefinition(
+              column: 'author_id',
+              referencedTable: 'users',
+              referencedColumn: 'id',
+            ),
+          ),
+        ];
+
+        final content = generator.generateMigrationFile('AddAuthorFK', operations);
+
+        expect(content, contains("builder.addForeignKey('posts', 'author_id', 'users', referencedColumn: 'id')"));
+        // Reverse should drop the constraint
+        expect(content, contains("builder.dropConstraint('posts', 'fk_posts_author_id')"));
+      });
+
+      test('generates DropConstraint operation', () {
+        final operations = [const DropConstraint('orders', 'fk_orders_user_id')];
+
+        final content = generator.generateMigrationFile('DropUserFK', operations);
+
+        expect(content, contains("builder.dropConstraint('orders', 'fk_orders_user_id')"));
+      });
+
+      test('generates RawSql operation', () {
+        final operations = [const RawSql('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"')];
+
+        final content = generator.generateMigrationFile('AddUuidExtension', operations);
+
+        expect(content, contains("builder.raw('CREATE EXTENSION IF NOT EXISTS"));
+      });
+
+      test('generates RawSql with reverse', () {
+        final operations = [
+          const RawSql(
+            'CREATE MATERIALIZED VIEW stats AS SELECT COUNT(*) FROM users',
+            reverseSql: 'DROP MATERIALIZED VIEW stats',
+          ),
+        ];
+
+        final content = generator.generateMigrationFile('CreateStatsView', operations);
+
+        expect(content, contains('CREATE MATERIALIZED VIEW stats'));
+        expect(content, contains('DROP MATERIALIZED VIEW stats'));
+      });
+
+      test('generates RunDart operation', () {
+        final operations = [
+          RunDart((conn) async {
+            // Migrate data
+          }),
+        ];
+
+        final content = generator.generateMigrationFile('MigrateData', operations);
+
+        expect(content, contains('// RunDart operation - implement manually'));
       });
 
       test('generates nullable column', () {

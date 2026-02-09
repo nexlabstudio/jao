@@ -304,9 +304,22 @@ class SchemaGenerator {
           );
         }
       } else {
-        // Column exists - check for type/nullability changes
-        // This is more complex and usually requires careful handling
-        // For now, we'll skip auto-detecting type changes
+        // Column exists - check for nullability changes
+        // Skip PK fields: SQLite's PRAGMA table_info reports notnull=0 for
+        // INTEGER PRIMARY KEY even though PKs are implicitly NOT NULL.
+        // PostgreSQL/MySQL report PKs correctly, but this check is harmless there.
+        if (!field.primaryKey && !dbColumn.isPrimaryKey && field.nullable != dbColumn.nullable) {
+          operations.add(
+            AlterColumn(
+              ColumnModification(
+                table: model.tableName,
+                column: field.columnName,
+                nullable: field.nullable,
+              ),
+            ),
+          );
+        }
+        // TODO(mastersam07): Add type change detection (more complex due to type mapping)
       }
     }
 
@@ -357,15 +370,34 @@ class SchemaGenerator {
   }
 
   String _operationToCode(MigrationOperation op, String indent) {
-    if (op is CreateTable) {
-      return _createTableToCode(op, indent);
-    } else if (op is DropTable) {
-      return "${indent}builder.dropTable('${op.name}');";
-    } else if (op is AddColumn) {
-      return "${indent}builder.addColumn('${op.table}', '${op.column.name}', FieldType.${op.column.type.name});";
-    } else if (op is CreateIndex) {
-      final cols = op.index.columns.map((c) => "'$c'").join(', ');
-      return "${indent}builder.createIndex('${op.table}', [$cols], unique: ${op.index.unique});";
+    switch (op) {
+      case CreateTable():
+        return _createTableToCode(op, indent);
+      case DropTable():
+        return "${indent}builder.dropTable('${op.name}');";
+      case RenameTable():
+        return "${indent}builder.renameTable('${op.oldName}', '${op.newName}');";
+      case AddColumn():
+        return "${indent}builder.addColumn('${op.table}', '${op.column.name}', FieldType.${op.column.type.name});";
+      case DropColumn():
+        return "${indent}builder.dropColumn('${op.table}', '${op.column}');";
+      case RenameColumn():
+        return "${indent}builder.renameColumn('${op.table}', '${op.oldName}', '${op.newName}');";
+      case AlterColumn():
+        return _alterColumnToCode(op, indent);
+      case CreateIndex():
+        final cols = op.index.columns.map((c) => "'$c'").join(', ');
+        return "${indent}builder.createIndex('${op.table}', [$cols], unique: ${op.index.unique});";
+      case DropIndex():
+        return "${indent}builder.dropIndex('${op.name}');";
+      case AddForeignKey():
+        return "${indent}builder.addForeignKey('${op.table}', '${op.foreignKey.column}', '${op.foreignKey.referencedTable}', referencedColumn: '${op.foreignKey.referencedColumn}');";
+      case DropConstraint():
+        return "${indent}builder.dropConstraint('${op.table}', '${op.constraintName}');";
+      case RawSql():
+        return "${indent}builder.raw('${op.sql.replaceAll("'", "\\'")}');";
+      case RunDart():
+        return '$indent// RunDart operation - implement manually';
     }
     return '$indent// Unsupported operation: ${op.runtimeType}';
   }
@@ -378,6 +410,35 @@ class SchemaGenerator {
       buffer.writeln(_columnToCode(col, '$indent  '));
     }
 
+    buffer.write('$indent});');
+    return buffer.toString();
+  }
+
+  String _alterColumnToCode(AlterColumn op, String indent) {
+    final mod = op.modification;
+    final modifications = <String>[];
+
+    if (mod.nullable case final nullable?) {
+      modifications.add(nullable ? 'col.nullable()' : 'col.notNullable()');
+    }
+    if (mod.type case final type?) {
+      modifications.add('col.setType(FieldType.${type.name})');
+    }
+    if (mod.defaultValue case final defaultValue?) {
+      modifications.add("col.defaultValue('${defaultValue}')");
+    }
+    if (mod.dropDefault) {
+      modifications.add('col.dropDefault()');
+    }
+    if (mod.rename case final rename?) {
+      modifications.add("col.renameTo('${rename}')");
+    }
+
+    final buffer = StringBuffer();
+    buffer.writeln("${indent}builder.alterColumn('${mod.table}', '${mod.column}', (col) {");
+    for (final m in modifications) {
+      buffer.writeln('$indent  $m;');
+    }
     buffer.write('$indent});');
     return buffer.toString();
   }
@@ -408,12 +469,42 @@ class SchemaGenerator {
   }
 
   String? _operationToReverseCode(MigrationOperation op, String indent) {
-    if (op is CreateTable) {
-      return "${indent}builder.dropTable('${op.table.name}');";
-    } else if (op is AddColumn) {
-      return "${indent}builder.dropColumn('${op.table}', '${op.column.name}');";
-    } else if (op is CreateIndex) {
-      return "${indent}builder.dropIndex('${op.index.name}');";
+    switch (op) {
+      case CreateTable():
+        return "${indent}builder.dropTable('${op.table.name}');";
+      case DropTable():
+        return '$indent// TODO: Cannot reverse DropTable - table definition lost';
+      case RenameTable():
+        return "${indent}builder.renameTable('${op.newName}', '${op.oldName}');";
+      case AddColumn():
+        return "${indent}builder.dropColumn('${op.table}', '${op.column.name}');";
+      case DropColumn():
+        return '$indent// TODO: Cannot reverse DropColumn - column definition lost';
+      case RenameColumn():
+        return "${indent}builder.renameColumn('${op.table}', '${op.newName}', '${op.oldName}');";
+      case AlterColumn():
+        final mod = op.modification;
+        if (mod.nullable case final nullable?) {
+          final reverseNullable = !nullable;
+          final reverseMethod = reverseNullable ? 'col.nullable()' : 'col.notNullable()';
+          return "${indent}builder.alterColumn('${mod.table}', '${mod.column}', (col) {\n$indent  $reverseMethod;\n$indent});";
+        }
+        return '$indent// TODO: Manual reversal needed for AlterColumn';
+      case CreateIndex():
+        return "${indent}builder.dropIndex('${op.index.name}');";
+      case DropIndex():
+        return '$indent// TODO: Cannot reverse DropIndex - index definition lost';
+      case AddForeignKey():
+        return "${indent}builder.dropConstraint('${op.table}', 'fk_${op.table}_${op.foreignKey.column}');";
+      case DropConstraint():
+        return '$indent// TODO: Cannot reverse DropConstraint - constraint definition lost';
+      case RawSql():
+        if (op.reverseSql case final reverseSql?) {
+          return "${indent}builder.raw('${reverseSql.replaceAll("'", "\\'")}');";
+        }
+        return '$indent// TODO: No reverse SQL provided for RawSql';
+      case RunDart():
+        return '$indent// TODO: Cannot reverse RunDart operation';
     }
     return null;
   }
