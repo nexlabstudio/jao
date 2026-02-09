@@ -418,20 +418,20 @@ class SchemaGenerator {
     final mod = op.modification;
     final modifications = <String>[];
 
-    if (mod.nullable != null) {
-      modifications.add(mod.nullable! ? 'col.nullable()' : 'col.notNullable()');
+    if (mod.nullable case final nullable?) {
+      modifications.add(nullable ? 'col.nullable()' : 'col.notNullable()');
     }
-    if (mod.type != null) {
-      modifications.add('col.setType(FieldType.${mod.type!.name})');
+    if (mod.type case final type?) {
+      modifications.add('col.setType(FieldType.${type.name})');
     }
-    if (mod.defaultValue != null) {
-      modifications.add("col.defaultValue('${mod.defaultValue}')");
+    if (mod.defaultValue case final defaultValue?) {
+      modifications.add("col.defaultValue('${defaultValue}')");
     }
     if (mod.dropDefault) {
       modifications.add('col.dropDefault()');
     }
-    if (mod.rename != null) {
-      modifications.add("col.renameTo('${mod.rename}')");
+    if (mod.rename case final rename?) {
+      modifications.add("col.renameTo('${rename}')");
     }
 
     final buffer = StringBuffer();
@@ -484,8 +484,8 @@ class SchemaGenerator {
         return "${indent}builder.renameColumn('${op.table}', '${op.newName}', '${op.oldName}');";
       case AlterColumn():
         final mod = op.modification;
-        if (mod.nullable != null) {
-          final reverseNullable = !mod.nullable!;
+        if (mod.nullable case final nullable?) {
+          final reverseNullable = !nullable;
           final reverseMethod = reverseNullable ? 'col.nullable()' : 'col.notNullable()';
           return "${indent}builder.alterColumn('${mod.table}', '${mod.column}', (col) {\n$indent  $reverseMethod;\n$indent});";
         }
@@ -499,8 +499,8 @@ class SchemaGenerator {
       case DropConstraint():
         return '$indent// TODO: Cannot reverse DropConstraint - constraint definition lost';
       case RawSql():
-        if (op.reverseSql != null) {
-          return "${indent}builder.raw('${op.reverseSql!.replaceAll("'", "\\'")}');";
+        if (op.reverseSql case final reverseSql?) {
+          return "${indent}builder.raw('${reverseSql.replaceAll("'", "\\'")}');";
         }
         return '$indent// TODO: No reverse SQL provided for RawSql';
       case RunDart():
