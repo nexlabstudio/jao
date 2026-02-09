@@ -1,3 +1,12 @@
+## [Unrealesed] - 2026-02-09
+
+### Added
+
+- `EnumField` support in migration schema generator:
+  - `fieldDefToDbType` now handles `EnumField` annotation
+  - Returns `FieldType.integer` when `storeAsInt: true`
+  - Returns `FieldType.varchar` for string-based storage (default)
+
 ## [0.2.5] - 2026-02-09
 
 ### Added
