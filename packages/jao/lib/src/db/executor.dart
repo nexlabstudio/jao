@@ -18,6 +18,7 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
   final List<String> autoNowAddFields;
   final List<String> autoNowFields;
   final List<String> autoGenerateUuidFields;
+  final Map<String, Object?> defaultValues;
 
   ModelExecutor({
     required this.pool,
@@ -29,6 +30,7 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
     this.autoNowAddFields = const [],
     this.autoNowFields = const [],
     this.autoGenerateUuidFields = const [],
+    this.defaultValues = const {},
   });
 
   String _currentTimestamp() => DateTime.now().toUtc().toIso8601String();
@@ -36,6 +38,12 @@ class ModelExecutor<T> implements QueryExecutor<T>, CreateCapable<T>, RawQueryCa
   Map<String, Object?> _injectCreateValues(Map<String, Object?> values) {
     final result = Map<String, Object?>.from(values);
     final now = _currentTimestamp();
+
+    for (final entry in defaultValues.entries) {
+      if (!result.containsKey(entry.key) || result[entry.key] == null) {
+        result[entry.key] = entry.value;
+      }
+    }
 
     for (final field in autoGenerateUuidFields) {
       if (!result.containsKey(field) || result[field] == null) {
