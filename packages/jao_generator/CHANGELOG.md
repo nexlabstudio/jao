@@ -1,3 +1,14 @@
+## [Unreleased] - 2026-02-09
+
+### Added
+
+- `EnumField` support for enum-to-database mapping:
+  - Generates `fromRow` with `Enum.values.byName()` for string storage (default)
+  - Generates `fromRow` with `Enum.values[index]` for int storage (`storeAsInt: true`)
+  - Generates `toRow` with `.name` or `.index` based on storage type
+  - Handles nullable enum fields correctly
+  - Schema uses `varchar` for string-based or `integer` for int-based storage
+
 ## [0.2.3] - 2026-02-09
 
 ### Added

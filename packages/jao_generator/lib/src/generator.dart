@@ -49,6 +49,8 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
             autoGenerateUuid: fieldAnnotation.autoGenerateUuid,
             defaultValue: fieldAnnotation.defaultValue,
             relation: fieldAnnotation.relation,
+            isEnum: fieldAnnotation.isEnum,
+            storeEnumAsInt: fieldAnnotation.storeEnumAsInt,
           ),
         );
       } else {
@@ -91,9 +93,10 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
       if (type == null) continue;
 
       final typeName = type.getDisplayString();
+      final baseTypeName = typeName.contains('<') ? typeName.substring(0, typeName.indexOf('<')) : typeName;
       final defaultValue = _extractDefaultValue(value.getField('defaultValue'));
 
-      switch (typeName) {
+      switch (baseTypeName) {
         case 'CharField':
           return _FieldAnnotationInfo('String', 'StringFieldRef', 'varchar', annotation.toSource(),
               defaultValue: defaultValue);
@@ -225,6 +228,17 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
         case 'TimeField':
           return _FieldAnnotationInfo('Duration', 'DurationFieldRef', 'time', annotation.toSource(),
               defaultValue: defaultValue);
+        case 'EnumField':
+          final storeAsInt = value.getField('storeAsInt')?.toBoolValue() ?? false;
+          return _FieldAnnotationInfo(
+            storeAsInt ? 'int' : 'String',
+            storeAsInt ? 'IntFieldRef' : 'StringFieldRef',
+            storeAsInt ? 'integer' : 'varchar',
+            annotation.toSource(),
+            defaultValue: defaultValue,
+            isEnum: true,
+            storeEnumAsInt: storeAsInt,
+          );
       }
     }
     return null;
@@ -503,6 +517,22 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     final isNullable = field.nullable;
     final rowAccess = "row['$columnName']";
 
+    if (field.isEnum) {
+      if (field.storeEnumAsInt) {
+        if (isNullable) {
+          return '$rowAccess != null ? $dartTypeName.values[$rowAccess as int] : null';
+        } else {
+          return '$dartTypeName.values[$rowAccess as int]';
+        }
+      } else {
+        if (isNullable) {
+          return '$rowAccess != null ? $dartTypeName.values.byName($rowAccess as String) : null';
+        } else {
+          return '$dartTypeName.values.byName($rowAccess as String)';
+        }
+      }
+    }
+
     switch (dartTypeName) {
       case 'DateTime':
         if (isNullable) {
@@ -559,6 +589,20 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     final rawTypeName = field.dartType.getDisplayString();
     final dartTypeName = rawTypeName.endsWith('?') ? rawTypeName.substring(0, rawTypeName.length - 1) : rawTypeName;
 
+    if (field.isEnum) {
+      if (field.storeEnumAsInt) {
+        if (field.nullable) {
+          return '$prefix.${field.name}?.index';
+        }
+        return '$prefix.${field.name}.index';
+      } else {
+        if (field.nullable) {
+          return '$prefix.${field.name}?.name';
+        }
+        return '$prefix.${field.name}.name';
+      }
+    }
+
     if (dartTypeName == 'DateTime') {
       if (field.nullable) {
         return '$prefix.${field.name}?.toIso8601String()';
@@ -591,6 +635,8 @@ class _FieldInfo {
   final bool autoGenerateUuid;
   final String? defaultValue;
   final _RelationInfo? relation;
+  final bool isEnum;
+  final bool storeEnumAsInt;
 
   _FieldInfo({
     required this.name,
@@ -606,6 +652,8 @@ class _FieldInfo {
     this.autoGenerateUuid = false,
     this.defaultValue,
     this.relation,
+    this.isEnum = false,
+    this.storeEnumAsInt = false,
   });
 }
 
@@ -637,6 +685,8 @@ class _FieldAnnotationInfo {
   final bool autoGenerateUuid;
   final String? defaultValue;
   final _RelationInfo? relation;
+  final bool isEnum;
+  final bool storeEnumAsInt;
 
   _FieldAnnotationInfo(
     this.type,
@@ -650,5 +700,7 @@ class _FieldAnnotationInfo {
     this.autoGenerateUuid = false,
     this.defaultValue,
     this.relation,
+    this.isEnum = false,
+    this.storeEnumAsInt = false,
   });
 }

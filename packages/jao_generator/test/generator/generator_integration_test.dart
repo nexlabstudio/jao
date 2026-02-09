@@ -880,6 +880,146 @@ class Article {
         },
       );
     });
+
+    test('Generator handles EnumField stored as string (default)', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/task.dart': '''
+import 'package:jao/jao.dart';
+
+enum TaskStatus { pending, inProgress, completed }
+
+@Model()
+class Task {
+  late int id;
+  late String title;
+  @EnumField()
+  late TaskStatus status;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/task.jao.dart': decodedMatches(
+            allOf([
+              // Field ref should be StringFieldRef for string-based enum
+              contains("final status = const StringFieldRef('status')"),
+              // fromRow should use values.byName
+              contains("TaskStatus.values.byName(row['status'] as String)"),
+              // toRow should use .name
+              contains("'status': model.status.name"),
+              // Schema should use varchar
+              contains("dbType: FieldType.varchar"),
+            ]),
+          ),
+        },
+      );
+    });
+
+    test('Generator handles EnumField stored as int', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/priority.dart': '''
+import 'package:jao/jao.dart';
+
+enum Priority { low, medium, high, critical }
+
+@Model()
+class Issue {
+  late int id;
+  late String title;
+  @EnumField(storeAsInt: true)
+  late Priority priority;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/priority.jao.dart': decodedMatches(
+            allOf([
+              // Field ref should be IntFieldRef for int-based enum
+              contains("final priority = const IntFieldRef('priority')"),
+              // fromRow should use values[index]
+              contains("Priority.values[row['priority'] as int]"),
+              // toRow should use .index
+              contains("'priority': model.priority.index"),
+              // Schema should use integer
+              contains("dbType: FieldType.integer"),
+            ]),
+          ),
+        },
+      );
+    });
+
+    test('Generator handles nullable EnumField stored as string', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/order.dart': '''
+import 'package:jao/jao.dart';
+
+enum ShippingMethod { standard, express, overnight }
+
+@Model()
+class Order {
+  late int id;
+  @EnumField()
+  ShippingMethod? shippingMethod;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/order.jao.dart': decodedMatches(
+            allOf([
+              // fromRow should handle null - check key parts
+              contains("row['shipping_method'] != null"),
+              contains("ShippingMethod.values.byName(row['shipping_method'] as String)"),
+              // toRow should use ?.name
+              contains("model.shippingMethod?.name"),
+              // Schema should mark nullable
+              contains("nullable: true"),
+            ]),
+          ),
+        },
+      );
+    });
+
+    test('Generator handles nullable EnumField stored as int', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/ticket.dart': '''
+import 'package:jao/jao.dart';
+
+enum Severity { info, warning, error, critical }
+
+@Model()
+class Ticket {
+  late int id;
+  @EnumField(storeAsInt: true)
+  Severity? severity;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/ticket.jao.dart': decodedMatches(
+            allOf([
+              // fromRow should handle null - check key parts
+              contains("row['severity'] != null"),
+              contains("Severity.values[row['severity'] as int]"),
+              // toRow should use ?.index
+              contains("model.severity?.index"),
+              // Schema should mark nullable
+              contains("nullable: true"),
+            ]),
+          ),
+        },
+      );
+    });
   });
 }
 
@@ -986,6 +1126,11 @@ class JsonField {
 
 class BinaryField {
   const BinaryField();
+}
+
+class EnumField<T extends Enum> {
+  final bool storeAsInt;
+  const EnumField({this.storeAsInt = false});
 }
 
 class ForeignKey {

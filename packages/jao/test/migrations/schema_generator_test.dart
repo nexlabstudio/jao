@@ -965,8 +965,12 @@ void main() {
       expect(fieldDefToDbType(const OneToOneField(Object)), equals(FieldType.integer));
     });
 
-    test('EnumField maps to text', () {
-      expect(fieldDefToDbType(const EnumField<TestEnum>()), equals(FieldType.text));
+    test('EnumField maps to varchar (string storage)', () {
+      expect(fieldDefToDbType(const EnumField<TestEnum>()), equals(FieldType.varchar));
+    });
+
+    test('EnumField with storeAsInt maps to integer', () {
+      expect(fieldDefToDbType(const EnumField<TestEnum>(storeAsInt: true)), equals(FieldType.integer));
     });
   });
 }
