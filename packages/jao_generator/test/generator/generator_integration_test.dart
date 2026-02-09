@@ -726,6 +726,46 @@ class Post {
       );
     });
 
+    test('Generator outputs ForeignKeyInfo in schema for FK fields', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/models.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class User {
+  @AutoField()
+  late int id;
+  late String name;
+}
+
+@Model()
+class Book {
+  @AutoField()
+  late int id;
+  late String title;
+  @ForeignKey(User)
+  int? creatorId;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/models.jao.dart': decodedMatches(
+            allOf([
+              // Verify schema includes ForeignKeyInfo for FK fields
+              contains('foreignKey: ForeignKeyInfo('),
+              contains("referencedTable: 'user'"),
+              contains("referencedColumn: 'id'"),
+              // Verify nullable is true for nullable FK
+              contains('nullable: true'),
+            ]),
+          ),
+        },
+      );
+    });
+
     test('Generator handles nullable int and double fields', () async {
       await testBuilder(
         builder,

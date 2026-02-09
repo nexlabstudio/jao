@@ -434,6 +434,12 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
       buffer.writeln('        autoIncrement: ${field.autoIncrement},');
       buffer.writeln('        autoNowAdd: ${field.autoNowAdd},');
       buffer.writeln('        autoNow: ${field.autoNow},');
+      if (field.relation case final relation?) {
+        buffer.writeln('        foreignKey: ForeignKeyInfo(');
+        buffer.writeln("          referencedTable: '${relation.relatedTable}',");
+        buffer.writeln("          referencedColumn: '${relation.relatedColumn}',");
+        buffer.writeln('        ),');
+      }
       buffer.writeln('      ),');
     }
     buffer.writeln('    ],');
