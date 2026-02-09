@@ -59,7 +59,7 @@ jobs:
           dart pub global run coverage:test_with_coverage \
             --scope-output=${{ matrix.package }} \
             -- test/
-        continue-on-error: ${{ matrix.package != 'jao' }}
+        continue-on-error: ${{ matrix.package == 'jao_cli' }}
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v6
