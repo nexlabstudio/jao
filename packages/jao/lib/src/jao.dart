@@ -12,6 +12,7 @@ class ModelRegistration<T> {
   final List<String> autoNowAddFields;
   final List<String> autoNowFields;
   final List<String> autoGenerateUuidFields;
+  final Map<String, Object?> defaultValues;
 
   const ModelRegistration({
     required this.tableName,
@@ -21,6 +22,7 @@ class ModelRegistration<T> {
     this.autoNowAddFields = const [],
     this.autoNowFields = const [],
     this.autoGenerateUuidFields = const [],
+    this.defaultValues = const {},
   });
 }
 
@@ -75,6 +77,7 @@ class Jao {
         autoNowAddFields: reg.autoNowAddFields,
         autoNowFields: reg.autoNowFields,
         autoGenerateUuidFields: reg.autoGenerateUuidFields,
+        defaultValues: reg.defaultValues,
       );
 
       _executors[T] = executor;

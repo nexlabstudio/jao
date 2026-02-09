@@ -803,6 +803,43 @@ class FileData {
         },
       );
     });
+
+    test('Generator handles fields with defaultValue', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/article.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class Article {
+  late int id;
+  late String title;
+  @CharField(maxLength: 50, defaultValue: 'draft')
+  late String status;
+  @IntegerField(defaultValue: 0)
+  late int views;
+  @BooleanField(defaultValue: false)
+  late bool featured;
+  @FloatField(defaultValue: 0.0)
+  late double rating;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/article.jao.dart': decodedMatches(
+            allOf([
+              contains("defaultValues: {"),
+              contains("'status': 'draft'"),
+              contains("'views': 0"),
+              contains("'featured': false"),
+              contains("'rating': 0.0"),
+            ]),
+          ),
+        },
+      );
+    });
   });
 }
 
@@ -824,7 +861,8 @@ class BigAutoField {
 
 class CharField {
   final int maxLength;
-  const CharField({this.maxLength = 255});
+  final Object? defaultValue;
+  const CharField({this.maxLength = 255, this.defaultValue});
 }
 
 class TextField {
@@ -842,7 +880,8 @@ class UrlField {
 }
 
 class IntegerField {
-  const IntegerField();
+  final Object? defaultValue;
+  const IntegerField({this.defaultValue});
 }
 
 class SmallIntegerField {
@@ -858,7 +897,8 @@ class PositiveIntegerField {
 }
 
 class FloatField {
-  const FloatField();
+  final Object? defaultValue;
+  const FloatField({this.defaultValue});
 }
 
 class DecimalField {
@@ -868,7 +908,8 @@ class DecimalField {
 }
 
 class BooleanField {
-  const BooleanField();
+  final Object? defaultValue;
+  const BooleanField({this.defaultValue});
 }
 
 class DateField {

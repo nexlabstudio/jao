@@ -47,6 +47,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
             autoNowAdd: fieldAnnotation.autoNowAdd,
             autoNow: fieldAnnotation.autoNow,
             autoGenerateUuid: fieldAnnotation.autoGenerateUuid,
+            defaultValue: fieldAnnotation.defaultValue,
             relation: fieldAnnotation.relation,
           ),
         );
@@ -61,6 +62,26 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     return fields;
   }
 
+  String? _extractDefaultValue(dynamic dartObject) {
+    if (dartObject == null || dartObject.isNull) return null;
+
+    if (dartObject.toIntValue() case final intVal?) {
+      return intVal.toString();
+    }
+    if (dartObject.toDoubleValue() case final doubleVal?) {
+      return doubleVal.toString();
+    }
+    if (dartObject.toBoolValue() case final boolVal?) {
+      return boolVal.toString();
+    }
+    if (dartObject.toStringValue() case final stringVal?) {
+      final escaped = stringVal.replaceAll("'", "\\'");
+      return "'$escaped'";
+    }
+
+    return null;
+  }
+
   _FieldAnnotationInfo? _getFieldAnnotation(FieldElement field) {
     for (final annotation in field.metadata.annotations) {
       final value = annotation.computeConstantValue();
@@ -70,24 +91,33 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
       if (type == null) continue;
 
       final typeName = type.getDisplayString();
+      final defaultValue = _extractDefaultValue(value.getField('defaultValue'));
 
       switch (typeName) {
         case 'CharField':
-          return _FieldAnnotationInfo('String', 'StringFieldRef', 'varchar', annotation.toSource());
+          return _FieldAnnotationInfo('String', 'StringFieldRef', 'varchar', annotation.toSource(),
+              defaultValue: defaultValue);
         case 'TextField':
-          return _FieldAnnotationInfo('String', 'StringFieldRef', 'text', annotation.toSource());
+          return _FieldAnnotationInfo('String', 'StringFieldRef', 'text', annotation.toSource(),
+              defaultValue: defaultValue);
         case 'EmailField':
-          return _FieldAnnotationInfo('String', 'StringFieldRef', 'varchar', annotation.toSource());
+          return _FieldAnnotationInfo('String', 'StringFieldRef', 'varchar', annotation.toSource(),
+              defaultValue: defaultValue);
         case 'UrlField':
-          return _FieldAnnotationInfo('String', 'StringFieldRef', 'varchar', annotation.toSource());
+          return _FieldAnnotationInfo('String', 'StringFieldRef', 'varchar', annotation.toSource(),
+              defaultValue: defaultValue);
         case 'IntegerField':
-          return _FieldAnnotationInfo('int', 'IntFieldRef', 'integer', annotation.toSource());
+          return _FieldAnnotationInfo('int', 'IntFieldRef', 'integer', annotation.toSource(),
+              defaultValue: defaultValue);
         case 'SmallIntegerField':
-          return _FieldAnnotationInfo('int', 'IntFieldRef', 'smallInt', annotation.toSource());
+          return _FieldAnnotationInfo('int', 'IntFieldRef', 'smallInt', annotation.toSource(),
+              defaultValue: defaultValue);
         case 'BigIntegerField':
-          return _FieldAnnotationInfo('int', 'IntFieldRef', 'bigInt', annotation.toSource());
+          return _FieldAnnotationInfo('int', 'IntFieldRef', 'bigInt', annotation.toSource(),
+              defaultValue: defaultValue);
         case 'PositiveIntegerField':
-          return _FieldAnnotationInfo('int', 'IntFieldRef', 'integer', annotation.toSource());
+          return _FieldAnnotationInfo('int', 'IntFieldRef', 'integer', annotation.toSource(),
+              defaultValue: defaultValue);
         case 'AutoField':
           return _FieldAnnotationInfo(
             'int',
@@ -107,13 +137,17 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
             autoIncrement: true,
           );
         case 'FloatField':
-          return _FieldAnnotationInfo('double', 'DoubleFieldRef', 'real', annotation.toSource());
+          return _FieldAnnotationInfo('double', 'DoubleFieldRef', 'real', annotation.toSource(),
+              defaultValue: defaultValue);
         case 'DecimalField':
-          return _FieldAnnotationInfo('double', 'DoubleFieldRef', 'decimal', annotation.toSource());
+          return _FieldAnnotationInfo('double', 'DoubleFieldRef', 'decimal', annotation.toSource(),
+              defaultValue: defaultValue);
         case 'BooleanField':
-          return _FieldAnnotationInfo('bool', 'BoolFieldRef', 'boolean', annotation.toSource());
+          return _FieldAnnotationInfo('bool', 'BoolFieldRef', 'boolean', annotation.toSource(),
+              defaultValue: defaultValue);
         case 'DateField':
-          return _FieldAnnotationInfo('DateTime', 'DateTimeFieldRef', 'date', annotation.toSource());
+          return _FieldAnnotationInfo('DateTime', 'DateTimeFieldRef', 'date', annotation.toSource(),
+              defaultValue: defaultValue);
         case 'DateTimeField':
           final autoNowAdd = value.getField('autoNowAdd')?.toBoolValue() ?? false;
           final autoNow = value.getField('autoNow')?.toBoolValue() ?? false;
@@ -124,9 +158,11 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
             annotation.toSource(),
             autoNowAdd: autoNowAdd,
             autoNow: autoNow,
+            defaultValue: defaultValue,
           );
         case 'DurationField':
-          return _FieldAnnotationInfo('Duration', 'DurationFieldRef', 'interval', annotation.toSource());
+          return _FieldAnnotationInfo('Duration', 'DurationFieldRef', 'interval', annotation.toSource(),
+              defaultValue: defaultValue);
         case 'ForeignKey':
         case 'OneToOneField':
         case 'ManyToManyField':
@@ -170,6 +206,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
             'uuid',
             annotation.toSource(),
             autoGenerateUuid: autoGenerate,
+            defaultValue: defaultValue,
           );
         case 'UuidPrimaryKey':
           return _FieldAnnotationInfo(
@@ -181,11 +218,13 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
             autoGenerateUuid: true,
           );
         case 'JsonField':
-          return _FieldAnnotationInfo('dynamic', 'FieldRef', 'jsonb', annotation.toSource());
+          return _FieldAnnotationInfo('dynamic', 'FieldRef', 'jsonb', annotation.toSource(),
+              defaultValue: defaultValue);
         case 'BinaryField':
           return _FieldAnnotationInfo('List<int>', 'FieldRef', 'bytea', annotation.toSource());
         case 'TimeField':
-          return _FieldAnnotationInfo('Duration', 'DurationFieldRef', 'time', annotation.toSource());
+          return _FieldAnnotationInfo('Duration', 'DurationFieldRef', 'time', annotation.toSource(),
+              defaultValue: defaultValue);
       }
     }
     return null;
@@ -313,6 +352,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     final autoNowAddFields = fields.where((f) => f.autoNowAdd).map((f) => _toSnakeCase(f.name)).toList();
     final autoNowFields = fields.where((f) => f.autoNow).map((f) => _toSnakeCase(f.name)).toList();
     final autoGenerateUuidFields = fields.where((f) => f.autoGenerateUuid).map((f) => _toSnakeCase(f.name)).toList();
+    final fieldsWithDefaults = fields.where((f) => f.defaultValue != null).toList();
 
     buffer.writeln('class ${className}s {');
     buffer.writeln('  ${className}s._();');
@@ -338,6 +378,14 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     }
     if (autoGenerateUuidFields.isNotEmpty) {
       buffer.writeln("        autoGenerateUuidFields: [${autoGenerateUuidFields.map((f) => "'$f'").join(', ')}],");
+    }
+    if (fieldsWithDefaults.isNotEmpty) {
+      buffer.writeln('        defaultValues: {');
+      for (final f in fieldsWithDefaults) {
+        final columnName = _toSnakeCase(f.name);
+        buffer.writeln("          '$columnName': ${f.defaultValue},");
+      }
+      buffer.writeln('        },');
     }
     buffer.writeln('      ));');
     buffer.writeln('    }');
@@ -535,6 +583,7 @@ class _FieldInfo {
   final bool autoNowAdd;
   final bool autoNow;
   final bool autoGenerateUuid;
+  final String? defaultValue;
   final _RelationInfo? relation;
 
   _FieldInfo({
@@ -549,6 +598,7 @@ class _FieldInfo {
     this.autoNowAdd = false,
     this.autoNow = false,
     this.autoGenerateUuid = false,
+    this.defaultValue,
     this.relation,
   });
 }
@@ -579,6 +629,7 @@ class _FieldAnnotationInfo {
   final bool autoNowAdd;
   final bool autoNow;
   final bool autoGenerateUuid;
+  final String? defaultValue;
   final _RelationInfo? relation;
 
   _FieldAnnotationInfo(
@@ -591,6 +642,7 @@ class _FieldAnnotationInfo {
     this.autoNowAdd = false,
     this.autoNow = false,
     this.autoGenerateUuid = false,
+    this.defaultValue,
     this.relation,
   });
 }

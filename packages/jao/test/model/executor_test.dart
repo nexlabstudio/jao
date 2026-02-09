@@ -759,6 +759,87 @@ void main() {
         expect(docs[0]['id'], isNot(equals(docs[1]['id'])));
       });
     });
+
+    group('defaultValues', () {
+      late ConnectionPool defaultsPool;
+      late ModelExecutor<Map<String, dynamic>> defaultsExecutor;
+
+      setUp(() async {
+        final config = DatabaseConfig.sqliteMemory();
+        defaultsPool = await adapter.createPool(config);
+
+        await defaultsPool.withConnection((conn) async {
+          await conn.execute('''
+            CREATE TABLE articles (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              title TEXT NOT NULL,
+              status TEXT NOT NULL DEFAULT 'draft',
+              views INTEGER NOT NULL DEFAULT 0,
+              featured INTEGER NOT NULL DEFAULT 0
+            )
+          ''');
+        });
+
+        defaultsExecutor = ModelExecutor<Map<String, dynamic>>(
+          pool: defaultsPool,
+          compiler: compiler,
+          tableName: 'articles',
+          pkField: 'id',
+          fromRow: (row) => row,
+          toRow: (model) => model,
+          defaultValues: {
+            'status': 'draft',
+            'views': 0,
+            'featured': false,
+          },
+        );
+      });
+
+      tearDown(() async {
+        await defaultsPool.close();
+      });
+
+      test('applies default values on create when not provided', () async {
+        final article = await defaultsExecutor.create({'title': 'Test Article'});
+
+        expect(article['status'], equals('draft'));
+        expect(article['views'], equals(0));
+        // SQLite stores booleans as integers (0/1)
+        expect(article['featured'], anyOf(equals(false), equals(0)));
+      });
+
+      test('does not override explicit values', () async {
+        final article = await defaultsExecutor.create({
+          'title': 'Test Article',
+          'status': 'published',
+          'views': 100,
+          'featured': 1, // SQLite uses integers for booleans
+        });
+
+        expect(article['status'], equals('published'));
+        expect(article['views'], equals(100));
+        expect(article['featured'], equals(1));
+      });
+
+      test('applies default values for null values', () async {
+        final article = await defaultsExecutor.create({
+          'title': 'Test Article',
+          'status': null,
+        });
+
+        expect(article['status'], equals('draft'));
+      });
+
+      test('applies default values in bulkCreate', () async {
+        final articles = await defaultsExecutor.bulkCreate([
+          {'title': 'Article 1'},
+          {'title': 'Article 2', 'status': 'published'},
+        ]);
+
+        expect(articles[0]['status'], equals('draft'));
+        expect(articles[1]['status'], equals('published'));
+      });
+    });
   });
 
   group('Manager', () {
