@@ -1,3 +1,16 @@
+## [0.2.3] - 2026-02-09
+
+### Added
+
+- `defaultValue` support for field annotations:
+  - Extracts `defaultValue` from `@CharField`, `@IntegerField`, `@BooleanField`, `@FloatField`, and other field types
+  - Generates `defaultValues` map in `ModelRegistration` for runtime default value injection
+  - Supports string, int, bool, and double default values
+- `ForeignKeyInfo` in schema for FK fields:
+  - Generated `ModelFieldSchema` now includes `foreignKey: ForeignKeyInfo(...)` for `@ForeignKey` and `@OneToOneField`
+  - Enables migration generator to create proper foreign key constraints
+  - Supports nullable foreign key relationships
+
 ## [0.2.2] - 2026-02-02
 
 ### Fixed

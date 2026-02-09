@@ -1,3 +1,12 @@
+## [0.2.5] - 2026-02-09
+
+### Added
+
+- Default values support for model fields:
+  - `defaultValues` parameter in `ModelRegistration` and `ModelExecutor`
+  - Automatically applies default values during `create()` and `bulkCreate()` when field is not provided or null
+  - Works with all field types (string, int, bool, double)
+
 ## [0.2.4] - 2026-01-01
 
 ### Added
