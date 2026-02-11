@@ -1558,6 +1558,83 @@ void main() {
       expect(fieldDefToDbType(const EnumField<TestEnum>(storeAsInt: true)), equals(FieldType.integer));
     });
   });
+
+  group('SchemaGenerator additional field types', () {
+    late SchemaGenerator generator;
+
+    setUp(() {
+      generator = SchemaGenerator(const SqliteAdapter());
+    });
+
+    test('generates CreateTable with doublePrecision field', () {
+      const schema = ModelSchema(
+        className: 'Scientific',
+        tableName: 'scientific_data',
+        fields: [
+          ModelFieldSchema(
+            name: 'id',
+            columnName: 'id',
+            dbType: FieldType.serial,
+            primaryKey: true,
+            autoIncrement: true,
+          ),
+          ModelFieldSchema(
+            name: 'value',
+            columnName: 'value',
+            dbType: FieldType.doublePrecision,
+            nullable: true,
+            defaultValue: '3.14159',
+          ),
+        ],
+      );
+
+      final operations = generator.generateCreateTable(schema);
+
+      expect(operations.length, equals(1));
+      final createTable = operations[0] as CreateTable;
+      final valueCol = createTable.table.columns.firstWhere((c) => c.name == 'value');
+      expect(valueCol.type, equals(FieldType.doublePrecision));
+    });
+
+    test('generates CreateTable with blob field', () {
+      const schema = ModelSchema(
+        className: 'FileStorage',
+        tableName: 'file_storage',
+        fields: [
+          ModelFieldSchema(
+            name: 'id',
+            columnName: 'id',
+            dbType: FieldType.serial,
+            primaryKey: true,
+            autoIncrement: true,
+          ),
+          ModelFieldSchema(name: 'data', columnName: 'data', dbType: FieldType.blob, nullable: true),
+        ],
+      );
+
+      final operations = generator.generateCreateTable(schema);
+
+      expect(operations.length, equals(1));
+      final createTable = operations[0] as CreateTable;
+      expect(createTable.table.columns.any((c) => c.name == 'data'), isTrue);
+    });
+  });
+
+  group('generateMigrationFile code generation', () {
+    late SchemaGenerator generator;
+
+    setUp(() {
+      generator = SchemaGenerator(const SqliteAdapter());
+    });
+
+    test('generates code for DropConstraint operation', () {
+      final operations = [const DropConstraint('posts', 'fk_posts_author')];
+
+      final code = generator.generateMigrationFile('DropFkMigration', operations);
+
+      expect(code, contains("builder.dropConstraint('posts', 'fk_posts_author')"));
+    });
+  });
 }
 
 // Test enum for EnumField tests

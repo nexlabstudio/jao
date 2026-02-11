@@ -536,4 +536,306 @@ void main() {
       expect(ex.toString(), contains('test.db'));
     });
   });
+
+  group('generateTableRecreationSql', () {
+    test('generates basic nullability change SQL', () {
+      final schema = TableSchema(
+        name: 'items',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'name', type: 'TEXT', nullable: false),
+        ],
+        indexes: [],
+        constraints: [],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'items',
+        currentSchema: schema,
+        columnName: 'name',
+        newNullable: true,
+      );
+
+      expect(statements[0], contains('ALTER TABLE "items" RENAME TO "_old_items"'));
+      expect(statements[1], contains('CREATE TABLE "items"'));
+      expect(statements[1], isNot(contains('"name" TEXT NOT NULL')));
+      expect(statements[2], contains('INSERT INTO "items"'));
+      expect(statements[3], contains('DROP TABLE "_old_items"'));
+    });
+
+    test('generates type change SQL', () {
+      final schema = TableSchema(
+        name: 'products',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'price', type: 'INTEGER', nullable: false),
+        ],
+        indexes: [],
+        constraints: [],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'products',
+        currentSchema: schema,
+        columnName: 'price',
+        newType: FieldType.decimal,
+      );
+
+      expect(statements[1], contains('REAL'));
+    });
+
+    test('generates column rename SQL', () {
+      final schema = TableSchema(
+        name: 'users',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'name', type: 'TEXT', nullable: false),
+        ],
+        indexes: [],
+        constraints: [],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'users',
+        currentSchema: schema,
+        columnName: 'name',
+        renameTo: 'full_name',
+      );
+
+      expect(statements[1], contains('"full_name" TEXT'));
+      expect(statements[2], contains('INSERT INTO "users" ("id", "full_name")'));
+      expect(statements[2], contains('SELECT "id", "name" FROM "_old_users"'));
+    });
+
+    test('generates default value change SQL', () {
+      final schema = TableSchema(
+        name: 'settings',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'active', type: 'INTEGER', nullable: false),
+        ],
+        indexes: [],
+        constraints: [],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'settings',
+        currentSchema: schema,
+        columnName: 'active',
+        newDefault: '1',
+      );
+
+      expect(statements[1], contains('DEFAULT 1'));
+    });
+
+    test('generates drop default SQL', () {
+      final schema = TableSchema(
+        name: 'settings',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'theme', type: 'TEXT', nullable: false, defaultValue: "'dark'"),
+        ],
+        indexes: [],
+        constraints: [],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'settings',
+        currentSchema: schema,
+        columnName: 'theme',
+        dropDefault: true,
+      );
+
+      expect(statements[1], isNot(contains('DEFAULT')));
+    });
+
+    test('handles non-INTEGER primary key', () {
+      final schema = TableSchema(
+        name: 'entities',
+        columns: [
+          ColumnSchema(name: 'uuid', type: 'TEXT', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'name', type: 'TEXT', nullable: false),
+        ],
+        indexes: [],
+        constraints: [],
+        primaryKey: 'uuid',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'entities',
+        currentSchema: schema,
+        columnName: 'name',
+        newNullable: true,
+      );
+
+      expect(statements[1], contains('PRIMARY KEY ("uuid")'));
+    });
+
+    test('recreates foreign key constraints', () {
+      final schema = TableSchema(
+        name: 'posts',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'author_id', type: 'INTEGER', nullable: false),
+          ColumnSchema(name: 'title', type: 'TEXT', nullable: false),
+        ],
+        indexes: [],
+        constraints: [
+          ConstraintSchema(
+            name: 'fk_posts_author',
+            type: ConstraintType.foreignKey,
+            columns: ['author_id'],
+            referencedTable: 'users',
+            referencedColumns: ['id'],
+            onDelete: 'CASCADE',
+            onUpdate: 'NO ACTION',
+          ),
+        ],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'posts',
+        currentSchema: schema,
+        columnName: 'title',
+        newNullable: true,
+      );
+
+      expect(statements[1], contains('FOREIGN KEY ("author_id") REFERENCES "users"("id")'));
+      expect(statements[1], contains('ON DELETE CASCADE'));
+    });
+
+    test('renames FK column when column is renamed', () {
+      final schema = TableSchema(
+        name: 'posts',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'author_id', type: 'INTEGER', nullable: false),
+        ],
+        indexes: [],
+        constraints: [
+          ConstraintSchema(
+            name: 'fk_posts_author',
+            type: ConstraintType.foreignKey,
+            columns: ['author_id'],
+            referencedTable: 'users',
+            referencedColumns: ['id'],
+          ),
+        ],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'posts',
+        currentSchema: schema,
+        columnName: 'author_id',
+        renameTo: 'user_id',
+      );
+
+      expect(statements[1], contains('FOREIGN KEY ("user_id") REFERENCES "users"("id")'));
+    });
+
+    test('recreates indexes', () {
+      final schema = TableSchema(
+        name: 'users',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'email', type: 'TEXT', nullable: false),
+        ],
+        indexes: [
+          IndexSchema(name: 'idx_users_email', columns: ['email'], unique: false),
+        ],
+        constraints: [],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'users',
+        currentSchema: schema,
+        columnName: 'email',
+        newNullable: true,
+      );
+
+      expect(statements.last, contains('CREATE INDEX "idx_users_email" ON "users" ("email")'));
+    });
+
+    test('recreates unique indexes', () {
+      final schema = TableSchema(
+        name: 'users',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'email', type: 'TEXT', nullable: false),
+        ],
+        indexes: [
+          IndexSchema(name: 'idx_users_email_unique', columns: ['email'], unique: true),
+        ],
+        constraints: [],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'users',
+        currentSchema: schema,
+        columnName: 'email',
+        newNullable: true,
+      );
+
+      expect(statements.last, contains('CREATE UNIQUE INDEX'));
+    });
+
+    test('renames index column when column is renamed', () {
+      final schema = TableSchema(
+        name: 'users',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'name', type: 'TEXT', nullable: false),
+        ],
+        indexes: [
+          IndexSchema(name: 'idx_users_name', columns: ['name'], unique: false),
+        ],
+        constraints: [],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'users',
+        currentSchema: schema,
+        columnName: 'name',
+        renameTo: 'full_name',
+      );
+
+      expect(statements.last, contains('CREATE INDEX "idx_users_name" ON "users" ("full_name")'));
+    });
+
+    test('skips sqlite auto-created indexes', () {
+      final schema = TableSchema(
+        name: 'users',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'email', type: 'TEXT', nullable: false),
+        ],
+        indexes: [
+          IndexSchema(name: 'sqlite_autoindex_users_1', columns: ['id'], unique: true),
+          IndexSchema(name: 'idx_users_email', columns: ['email'], unique: false),
+        ],
+        constraints: [],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'users',
+        currentSchema: schema,
+        columnName: 'email',
+        newNullable: true,
+      );
+
+      expect(statements.any((s) => s.contains('sqlite_autoindex')), isFalse);
+      expect(statements.any((s) => s.contains('idx_users_email')), isTrue);
+    });
+  });
 }
