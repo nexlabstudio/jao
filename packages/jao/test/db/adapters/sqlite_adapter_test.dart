@@ -14,6 +14,50 @@ void main() {
     });
   });
 
+  group('SqliteDialect', () {
+    const dialect = SqliteDialect();
+
+    test('booleanLiteral returns 1 for true', () {
+      expect(dialect.booleanLiteral(true), equals('1'));
+    });
+
+    test('booleanLiteral returns 0 for false', () {
+      expect(dialect.booleanLiteral(false), equals('0'));
+    });
+
+    test('currentTimestamp returns SQLite datetime function', () {
+      expect(dialect.currentTimestamp(), equals("datetime('now')"));
+    });
+
+    test('sqlType returns TEXT for jsonb', () {
+      expect(dialect.sqlType(FieldType.jsonb), equals('TEXT'));
+    });
+
+    test('sqlType returns TEXT for array', () {
+      expect(dialect.sqlType(FieldType.array), equals('TEXT'));
+    });
+
+    test('concat joins parts with ||', () {
+      expect(dialect.concat(['a', 'b', 'c']), equals('a || b || c'));
+    });
+
+    test('limitOffset with only limit', () {
+      expect(dialect.limitOffset(10, null), equals(' LIMIT 10'));
+    });
+
+    test('limitOffset with only offset uses LIMIT -1', () {
+      expect(dialect.limitOffset(null, 5), equals(' LIMIT -1 OFFSET 5'));
+    });
+
+    test('limitOffset with both limit and offset', () {
+      expect(dialect.limitOffset(10, 5), equals(' LIMIT 10 OFFSET 5'));
+    });
+
+    test('limitOffset with neither returns empty string', () {
+      expect(dialect.limitOffset(null, null), equals(''));
+    });
+  });
+
   group('SqliteConnection', () {
     late SqliteConnectionPool pool;
     late DatabaseConnection conn;
@@ -534,6 +578,85 @@ void main() {
     test('includes database when provided', () {
       final ex = SqliteException('Error', database: 'test.db');
       expect(ex.toString(), contains('test.db'));
+    });
+
+    test('includes error code when provided', () {
+      final ex = SqliteException('Error', errorCode: 19);
+      expect(ex.toString(), contains('code: 19'));
+    });
+  });
+
+  group('SqliteAdapter database operations', () {
+    const adapter = SqliteAdapter();
+
+    test('databaseExists returns false for memory database', () async {
+      final config = DatabaseConfig.sqliteMemory();
+      final exists = await adapter.databaseExists(config);
+      expect(exists, isFalse);
+    });
+
+    test('createDatabase does nothing for memory database', () async {
+      final config = DatabaseConfig.sqliteMemory();
+      // Should not throw
+      await adapter.createDatabase(config);
+    });
+
+    test('dropDatabase does nothing for memory database', () async {
+      final config = DatabaseConfig.sqliteMemory();
+      // Should not throw
+      await adapter.dropDatabase(config);
+    });
+
+    test('connect creates connection for memory database', () async {
+      final config = DatabaseConfig.sqliteMemory();
+      final conn = await adapter.connect(config);
+      expect(conn.isOpen, isTrue);
+      await conn.close();
+    });
+  });
+
+  group('SqliteConnectionPool edge cases', () {
+    test('pool available returns 1 when connection not in use', () async {
+      final pool = await SqliteConnectionPool.create(DatabaseConfig.sqliteMemory());
+      expect(pool.available, equals(1));
+      await pool.close();
+    });
+
+    test('pool available returns 0 when connection in use', () async {
+      final pool = await SqliteConnectionPool.create(DatabaseConfig.sqliteMemory());
+      final conn = await pool.acquire();
+      expect(pool.available, equals(0));
+      await pool.release(conn);
+      await pool.close();
+    });
+  });
+
+  group('SqliteTransaction edge cases', () {
+    late SqliteConnectionPool pool;
+    late DatabaseConnection conn;
+
+    setUp(() async {
+      pool = await SqliteConnectionPool.create(DatabaseConfig.sqliteMemory());
+      conn = await pool.acquire();
+    });
+
+    tearDown(() async {
+      await pool.release(conn);
+      await pool.close();
+    });
+
+    test('transaction throws StateError when executing after commit', () async {
+      final tx = await conn.beginTransaction();
+      await tx.commit();
+
+      expect(() => tx.execute('SELECT 1'), throwsStateError);
+    });
+
+    test('transaction throws StateError when executing after rollback', () async {
+      final tx = await conn.beginTransaction();
+      await tx.rollback();
+
+      expect(() => tx.execute('SELECT 1'), throwsStateError);
     });
   });
 
