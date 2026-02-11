@@ -167,6 +167,45 @@ class AutoReverseMultipleOps extends Migration {
   }
 }
 
+// Migration for testing AlterColumn (SQLite table recreation)
+class CreateItemsTable extends Migration {
+  @override
+  String get name => '020_create_items';
+
+  @override
+  void up(MigrationBuilder builder) {
+    builder.createTable('items', (table) {
+      table.id();
+      table.string('name');
+      table.text('description');
+    });
+  }
+
+  @override
+  void down(MigrationBuilder builder) {
+    builder.dropTable('items');
+  }
+}
+
+class MakeDescriptionNullable extends Migration {
+  @override
+  String get name => '021_make_description_nullable';
+
+  @override
+  void up(MigrationBuilder builder) {
+    builder.alterColumn('items', 'description', (col) {
+      col.nullable();
+    });
+  }
+
+  @override
+  void down(MigrationBuilder builder) {
+    builder.alterColumn('items', 'description', (col) {
+      col.notNullable();
+    });
+  }
+}
+
 void main() {
   group('MigrationBuilder', () {
     group('createTable()', () {
@@ -936,6 +975,70 @@ void main() {
         expect(sql, contains('DROP TABLE'));
       });
     });
+
+    group('SQLite table recreation (AlterColumn)', () {
+      test('AlterColumn changes nullability via table recreation', () async {
+        // First create the items table
+        await runner.migrate([CreateItemsTable()]);
+
+        // Verify description is NOT NULL initially
+        var schema = await pool.withConnection((conn) => adapter.getTableSchema(conn, 'items'));
+        var descCol = schema.columns.firstWhere((c) => c.name == 'description');
+        expect(descCol.nullable, isFalse);
+
+        // Apply the AlterColumn migration (should use table recreation)
+        final result = await runner.migrate([CreateItemsTable(), MakeDescriptionNullable()]);
+
+        expect(result.isSuccess, isTrue);
+        expect(result.applied, equals(['021_make_description_nullable']));
+
+        // Verify description is now nullable
+        schema = await pool.withConnection((conn) => adapter.getTableSchema(conn, 'items'));
+        descCol = schema.columns.firstWhere((c) => c.name == 'description');
+        expect(descCol.nullable, isTrue);
+      });
+
+      test('AlterColumn preserves data during table recreation', () async {
+        // Create the items table
+        await runner.migrate([CreateItemsTable()]);
+
+        // Insert some test data
+        await pool.withConnection((conn) async {
+          await conn.execute("INSERT INTO items (name, description) VALUES ('Item 1', 'Description 1')");
+          await conn.execute("INSERT INTO items (name, description) VALUES ('Item 2', 'Description 2')");
+        });
+
+        // Apply the AlterColumn migration
+        await runner.migrate([CreateItemsTable(), MakeDescriptionNullable()]);
+
+        // Verify data is preserved
+        final rows = await pool.withConnection((conn) => conn.query('SELECT * FROM items ORDER BY id'));
+
+        expect(rows.length, equals(2));
+        expect(rows[0]['name'], equals('Item 1'));
+        expect(rows[0]['description'], equals('Description 1'));
+        expect(rows[1]['name'], equals('Item 2'));
+        expect(rows[1]['description'], equals('Description 2'));
+      });
+
+      test('AlterColumn rollback restores original nullability', () async {
+        // Create the items table and apply nullable migration
+        await runner.migrate([CreateItemsTable(), MakeDescriptionNullable()]);
+
+        // Verify description is nullable
+        var schema = await pool.withConnection((conn) => adapter.getTableSchema(conn, 'items'));
+        var descCol = schema.columns.firstWhere((c) => c.name == 'description');
+        expect(descCol.nullable, isTrue);
+
+        // Rollback the nullable migration
+        await runner.rollback([CreateItemsTable(), MakeDescriptionNullable()]);
+
+        // Verify description is NOT NULL again
+        schema = await pool.withConnection((conn) => adapter.getTableSchema(conn, 'items'));
+        descCol = schema.columns.firstWhere((c) => c.name == 'description');
+        expect(descCol.nullable, isFalse);
+      });
+    });
   });
 
   group('MigrationResult', () {
@@ -1006,4 +1109,213 @@ void main() {
       expect(MigrationDirection.values, contains(MigrationDirection.down));
     });
   });
+
+  group('RunDart operations', () {
+    late SqliteAdapter adapter;
+    late ConnectionPool pool;
+    late MigrationRunner runner;
+
+    setUp(() async {
+      final config = DatabaseConfig.sqliteMemory();
+      adapter = const SqliteAdapter();
+      pool = await adapter.createPool(config);
+      runner = MigrationRunner(adapter: adapter, pool: pool);
+    });
+
+    tearDown(() async {
+      await pool.close();
+    });
+
+    test('RunDart forward executes during up migration', () async {
+      var forwardCalled = false;
+
+      final migration = _RunDartMigration(
+        migrationName: 'run_dart_forward',
+        forward: (conn) async {
+          forwardCalled = true;
+          await conn.execute('CREATE TABLE dart_test (id INTEGER PRIMARY KEY)');
+        },
+      );
+
+      await runner.migrate([migration]);
+
+      expect(forwardCalled, isTrue);
+      final exists = await pool.withConnection((conn) => adapter.tableExists(conn, 'dart_test'));
+      expect(exists, isTrue);
+    });
+
+    test('RunDart backward executes during rollback', () async {
+      var backwardCalled = false;
+
+      final migration = _RunDartMigration(
+        migrationName: 'run_dart_backward',
+        forward: (conn) async {
+          await conn.execute('CREATE TABLE dart_backward_test (id INTEGER PRIMARY KEY)');
+        },
+        backward: (conn) async {
+          backwardCalled = true;
+          await conn.execute('DROP TABLE dart_backward_test');
+        },
+      );
+
+      // First apply the migration
+      await runner.migrate([migration]);
+
+      // Then rollback
+      await runner.rollback([migration]);
+
+      expect(backwardCalled, isTrue);
+      final exists = await pool.withConnection((conn) => adapter.tableExists(conn, 'dart_backward_test'));
+      expect(exists, isFalse);
+    });
+
+    test('RunDart without backward skips during rollback', () async {
+      final migration = _RunDartMigration(
+        migrationName: 'run_dart_no_backward',
+        forward: (conn) async {
+          await conn.execute('CREATE TABLE no_backward_test (id INTEGER PRIMARY KEY)');
+        },
+        // No backward function
+      );
+
+      // Apply the migration
+      await runner.migrate([migration]);
+
+      // Rollback should not throw even without backward
+      final result = await runner.rollback([migration]);
+      expect(result.rolledBack, contains('run_dart_no_backward'));
+    });
+
+    test('RunDart backward executes during autoReverse rollback', () async {
+      var backwardCalled = false;
+
+      final migration = _AutoReverseMigration(
+        migrationName: 'auto_reverse_run_dart',
+        forward: (conn) async {
+          await conn.execute('CREATE TABLE auto_reverse_test (id INTEGER PRIMARY KEY)');
+        },
+        backward: (conn) async {
+          backwardCalled = true;
+          await conn.execute('DROP TABLE IF EXISTS auto_reverse_test');
+        },
+      );
+
+      // Apply the migration
+      await runner.migrate([migration]);
+
+      // Verify forward ran
+      final existsBefore = await pool.withConnection((conn) => adapter.tableExists(conn, 'auto_reverse_test'));
+      expect(existsBefore, isTrue);
+
+      // Rollback using autoReverse (which calls operation.backward)
+      await runner.rollback([migration]);
+
+      expect(backwardCalled, isTrue);
+    });
+  });
+
+  group('Rollback error handling', () {
+    late SqliteAdapter adapter;
+    late ConnectionPool pool;
+    late MigrationRunner runner;
+
+    setUp(() async {
+      final config = DatabaseConfig.sqliteMemory();
+      adapter = const SqliteAdapter();
+      pool = await adapter.createPool(config);
+      runner = MigrationRunner(adapter: adapter, pool: pool);
+    });
+
+    tearDown(() async {
+      await pool.close();
+    });
+
+    test('rollback catches and reports errors', () async {
+      final migration = _FailingRollbackMigration();
+
+      // First apply the migration
+      await runner.migrate([migration]);
+
+      // Rollback should fail but not throw
+      final result = await runner.rollback([migration]);
+
+      expect(result.errors, isNotEmpty);
+      expect(result.errors.first.migrationName, equals('failing_rollback'));
+      expect(result.errors.first.message, contains('Rollback intentionally failed'));
+    });
+  });
+}
+
+// Helper migration class for RunDart tests
+class _RunDartMigration extends Migration {
+  final String migrationName;
+  final Future<void> Function(DatabaseConnection conn) forward;
+  final Future<void> Function(DatabaseConnection conn)? backward;
+
+  _RunDartMigration({
+    required this.migrationName,
+    required this.forward,
+    this.backward,
+  });
+
+  @override
+  String get name => migrationName;
+
+  @override
+  void up(MigrationBuilder builder) {
+    builder.runDart(forward, backward: backward);
+  }
+
+  @override
+  void down(MigrationBuilder builder) {
+    if (backward != null) {
+      builder.runDart(backward!, backward: forward);
+    }
+  }
+}
+
+// Helper migration class that fails during rollback
+class _FailingRollbackMigration extends Migration {
+  @override
+  String get name => 'failing_rollback';
+
+  @override
+  void up(MigrationBuilder builder) {
+    builder.createTable('failing_rollback_test', (table) {
+      table.id();
+    });
+  }
+
+  @override
+  void down(MigrationBuilder builder) {
+    builder.rawSql('INVALID SQL THAT WILL FAIL -- Rollback intentionally failed');
+  }
+}
+
+class _AutoReverseMigration extends Migration {
+  final String migrationName;
+  final Future<void> Function(DatabaseConnection conn) forward;
+  final Future<void> Function(DatabaseConnection conn)? backward;
+
+  _AutoReverseMigration({
+    required this.migrationName,
+    required this.forward,
+    this.backward,
+  });
+
+  @override
+  String get name => migrationName;
+
+  @override
+  bool get autoReverse => true;
+
+  @override
+  void up(MigrationBuilder builder) {
+    builder.runDart(forward, backward: backward);
+  }
+
+  @override
+  void down(MigrationBuilder builder) {
+    // Not used when autoReverse is true
+  }
 }

@@ -4,6 +4,7 @@
 /// generates the necessary migration operations.
 library;
 
+import '../db/adapters/sqlite.dart';
 import '../db/connection.dart';
 import '../fields/field_def.dart';
 import 'schema.dart';
@@ -246,6 +247,7 @@ class SchemaGenerator {
       }
     }
 
+    // TODO(mastersam07): Will consider this later as dropping tables is destructive
     // Check for tables that no longer have models (optional - usually don't auto-drop)
     // for (final tableName in existingTables) {
     //   if (!models.any((m) => m.tableName == tableName)) {
@@ -319,10 +321,30 @@ class SchemaGenerator {
             ),
           );
         }
-        // TODO(mastersam07): Add type change detection (more complex due to type mapping)
+        // Check for type changes
+        final normalizedDbType = _normalizeDbType(dbColumn.type);
+        if (normalizedDbType case final normalizedDbType? when normalizedDbType != field.dbType) {
+          // Skip if both are integer-like types for PKs (serial vs integer)
+          final isIntegerLike = _isIntegerType(field.dbType) && _isIntegerType(normalizedDbType);
+          // Skip if types are equivalent for SQLite (e.g., TEXT ↔ timestamp, varchar ↔ text)
+          final isSqliteEquivalent =
+              adapter is SqliteAdapter && _areTypesEquivalentForSqlite(field.dbType, normalizedDbType);
+          if ((!field.primaryKey && !dbColumn.isPrimaryKey || !isIntegerLike) && !isSqliteEquivalent) {
+            operations.add(
+              AlterColumn(
+                ColumnModification(
+                  table: model.tableName,
+                  column: field.columnName,
+                  type: field.dbType,
+                ),
+              ),
+            );
+          }
+        }
       }
     }
 
+    // TODO(mastersam07): Will consider this later as dropping columns is destructive
     // Check for removed columns (usually don't auto-drop)
     // for (final dbColumn in dbSchema.columns) {
     //   if (!model.fields.any((f) => f.columnName == dbColumn.name)) {
@@ -422,7 +444,7 @@ class SchemaGenerator {
       modifications.add(nullable ? 'col.nullable()' : 'col.notNullable()');
     }
     if (mod.type case final type?) {
-      modifications.add('col.setType(FieldType.${type.name})');
+      modifications.add('col.type(FieldType.${type.name})');
     }
     if (mod.defaultValue case final defaultValue?) {
       modifications.add("col.defaultValue('${defaultValue}')");
@@ -513,6 +535,133 @@ class SchemaGenerator {
     return input
         .replaceAllMapped(RegExp(r'[A-Z]'), (match) => '_${match.group(0)!.toLowerCase()}')
         .replaceFirst(RegExp(r'^_'), '');
+  }
+
+  /// Normalize a raw database type string to a FieldType.
+  ///
+  /// Each database reports types differently:
+  /// - SQLite: "TEXT", "INTEGER", "REAL", "BLOB"
+  /// - PostgreSQL: "character varying", "integer", "bigint", "text", "boolean", etc.
+  /// - MySQL: "varchar", "int", "bigint", "text", "tinyint", etc.
+  ///
+  /// Returns null if the type cannot be normalized (unknown type).
+  FieldType? _normalizeDbType(String rawType) {
+    final type = rawType.toUpperCase().trim();
+
+    // Handle types with parameters like VARCHAR(255), DECIMAL(10,2)
+    final baseType = type.replaceAll(RegExp(r'\([^)]*\)'), '').trim();
+
+    return switch (baseType) {
+      // Integer types
+      'INTEGER' || 'INT' || 'INT4' || 'MEDIUMINT' => FieldType.integer,
+      'SMALLINT' || 'INT2' || 'TINYINT' => FieldType.smallInt,
+      'BIGINT' || 'INT8' => FieldType.bigInt,
+      'SERIAL' || 'SERIAL4' => FieldType.serial,
+      'BIGSERIAL' || 'SERIAL8' => FieldType.bigSerial,
+
+      // Floating point types
+      'REAL' || 'FLOAT' || 'FLOAT4' => FieldType.real,
+      'DOUBLE PRECISION' || 'FLOAT8' || 'DOUBLE' => FieldType.doublePrecision,
+      'DECIMAL' || 'NUMERIC' || 'DEC' => FieldType.decimal,
+
+      // String types
+      'VARCHAR' || 'CHARACTER VARYING' || 'NVARCHAR' => FieldType.varchar,
+      'TEXT' || 'LONGTEXT' || 'MEDIUMTEXT' || 'TINYTEXT' => FieldType.text,
+      'CHAR' || 'CHARACTER' || 'NCHAR' => FieldType.char,
+
+      // Binary types
+      'BYTEA' || 'BLOB' || 'BINARY' || 'VARBINARY' || 'LONGBLOB' || 'MEDIUMBLOB' || 'TINYBLOB' => FieldType.bytea,
+
+      // Date/Time types
+      'DATE' => FieldType.date,
+      'TIME' || 'TIME WITHOUT TIME ZONE' => FieldType.time,
+      'TIMESTAMP' || 'DATETIME' || 'TIMESTAMP WITHOUT TIME ZONE' => FieldType.timestamp,
+      'TIMESTAMPTZ' || 'TIMESTAMP WITH TIME ZONE' => FieldType.timestampTz,
+      'INTERVAL' => FieldType.interval,
+
+      // Boolean type
+      'BOOLEAN' || 'BOOL' => FieldType.boolean,
+
+      // UUID type
+      'UUID' => FieldType.uuid,
+
+      // JSON types
+      'JSON' => FieldType.json,
+      'JSONB' => FieldType.jsonb,
+
+      // Unknown type
+      _ => null,
+    };
+  }
+
+  /// Check if a FieldType is an integer-like type.
+  ///
+  /// Used to avoid false positives when comparing serial vs integer for PKs.
+  bool _isIntegerType(FieldType type) {
+    return type == FieldType.integer ||
+        type == FieldType.smallInt ||
+        type == FieldType.bigInt ||
+        type == FieldType.serial ||
+        type == FieldType.bigSerial;
+  }
+
+  /// Check if two FieldTypes are equivalent for SQLite.
+  ///
+  /// SQLite has limited type affinity - it stores many types as TEXT or INTEGER.
+  /// This method returns true if two types are effectively the same in SQLite,
+  /// preventing false positive type change detection.
+  ///
+  /// Type affinities in SQLite:
+  /// - TEXT: varchar, text, char, timestamp, timestampTz, date, time, uuid, json, jsonb
+  /// - INTEGER: integer, smallInt, bigInt, serial, bigSerial, boolean
+  /// - REAL: real, doublePrecision, decimal
+  /// - BLOB: bytea, blob
+  bool _areTypesEquivalentForSqlite(FieldType modelType, FieldType dbType) {
+    // TEXT affinity types - SQLite stores all of these as TEXT
+    const textTypes = {
+      FieldType.text,
+      FieldType.varchar,
+      FieldType.char,
+      FieldType.timestamp,
+      FieldType.timestampTz,
+      FieldType.date,
+      FieldType.time,
+      FieldType.uuid,
+      FieldType.json,
+      FieldType.jsonb,
+      FieldType.interval,
+    };
+
+    // INTEGER affinity types
+    const integerTypes = {
+      FieldType.integer,
+      FieldType.smallInt,
+      FieldType.bigInt,
+      FieldType.serial,
+      FieldType.bigSerial,
+      FieldType.boolean,
+    };
+
+    // REAL affinity types
+    const realTypes = {
+      FieldType.real,
+      FieldType.doublePrecision,
+      FieldType.decimal,
+    };
+
+    // BLOB affinity types
+    const blobTypes = {
+      FieldType.bytea,
+      FieldType.blob,
+    };
+
+    // Check if both types belong to the same affinity group
+    if (textTypes.contains(modelType) && textTypes.contains(dbType)) return true;
+    if (integerTypes.contains(modelType) && integerTypes.contains(dbType)) return true;
+    if (realTypes.contains(modelType) && realTypes.contains(dbType)) return true;
+    if (blobTypes.contains(modelType) && blobTypes.contains(dbType)) return true;
+
+    return false;
   }
 }
 

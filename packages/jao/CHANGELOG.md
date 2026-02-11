@@ -10,12 +10,28 @@
   - Compares model field nullability with database column nullability
   - Generates `AlterColumn` operations when nullability differs
   - Skips primary key fields (SQLite reports PK as nullable even when NOT NULL)
+- Auto-detection of type changes in `_generateTableDiff`:
+  - Normalizes raw database type strings to `FieldType` for comparison
+  - Supports SQLite, PostgreSQL, and MySQL type naming conventions
+  - Generates `AlterColumn` operations when types differ
+  - Skips integer-like type mismatches for PKs (serial vs integer)
 - `AlterColumn` migration code generation:
   - Generates `builder.alterColumn()` calls with proper modifiers
   - Supports nullability changes (`col.nullable()` / `col.notNullable()`)
   - Supports type changes, default values, and column renames
   - Generates reverse operations in `down()` for nullability changes
-  - Note: Works with PostgreSQL/MySQL; SQLite requires manual table recreation
+- SQLite type equivalence logic in `_generateTableDiff`:
+  - Prevents false positive type changes due to SQLite type affinity
+  - TEXT types (varchar, timestamp, uuid, json) are equivalent in SQLite
+  - INTEGER types (int, bigint, boolean, serial) are equivalent in SQLite
+  - REAL types (real, double, decimal) are equivalent in SQLite
+  - BLOB types (bytea, blob) are equivalent in SQLite
+- SQLite table recreation for `AlterColumn` operations:
+  - Implements Django-style `_remake_table` pattern for SQLite
+  - Automatically renames old table, creates new table with modified schema
+  - Copies data from old table to new table preserving all rows
+  - Recreates indexes and foreign key constraints
+  - Supports nullability changes, type changes, default values, and renames
 
 ## [0.2.5] - 2026-02-09
 

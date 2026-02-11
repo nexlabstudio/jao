@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:jao/jao.dart';
 import 'package:test/test.dart';
 
@@ -11,6 +13,50 @@ void main() {
 
     test('dialect is SqliteDialect', () {
       expect(adapter.dialect, isA<SqliteDialect>());
+    });
+  });
+
+  group('SqliteDialect', () {
+    const dialect = SqliteDialect();
+
+    test('booleanLiteral returns 1 for true', () {
+      expect(dialect.booleanLiteral(true), equals('1'));
+    });
+
+    test('booleanLiteral returns 0 for false', () {
+      expect(dialect.booleanLiteral(false), equals('0'));
+    });
+
+    test('currentTimestamp returns SQLite datetime function', () {
+      expect(dialect.currentTimestamp(), equals("datetime('now')"));
+    });
+
+    test('sqlType returns TEXT for jsonb', () {
+      expect(dialect.sqlType(FieldType.jsonb), equals('TEXT'));
+    });
+
+    test('sqlType returns TEXT for array', () {
+      expect(dialect.sqlType(FieldType.array), equals('TEXT'));
+    });
+
+    test('concat joins parts with ||', () {
+      expect(dialect.concat(['a', 'b', 'c']), equals('a || b || c'));
+    });
+
+    test('limitOffset with only limit', () {
+      expect(dialect.limitOffset(10, null), equals(' LIMIT 10'));
+    });
+
+    test('limitOffset with only offset uses LIMIT -1', () {
+      expect(dialect.limitOffset(null, 5), equals(' LIMIT -1 OFFSET 5'));
+    });
+
+    test('limitOffset with both limit and offset', () {
+      expect(dialect.limitOffset(10, 5), equals(' LIMIT 10 OFFSET 5'));
+    });
+
+    test('limitOffset with neither returns empty string', () {
+      expect(dialect.limitOffset(null, null), equals(''));
     });
   });
 
@@ -534,6 +580,823 @@ void main() {
     test('includes database when provided', () {
       final ex = SqliteException('Error', database: 'test.db');
       expect(ex.toString(), contains('test.db'));
+    });
+
+    test('includes error code when provided', () {
+      final ex = SqliteException('Error', errorCode: 19);
+      expect(ex.toString(), contains('code: 19'));
+    });
+  });
+
+  group('SqliteAdapter database operations', () {
+    const adapter = SqliteAdapter();
+
+    test('databaseExists returns false for memory database', () async {
+      final config = DatabaseConfig.sqliteMemory();
+      final exists = await adapter.databaseExists(config);
+      expect(exists, isFalse);
+    });
+
+    test('createDatabase does nothing for memory database', () async {
+      final config = DatabaseConfig.sqliteMemory();
+      // Should not throw
+      await adapter.createDatabase(config);
+    });
+
+    test('dropDatabase does nothing for memory database', () async {
+      final config = DatabaseConfig.sqliteMemory();
+      // Should not throw
+      await adapter.dropDatabase(config);
+    });
+
+    test('connect creates connection for memory database', () async {
+      final config = DatabaseConfig.sqliteMemory();
+      final conn = await adapter.connect(config);
+      expect(conn.isOpen, isTrue);
+      await conn.close();
+    });
+  });
+
+  group('SqliteConnectionPool edge cases', () {
+    test('pool available returns 1 when connection not in use', () async {
+      final pool = await SqliteConnectionPool.create(DatabaseConfig.sqliteMemory());
+      expect(pool.available, equals(1));
+      await pool.close();
+    });
+
+    test('pool available returns 0 when connection in use', () async {
+      final pool = await SqliteConnectionPool.create(DatabaseConfig.sqliteMemory());
+      final conn = await pool.acquire();
+      expect(pool.available, equals(0));
+      await pool.release(conn);
+      await pool.close();
+    });
+  });
+
+  group('SqliteTransaction edge cases', () {
+    late SqliteConnectionPool pool;
+    late DatabaseConnection conn;
+
+    setUp(() async {
+      pool = await SqliteConnectionPool.create(DatabaseConfig.sqliteMemory());
+      conn = await pool.acquire();
+    });
+
+    tearDown(() async {
+      await pool.release(conn);
+      await pool.close();
+    });
+
+    test('transaction throws StateError when executing after commit', () async {
+      final tx = await conn.beginTransaction();
+      await tx.commit();
+
+      expect(() => tx.execute('SELECT 1'), throwsStateError);
+    });
+
+    test('transaction throws StateError when executing after rollback', () async {
+      final tx = await conn.beginTransaction();
+      await tx.rollback();
+
+      expect(() => tx.execute('SELECT 1'), throwsStateError);
+    });
+  });
+
+  group('generateTableRecreationSql', () {
+    test('generates basic nullability change SQL', () {
+      final schema = TableSchema(
+        name: 'items',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'name', type: 'TEXT', nullable: false),
+        ],
+        indexes: [],
+        constraints: [],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'items',
+        currentSchema: schema,
+        columnName: 'name',
+        newNullable: true,
+      );
+
+      expect(statements[0], contains('ALTER TABLE "items" RENAME TO "_old_items"'));
+      expect(statements[1], contains('CREATE TABLE "items"'));
+      expect(statements[1], isNot(contains('"name" TEXT NOT NULL')));
+      expect(statements[2], contains('INSERT INTO "items"'));
+      expect(statements[3], contains('DROP TABLE "_old_items"'));
+    });
+
+    test('generates type change SQL', () {
+      final schema = TableSchema(
+        name: 'products',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'price', type: 'INTEGER', nullable: false),
+        ],
+        indexes: [],
+        constraints: [],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'products',
+        currentSchema: schema,
+        columnName: 'price',
+        newType: FieldType.decimal,
+      );
+
+      expect(statements[1], contains('REAL'));
+    });
+
+    test('generates column rename SQL', () {
+      final schema = TableSchema(
+        name: 'users',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'name', type: 'TEXT', nullable: false),
+        ],
+        indexes: [],
+        constraints: [],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'users',
+        currentSchema: schema,
+        columnName: 'name',
+        renameTo: 'full_name',
+      );
+
+      expect(statements[1], contains('"full_name" TEXT'));
+      expect(statements[2], contains('INSERT INTO "users" ("id", "full_name")'));
+      expect(statements[2], contains('SELECT "id", "name" FROM "_old_users"'));
+    });
+
+    test('generates default value change SQL', () {
+      final schema = TableSchema(
+        name: 'settings',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'active', type: 'INTEGER', nullable: false),
+        ],
+        indexes: [],
+        constraints: [],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'settings',
+        currentSchema: schema,
+        columnName: 'active',
+        newDefault: '1',
+      );
+
+      expect(statements[1], contains('DEFAULT 1'));
+    });
+
+    test('generates drop default SQL', () {
+      final schema = TableSchema(
+        name: 'settings',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'theme', type: 'TEXT', nullable: false, defaultValue: "'dark'"),
+        ],
+        indexes: [],
+        constraints: [],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'settings',
+        currentSchema: schema,
+        columnName: 'theme',
+        dropDefault: true,
+      );
+
+      expect(statements[1], isNot(contains('DEFAULT')));
+    });
+
+    test('handles non-INTEGER primary key', () {
+      final schema = TableSchema(
+        name: 'entities',
+        columns: [
+          ColumnSchema(name: 'uuid', type: 'TEXT', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'name', type: 'TEXT', nullable: false),
+        ],
+        indexes: [],
+        constraints: [],
+        primaryKey: 'uuid',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'entities',
+        currentSchema: schema,
+        columnName: 'name',
+        newNullable: true,
+      );
+
+      expect(statements[1], contains('PRIMARY KEY ("uuid")'));
+    });
+
+    test('recreates foreign key constraints', () {
+      final schema = TableSchema(
+        name: 'posts',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'author_id', type: 'INTEGER', nullable: false),
+          ColumnSchema(name: 'title', type: 'TEXT', nullable: false),
+        ],
+        indexes: [],
+        constraints: [
+          ConstraintSchema(
+            name: 'fk_posts_author',
+            type: ConstraintType.foreignKey,
+            columns: ['author_id'],
+            referencedTable: 'users',
+            referencedColumns: ['id'],
+            onDelete: 'CASCADE',
+            onUpdate: 'NO ACTION',
+          ),
+        ],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'posts',
+        currentSchema: schema,
+        columnName: 'title',
+        newNullable: true,
+      );
+
+      expect(statements[1], contains('FOREIGN KEY ("author_id") REFERENCES "users"("id")'));
+      expect(statements[1], contains('ON DELETE CASCADE'));
+    });
+
+    test('renames FK column when column is renamed', () {
+      final schema = TableSchema(
+        name: 'posts',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'author_id', type: 'INTEGER', nullable: false),
+        ],
+        indexes: [],
+        constraints: [
+          ConstraintSchema(
+            name: 'fk_posts_author',
+            type: ConstraintType.foreignKey,
+            columns: ['author_id'],
+            referencedTable: 'users',
+            referencedColumns: ['id'],
+          ),
+        ],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'posts',
+        currentSchema: schema,
+        columnName: 'author_id',
+        renameTo: 'user_id',
+      );
+
+      expect(statements[1], contains('FOREIGN KEY ("user_id") REFERENCES "users"("id")'));
+    });
+
+    test('recreates indexes', () {
+      final schema = TableSchema(
+        name: 'users',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'email', type: 'TEXT', nullable: false),
+        ],
+        indexes: [
+          IndexSchema(name: 'idx_users_email', columns: ['email'], unique: false),
+        ],
+        constraints: [],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'users',
+        currentSchema: schema,
+        columnName: 'email',
+        newNullable: true,
+      );
+
+      expect(statements.last, contains('CREATE INDEX "idx_users_email" ON "users" ("email")'));
+    });
+
+    test('recreates unique indexes', () {
+      final schema = TableSchema(
+        name: 'users',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'email', type: 'TEXT', nullable: false),
+        ],
+        indexes: [
+          IndexSchema(name: 'idx_users_email_unique', columns: ['email'], unique: true),
+        ],
+        constraints: [],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'users',
+        currentSchema: schema,
+        columnName: 'email',
+        newNullable: true,
+      );
+
+      expect(statements.last, contains('CREATE UNIQUE INDEX'));
+    });
+
+    test('renames index column when column is renamed', () {
+      final schema = TableSchema(
+        name: 'users',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'name', type: 'TEXT', nullable: false),
+        ],
+        indexes: [
+          IndexSchema(name: 'idx_users_name', columns: ['name'], unique: false),
+        ],
+        constraints: [],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'users',
+        currentSchema: schema,
+        columnName: 'name',
+        renameTo: 'full_name',
+      );
+
+      expect(statements.last, contains('CREATE INDEX "idx_users_name" ON "users" ("full_name")'));
+    });
+
+    test('skips sqlite auto-created indexes', () {
+      final schema = TableSchema(
+        name: 'users',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'email', type: 'TEXT', nullable: false),
+        ],
+        indexes: [
+          IndexSchema(name: 'sqlite_autoindex_users_1', columns: ['id'], unique: true),
+          IndexSchema(name: 'idx_users_email', columns: ['email'], unique: false),
+        ],
+        constraints: [],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'users',
+        currentSchema: schema,
+        columnName: 'email',
+        newNullable: true,
+      );
+
+      expect(statements.any((s) => s.contains('sqlite_autoindex')), isFalse);
+      expect(statements.any((s) => s.contains('idx_users_email')), isTrue);
+    });
+  });
+
+  group('File-based SQLite database operations', () {
+    const adapter = SqliteAdapter();
+    late String testDbPath;
+
+    setUp(() {
+      // Create a temporary file path for testing
+      testDbPath = '${Directory.systemTemp.path}/test_sqlite_${DateTime.now().millisecondsSinceEpoch}.db';
+    });
+
+    tearDown(() {
+      // Clean up test database files
+      final dbFile = File(testDbPath);
+      if (dbFile.existsSync()) {
+        dbFile.deleteSync();
+      }
+      final walFile = File('$testDbPath-wal');
+      if (walFile.existsSync()) {
+        walFile.deleteSync();
+      }
+      final shmFile = File('$testDbPath-shm');
+      if (shmFile.existsSync()) {
+        shmFile.deleteSync();
+      }
+    });
+
+    test('databaseExists returns false for non-existent file', () async {
+      final config = DatabaseConfig.sqlite(testDbPath);
+      final exists = await adapter.databaseExists(config);
+      expect(exists, isFalse);
+    });
+
+    test('createDatabase creates a new database file', () async {
+      final config = DatabaseConfig.sqlite(testDbPath);
+
+      // File should not exist initially
+      expect(File(testDbPath).existsSync(), isFalse);
+
+      // Create the database
+      await adapter.createDatabase(config);
+
+      // File should now exist
+      expect(File(testDbPath).existsSync(), isTrue);
+    });
+
+    test('databaseExists returns true for existing file', () async {
+      final config = DatabaseConfig.sqlite(testDbPath);
+
+      // Create the database first
+      await adapter.createDatabase(config);
+
+      // Now check if it exists
+      final exists = await adapter.databaseExists(config);
+      expect(exists, isTrue);
+    });
+
+    test('dropDatabase deletes the database file', () async {
+      final config = DatabaseConfig.sqlite(testDbPath);
+
+      // Create the database first
+      await adapter.createDatabase(config);
+      expect(File(testDbPath).existsSync(), isTrue);
+
+      // Drop the database
+      await adapter.dropDatabase(config);
+      expect(File(testDbPath).existsSync(), isFalse);
+    });
+
+    test('dropDatabase handles non-existent file gracefully', () async {
+      final config = DatabaseConfig.sqlite(testDbPath);
+
+      // Drop should not throw for non-existent database
+      await adapter.dropDatabase(config);
+      expect(File(testDbPath).existsSync(), isFalse);
+    });
+
+    test('connect opens file-based database with foreign keys enabled', () async {
+      final config = DatabaseConfig.sqlite(testDbPath);
+      final conn = await adapter.connect(config);
+
+      expect(conn.isOpen, isTrue);
+
+      // Verify foreign keys are enabled
+      final result = await conn.query('PRAGMA foreign_keys');
+      expect(result.first['foreign_keys'], equals(1));
+
+      await conn.close();
+    });
+
+    test('file-based connection performs CRUD operations', () async {
+      final config = DatabaseConfig.sqlite(testDbPath);
+      final conn = await adapter.connect(config);
+
+      // Create table
+      await conn.execute('CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)');
+
+      // Insert
+      await conn.execute("INSERT INTO items (name) VALUES ('test')");
+
+      // Query
+      final rows = await conn.query('SELECT * FROM items');
+      expect(rows.length, equals(1));
+      expect(rows.first['name'], equals('test'));
+
+      await conn.close();
+    });
+
+    test('file-based database persists data across connections', () async {
+      final config = DatabaseConfig.sqlite(testDbPath);
+
+      // First connection - create table and insert data
+      var conn = await adapter.connect(config);
+      await conn.execute('CREATE TABLE persist_test (id INTEGER PRIMARY KEY, value TEXT)');
+      await conn.execute("INSERT INTO persist_test (value) VALUES ('persisted')");
+      await conn.close();
+
+      // Second connection - verify data exists
+      conn = await adapter.connect(config);
+      final rows = await conn.query('SELECT * FROM persist_test');
+      expect(rows.length, equals(1));
+      expect(rows.first['value'], equals('persisted'));
+      await conn.close();
+    });
+  });
+
+  group('SqliteConnection.executeUpdate', () {
+    late SqliteConnectionPool pool;
+    late SqliteConnection conn;
+
+    setUp(() async {
+      pool = await SqliteConnectionPool.create(DatabaseConfig.sqliteMemory());
+      conn = await pool.acquire() as SqliteConnection;
+      await conn.execute('CREATE TABLE update_test (id INTEGER PRIMARY KEY, value TEXT)');
+    });
+
+    tearDown(() async {
+      await pool.release(conn);
+      await pool.close();
+    });
+
+    test('executeUpdate performs INSERT without returning rows', () async {
+      final result = await conn.executeUpdate("INSERT INTO update_test (value) VALUES ('test')");
+
+      expect(result.affectedRows, equals(1));
+      expect(result.lastInsertId, isNotNull);
+      expect(result.rows, isEmpty);
+    });
+
+    test('executeUpdate performs UPDATE', () async {
+      await conn.execute("INSERT INTO update_test (value) VALUES ('original')");
+
+      final result = await conn.executeUpdate("UPDATE update_test SET value = 'updated' WHERE value = 'original'");
+
+      expect(result.affectedRows, equals(1));
+    });
+
+    test('executeUpdate performs DELETE', () async {
+      await conn.execute("INSERT INTO update_test (value) VALUES ('to_delete')");
+
+      final result = await conn.executeUpdate("DELETE FROM update_test WHERE value = 'to_delete'");
+
+      expect(result.affectedRows, equals(1));
+    });
+
+    test('executeUpdate handles parameters', () async {
+      final result = await conn.executeUpdate('INSERT INTO update_test (value) VALUES (?)', ['parameterized']);
+
+      expect(result.affectedRows, equals(1));
+
+      final rows = await conn.query('SELECT * FROM update_test WHERE value = ?', ['parameterized']);
+      expect(rows.length, equals(1));
+    });
+
+    test('executeUpdate throws SqliteException on error', () async {
+      expect(
+        () => conn.executeUpdate('INSERT INTO nonexistent_table (col) VALUES (1)'),
+        throwsA(isA<SqliteException>()),
+      );
+    });
+  });
+
+  group('SqliteConnectionPool connection recovery', () {
+    test('pool acquires new connection if existing one is closed', () async {
+      final pool = await SqliteConnectionPool.create(DatabaseConfig.sqliteMemory());
+
+      // Get first connection and close it
+      final conn1 = await pool.acquire();
+      await pool.release(conn1);
+      await conn1.close();
+
+      // Pool should create a new connection
+      final conn2 = await pool.acquire();
+      expect(conn2.isOpen, isTrue);
+
+      await pool.release(conn2);
+      await pool.close();
+    });
+
+    test('pool throws when acquiring while connection in use', () async {
+      final pool = await SqliteConnectionPool.create(DatabaseConfig.sqliteMemory());
+      final conn = await pool.acquire();
+
+      // SQLite is single-connection, so acquiring again should throw
+      expect(() => pool.acquire(), throwsStateError);
+
+      await pool.release(conn);
+      await pool.close();
+    });
+
+    test('release throws for foreign connection', () async {
+      final pool1 = await SqliteConnectionPool.create(DatabaseConfig.sqliteMemory());
+      final pool2 = await SqliteConnectionPool.create(DatabaseConfig.sqliteMemory());
+
+      final conn1 = await pool1.acquire();
+      final conn2 = await pool2.acquire();
+
+      // Releasing connection from wrong pool should throw
+      expect(() => pool1.release(conn2), throwsArgumentError);
+
+      await pool1.release(conn1);
+      await pool2.release(conn2);
+      await pool1.close();
+      await pool2.close();
+    });
+  });
+
+  group('SqliteConnection Duration conversion', () {
+    late SqliteConnectionPool pool;
+    late DatabaseConnection conn;
+
+    setUp(() async {
+      pool = await SqliteConnectionPool.create(DatabaseConfig.sqliteMemory());
+      conn = await pool.acquire();
+      await conn.execute('CREATE TABLE duration_test (id INTEGER PRIMARY KEY, dur INTEGER)');
+    });
+
+    tearDown(() async {
+      await pool.release(conn);
+      await pool.close();
+    });
+
+    test('Duration parameters are converted to microseconds', () async {
+      final duration = Duration(hours: 1, minutes: 30);
+      await conn.execute('INSERT INTO duration_test (dur) VALUES (?)', [duration]);
+
+      final rows = await conn.query('SELECT dur FROM duration_test');
+      expect(rows.first['dur'], equals(duration.inMicroseconds));
+    });
+  });
+
+  group('SqliteConnection path getter', () {
+    test('path returns the database path for file-based connection', () async {
+      final testPath = '${Directory.systemTemp.path}/test_path_getter_${DateTime.now().millisecondsSinceEpoch}.db';
+      try {
+        final config = DatabaseConfig.sqlite(testPath);
+        final conn = await SqliteConnection.connect(config);
+
+        expect(conn.path, equals(testPath));
+
+        await conn.close();
+      } finally {
+        final file = File(testPath);
+        if (file.existsSync()) file.deleteSync();
+      }
+    });
+
+    test('path returns :memory: for in-memory connection', () async {
+      final config = DatabaseConfig.sqliteMemory();
+      final conn = await SqliteConnection.connect(config);
+
+      expect(conn.path, equals(':memory:'));
+
+      await conn.close();
+    });
+  });
+
+  group('SqliteConnection error handling', () {
+    late SqliteConnectionPool pool;
+    late SqliteConnection conn;
+
+    setUp(() async {
+      pool = await SqliteConnectionPool.create(DatabaseConfig.sqliteMemory());
+      conn = await pool.acquire() as SqliteConnection;
+    });
+
+    tearDown(() async {
+      await pool.release(conn);
+      await pool.close();
+    });
+
+    test('execute throws SqliteException on invalid SQL', () async {
+      expect(
+        () => conn.execute('INVALID SQL STATEMENT'),
+        throwsA(isA<SqliteException>()),
+      );
+    });
+
+    test('execute SqliteException contains SQL and database path', () async {
+      try {
+        await conn.execute('SELECT * FROM nonexistent_table_xyz');
+        fail('Should have thrown SqliteException');
+      } catch (e) {
+        expect(e, isA<SqliteException>());
+        final ex = e as SqliteException;
+        expect(ex.sql, equals('SELECT * FROM nonexistent_table_xyz'));
+        expect(ex.database, equals(':memory:'));
+      }
+    });
+  });
+
+  group('generateTableRecreationSql ON UPDATE constraint', () {
+    test('recreates foreign key with ON UPDATE action', () {
+      final schema = TableSchema(
+        name: 'orders',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'user_id', type: 'INTEGER', nullable: false),
+          ColumnSchema(name: 'total', type: 'REAL', nullable: false),
+        ],
+        indexes: [],
+        constraints: [
+          ConstraintSchema(
+            name: 'fk_orders_user',
+            type: ConstraintType.foreignKey,
+            columns: ['user_id'],
+            referencedTable: 'users',
+            referencedColumns: ['id'],
+            onDelete: 'CASCADE',
+            onUpdate: 'CASCADE',
+          ),
+        ],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'orders',
+        currentSchema: schema,
+        columnName: 'total',
+        newNullable: true,
+      );
+
+      // Should contain ON UPDATE CASCADE
+      expect(statements[1], contains('ON UPDATE CASCADE'));
+    });
+
+    test('skips ON UPDATE when it is NO ACTION', () {
+      final schema = TableSchema(
+        name: 'items',
+        columns: [
+          ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          ColumnSchema(name: 'category_id', type: 'INTEGER', nullable: false),
+        ],
+        indexes: [],
+        constraints: [
+          ConstraintSchema(
+            name: 'fk_items_category',
+            type: ConstraintType.foreignKey,
+            columns: ['category_id'],
+            referencedTable: 'categories',
+            referencedColumns: ['id'],
+            onDelete: 'SET NULL',
+            onUpdate: 'NO ACTION',
+          ),
+        ],
+        primaryKey: 'id',
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'items',
+        currentSchema: schema,
+        columnName: 'category_id',
+        newNullable: true,
+      );
+
+      // Should NOT contain ON UPDATE since it's NO ACTION
+      expect(statements[1], isNot(contains('ON UPDATE')));
+      // Should contain ON DELETE SET NULL
+      expect(statements[1], contains('ON DELETE SET NULL'));
+    });
+  });
+
+  group('dropDatabase WAL/SHM cleanup', () {
+    const adapter = SqliteAdapter();
+
+    test('dropDatabase removes WAL file if it exists', () async {
+      final testPath = '${Directory.systemTemp.path}/test_wal_cleanup_${DateTime.now().millisecondsSinceEpoch}.db';
+      final walPath = '$testPath-wal';
+
+      try {
+        // Create the database
+        final config = DatabaseConfig.sqlite(testPath);
+        await adapter.createDatabase(config);
+
+        // Manually create a WAL file to simulate WAL mode
+        File(walPath).writeAsStringSync('fake wal data');
+        expect(File(walPath).existsSync(), isTrue);
+
+        // Drop the database
+        await adapter.dropDatabase(config);
+
+        // Both files should be deleted
+        expect(File(testPath).existsSync(), isFalse);
+        expect(File(walPath).existsSync(), isFalse);
+      } finally {
+        // Cleanup in case test fails
+        if (File(testPath).existsSync()) File(testPath).deleteSync();
+        if (File(walPath).existsSync()) File(walPath).deleteSync();
+      }
+    });
+
+    test('dropDatabase removes SHM file if it exists', () async {
+      final testPath = '${Directory.systemTemp.path}/test_shm_cleanup_${DateTime.now().millisecondsSinceEpoch}.db';
+      final shmPath = '$testPath-shm';
+
+      try {
+        // Create the database
+        final config = DatabaseConfig.sqlite(testPath);
+        await adapter.createDatabase(config);
+
+        // Manually create a SHM file to simulate WAL mode
+        File(shmPath).writeAsStringSync('fake shm data');
+        expect(File(shmPath).existsSync(), isTrue);
+
+        // Drop the database
+        await adapter.dropDatabase(config);
+
+        // Both files should be deleted
+        expect(File(testPath).existsSync(), isFalse);
+        expect(File(shmPath).existsSync(), isFalse);
+      } finally {
+        // Cleanup in case test fails
+        if (File(testPath).existsSync()) File(testPath).deleteSync();
+        if (File(shmPath).existsSync()) File(shmPath).deleteSync();
+      }
     });
   });
 }

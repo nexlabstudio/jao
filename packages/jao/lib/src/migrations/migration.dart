@@ -5,6 +5,7 @@ library;
 
 import 'dart:async';
 import 'package:meta/meta.dart';
+import '../db/adapters/sqlite.dart';
 import '../db/connection.dart';
 import 'operations.dart';
 import 'schema.dart';
@@ -393,19 +394,50 @@ class MigrationRunner {
       false => builder.operations,
     };
 
+    // For SQLite, pre-fetch table schemas for AlterColumn operations
+    // (must be done outside the transaction since SQLite is single-connection)
+    final sqliteSchemas = <String, TableSchema>{};
+    if (adapter is SqliteAdapter) {
+      await pool.withConnection((conn) async {
+        for (final operation in operations) {
+          if (operation is AlterColumn) {
+            final tableName = operation.modification.table;
+            if (!sqliteSchemas.containsKey(tableName)) {
+              sqliteSchemas[tableName] = await adapter.getTableSchema(conn, tableName);
+            }
+          }
+        }
+      });
+    }
+
     await pool.withTransaction((tx) async {
       for (final operation in operations) {
         if (operation is RunDart) {
-          // Handle Dart operations specially
-          final conn = await pool.acquire();
-          try {
-            if (direction == MigrationDirection.up) {
-              await operation.forward(conn);
-            } else {
-              await operation.backward?.call(conn);
-            }
-          } finally {
-            await pool.release(conn);
+          if (useAutoReverse) {
+            // When auto-reversing, we need to call the backward function
+            await operation.backward?.call(tx as DatabaseConnection);
+          } else {
+            // When direction is up, or when direction is down with explicit down() method,
+            // always call forward (down() sets up forward as the rollback action)
+            await operation.forward(tx as DatabaseConnection);
+          }
+        } else if (operation is AlterColumn && adapter is SqliteAdapter) {
+          final mod = operation.modification;
+          final currentSchema = sqliteSchemas[mod.table]!;
+
+          final statements = generateTableRecreationSql(
+            tableName: mod.table,
+            currentSchema: currentSchema,
+            columnName: mod.column,
+            newType: mod.type,
+            newNullable: mod.nullable,
+            newDefault: mod.defaultValue,
+            dropDefault: mod.dropDefault,
+            renameTo: mod.rename,
+          );
+
+          for (final statement in statements) {
+            await tx.execute(statement);
           }
         } else {
           final sql = switch (useAutoReverse) {
@@ -414,7 +446,6 @@ class MigrationRunner {
           };
 
           if (sql case final sql? when sql.isNotEmpty) {
-            // Handle multi-statement SQL
             for (final statement in sql.split(';\n')) {
               if (statement.trim().isNotEmpty) {
                 await tx.execute(statement);
@@ -439,7 +470,6 @@ class MigrationRunner {
     });
   }
 
-  /// Generate SQL for a migration without running it
   String generateSql(Migration migration, MigrationDirection direction) {
     final builder = MigrationBuilder();
     final useAutoReverse = direction == MigrationDirection.down && migration.autoReverse;
