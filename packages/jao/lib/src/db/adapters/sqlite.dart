@@ -592,6 +592,143 @@ class SqliteAdapter implements DatabaseAdapter {
   }
 }
 
+/// Generate table recreation SQL for ALTER COLUMN operations.
+///
+/// SQLite doesn't support ALTER COLUMN, so we need to:
+/// 1. Rename the old table to a temp name
+/// 2. Create a new table with the modified schema
+/// 3. Copy data from old table to new table
+/// 4. Drop the old table
+///
+/// This follows the pattern used by Django ORM's _remake_table.
+List<String> generateTableRecreationSql({
+  required String tableName,
+  required TableSchema currentSchema,
+  required String columnName,
+  FieldType? newType,
+  bool? newNullable,
+  String? newDefault,
+  bool dropDefault = false,
+  String? renameTo,
+}) {
+  const dialect = SqliteDialect();
+  final statements = <String>[];
+  final oldTableName = '_old_$tableName';
+  final quotedTable = dialect.quoteIdentifier(tableName);
+  final quotedOldTable = dialect.quoteIdentifier(oldTableName);
+
+  // Step 1: Rename the old table
+  statements.add('ALTER TABLE $quotedTable RENAME TO ${dialect.quoteIdentifier(oldTableName)}');
+
+  // Step 2: Build the new CREATE TABLE statement with modified column
+  final columnDefs = <String>[];
+  final columnNames = <String>[];
+  final oldColumnNames = <String>[];
+
+  for (final col in currentSchema.columns) {
+    final isTargetColumn = col.name == columnName;
+    final effectiveColName = isTargetColumn && renameTo != null ? renameTo : col.name;
+
+    columnNames.add(dialect.quoteIdentifier(effectiveColName));
+    oldColumnNames.add(dialect.quoteIdentifier(col.name));
+
+    String colType;
+    bool nullable;
+    String? defaultValue;
+
+    if (isTargetColumn) {
+      colType = newType != null ? dialect.sqlType(newType) : col.type;
+      nullable = newNullable ?? col.nullable;
+      defaultValue = dropDefault ? null : (newDefault ?? col.defaultValue);
+    } else {
+      colType = col.type;
+      nullable = col.nullable;
+      defaultValue = col.defaultValue;
+    }
+
+    final buffer = StringBuffer();
+    buffer.write(dialect.quoteIdentifier(effectiveColName));
+    buffer.write(' ');
+
+    // Handle SERIAL/AUTOINCREMENT specially
+    if (col.isPrimaryKey && colType == 'INTEGER') {
+      buffer.write('INTEGER PRIMARY KEY AUTOINCREMENT');
+    } else {
+      buffer.write(colType);
+      if (!nullable) {
+        buffer.write(' NOT NULL');
+      }
+      if (defaultValue != null) {
+        buffer.write(' DEFAULT $defaultValue');
+      }
+    }
+
+    columnDefs.add(buffer.toString());
+  }
+
+  // Add primary key constraint if not handled inline
+  final pk = currentSchema.primaryKey;
+  final pkCol = pk != null ? currentSchema.columns.where((c) => c.name == pk).firstOrNull : null;
+  if (pk != null && pkCol != null && pkCol.type != 'INTEGER') {
+    columnDefs.add('PRIMARY KEY (${dialect.quoteIdentifier(pk)})');
+  }
+
+  // Add foreign key constraints
+  for (final constraint in currentSchema.constraints) {
+    if (constraint.type == ConstraintType.foreignKey) {
+      final fkColumn = constraint.columns.first;
+      // If the FK column was renamed, use the new name
+      final effectiveFkColumn = fkColumn == columnName && renameTo != null ? renameTo : fkColumn;
+
+      final fkBuffer = StringBuffer();
+      fkBuffer.write('FOREIGN KEY (${dialect.quoteIdentifier(effectiveFkColumn)}) ');
+      fkBuffer.write('REFERENCES ${dialect.quoteIdentifier(constraint.referencedTable!)}');
+      fkBuffer.write('(${dialect.quoteIdentifier(constraint.referencedColumns!.first)})');
+
+      if (constraint.onDelete != null && constraint.onDelete != 'NO ACTION') {
+        fkBuffer.write(' ON DELETE ${constraint.onDelete}');
+      }
+      if (constraint.onUpdate != null && constraint.onUpdate != 'NO ACTION') {
+        fkBuffer.write(' ON UPDATE ${constraint.onUpdate}');
+      }
+
+      columnDefs.add(fkBuffer.toString());
+    }
+  }
+
+  statements.add('CREATE TABLE $quotedTable (\n  ${columnDefs.join(',\n  ')}\n)');
+
+  // Step 3: Copy data from old table to new table
+  statements.add(
+    'INSERT INTO $quotedTable (${columnNames.join(', ')}) '
+    'SELECT ${oldColumnNames.join(', ')} FROM $quotedOldTable',
+  );
+
+  // Step 4: Drop the old table
+  statements.add('DROP TABLE $quotedOldTable');
+
+  // Step 5: Recreate indexes (except auto-created ones)
+  for (final index in currentSchema.indexes) {
+    // Skip SQLite auto-created indexes
+    if (index.name.startsWith('sqlite_autoindex_')) continue;
+
+    final indexColumns = index.columns.map((c) {
+      // If the column was renamed, use the new name
+      return c == columnName && renameTo != null ? renameTo : c;
+    }).toList();
+
+    final indexBuffer = StringBuffer('CREATE ');
+    if (index.unique) indexBuffer.write('UNIQUE ');
+    indexBuffer.write('INDEX ${dialect.quoteIdentifier(index.name)} ON $quotedTable (');
+    indexBuffer.write(indexColumns.map((c) => dialect.quoteIdentifier(c)).join(', '));
+    indexBuffer.write(')');
+
+    statements.add(indexBuffer.toString());
+  }
+
+  return statements;
+}
+
 /// SQLite-specific exception.
 class SqliteException implements Exception {
   final String message;

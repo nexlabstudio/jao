@@ -817,6 +817,312 @@ void main() {
           expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
         });
       });
+
+      test('does not generate AlterColumn for SQLite TEXT type affinity (text to varchar)', () async {
+        await pool.withConnection((conn) async {
+          // Create table with TEXT column
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS type_change_test (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              description TEXT NOT NULL
+            )
+          ''');
+
+          // Model with VARCHAR type for description - equivalent in SQLite
+          const schema = ModelSchema(
+            className: 'TypeChangeTest',
+            tableName: 'type_change_test',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(
+                  name: 'description', columnName: 'description', dbType: FieldType.varchar, maxLength: 500),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          // TEXT and VARCHAR are equivalent in SQLite - no AlterColumn should be generated
+          expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+        });
+      });
+
+      test('does not generate AlterColumn for SQLite INTEGER type affinity (integer to bigint)', () async {
+        await pool.withConnection((conn) async {
+          // Create table with INTEGER column
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS bigint_test (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              count INTEGER NOT NULL
+            )
+          ''');
+
+          // Model with BIGINT type for count - equivalent in SQLite
+          const schema = ModelSchema(
+            className: 'BigIntTest',
+            tableName: 'bigint_test',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(name: 'count', columnName: 'count', dbType: FieldType.bigInt),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          // INTEGER and BIGINT are equivalent in SQLite - no AlterColumn should be generated
+          expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+        });
+      });
+
+      test('does not generate AlterColumn when types match', () async {
+        await pool.withConnection((conn) async {
+          // Create table with TEXT column
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS no_type_change_test (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              content TEXT NOT NULL
+            )
+          ''');
+
+          // Model with TEXT type (same as DB)
+          const schema = ModelSchema(
+            className: 'NoTypeChangeTest',
+            tableName: 'no_type_change_test',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(name: 'content', columnName: 'content', dbType: FieldType.text),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          // Should not detect a type change
+          expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+        });
+      });
+
+      test('does not generate AlterColumn for PK integer/serial mismatch', () async {
+        await pool.withConnection((conn) async {
+          // SQLite reports INTEGER PRIMARY KEY, model has serial
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS pk_type_test (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL
+            )
+          ''');
+
+          // Model with serial (should match INTEGER for PK)
+          const schema = ModelSchema(
+            className: 'PkTypeTest',
+            tableName: 'pk_type_test',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(name: 'name', columnName: 'name', dbType: FieldType.text),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          // Should not detect a type change for PK integer/serial
+          expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+        });
+      });
+
+      // ========== SQLite Type Equivalence Tests ==========
+
+      test('does not generate AlterColumn for SQLite TEXT type affinity (timestamp vs text)', () async {
+        await pool.withConnection((conn) async {
+          // SQLite stores timestamps as TEXT
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS timestamp_equiv_test (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              created_at TEXT NOT NULL
+            )
+          ''');
+
+          // Model uses timestampTz, which SQLite reports as TEXT
+          const schema = ModelSchema(
+            className: 'TimestampEquivTest',
+            tableName: 'timestamp_equiv_test',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(name: 'createdAt', columnName: 'created_at', dbType: FieldType.timestampTz),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          // Should not detect a type change - TEXT and timestampTz are equivalent in SQLite
+          expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+        });
+      });
+
+      test('does not generate AlterColumn for SQLite TEXT type affinity (uuid vs text)', () async {
+        await pool.withConnection((conn) async {
+          // SQLite stores UUIDs as TEXT
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS uuid_equiv_test (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              uuid TEXT NOT NULL
+            )
+          ''');
+
+          // Model uses UUID, which SQLite reports as TEXT
+          const schema = ModelSchema(
+            className: 'UuidEquivTest',
+            tableName: 'uuid_equiv_test',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(name: 'uuid', columnName: 'uuid', dbType: FieldType.uuid),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          // Should not detect a type change - TEXT and uuid are equivalent in SQLite
+          expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+        });
+      });
+
+      test('does not generate AlterColumn for SQLite TEXT type affinity (json vs text)', () async {
+        await pool.withConnection((conn) async {
+          // SQLite stores JSON as TEXT
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS json_equiv_test (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              data TEXT
+            )
+          ''');
+
+          // Model uses JSON, which SQLite reports as TEXT
+          const schema = ModelSchema(
+            className: 'JsonEquivTest',
+            tableName: 'json_equiv_test',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(name: 'data', columnName: 'data', dbType: FieldType.jsonb, nullable: true),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          // Should not detect a type change - TEXT and jsonb are equivalent in SQLite
+          expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+        });
+      });
+
+      test('does not generate AlterColumn for SQLite INTEGER type affinity (boolean vs integer)', () async {
+        await pool.withConnection((conn) async {
+          // SQLite stores booleans as INTEGER
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS bool_equiv_test (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              is_active INTEGER NOT NULL
+            )
+          ''');
+
+          // Model uses boolean, which SQLite reports as INTEGER
+          const schema = ModelSchema(
+            className: 'BoolEquivTest',
+            tableName: 'bool_equiv_test',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(name: 'isActive', columnName: 'is_active', dbType: FieldType.boolean),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          // Should not detect a type change - INTEGER and boolean are equivalent in SQLite
+          expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+        });
+      });
+
+      test('does not generate AlterColumn for SQLite REAL type affinity (decimal vs real)', () async {
+        await pool.withConnection((conn) async {
+          // SQLite stores decimals as REAL
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS decimal_equiv_test (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              price REAL NOT NULL
+            )
+          ''');
+
+          // Model uses decimal, which SQLite reports as REAL
+          const schema = ModelSchema(
+            className: 'DecimalEquivTest',
+            tableName: 'decimal_equiv_test',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(
+                name: 'price',
+                columnName: 'price',
+                dbType: FieldType.decimal,
+                precision: 10,
+                scale: 2,
+              ),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          // Should not detect a type change - REAL and decimal are equivalent in SQLite
+          expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+        });
+      });
     });
 
     group('generateMigrationFile()', () {
@@ -998,7 +1304,7 @@ void main() {
         final content = generator.generateMigrationFile('ChangePrice', operations);
 
         expect(content, contains("builder.alterColumn('products', 'price', (col) {"));
-        expect(content, contains('col.setType(FieldType.decimal)'));
+        expect(content, contains('col.type(FieldType.decimal)'));
       });
 
       test('generates AlterColumn with default value', () {

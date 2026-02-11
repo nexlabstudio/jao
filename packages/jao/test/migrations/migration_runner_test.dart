@@ -167,6 +167,45 @@ class AutoReverseMultipleOps extends Migration {
   }
 }
 
+// Migration for testing AlterColumn (SQLite table recreation)
+class CreateItemsTable extends Migration {
+  @override
+  String get name => '020_create_items';
+
+  @override
+  void up(MigrationBuilder builder) {
+    builder.createTable('items', (table) {
+      table.id();
+      table.string('name');
+      table.text('description');
+    });
+  }
+
+  @override
+  void down(MigrationBuilder builder) {
+    builder.dropTable('items');
+  }
+}
+
+class MakeDescriptionNullable extends Migration {
+  @override
+  String get name => '021_make_description_nullable';
+
+  @override
+  void up(MigrationBuilder builder) {
+    builder.alterColumn('items', 'description', (col) {
+      col.nullable();
+    });
+  }
+
+  @override
+  void down(MigrationBuilder builder) {
+    builder.alterColumn('items', 'description', (col) {
+      col.notNullable();
+    });
+  }
+}
+
 void main() {
   group('MigrationBuilder', () {
     group('createTable()', () {
@@ -934,6 +973,70 @@ void main() {
 
         // Should use explicit down() which has dropTable
         expect(sql, contains('DROP TABLE'));
+      });
+    });
+
+    group('SQLite table recreation (AlterColumn)', () {
+      test('AlterColumn changes nullability via table recreation', () async {
+        // First create the items table
+        await runner.migrate([CreateItemsTable()]);
+
+        // Verify description is NOT NULL initially
+        var schema = await pool.withConnection((conn) => adapter.getTableSchema(conn, 'items'));
+        var descCol = schema.columns.firstWhere((c) => c.name == 'description');
+        expect(descCol.nullable, isFalse);
+
+        // Apply the AlterColumn migration (should use table recreation)
+        final result = await runner.migrate([CreateItemsTable(), MakeDescriptionNullable()]);
+
+        expect(result.isSuccess, isTrue);
+        expect(result.applied, equals(['021_make_description_nullable']));
+
+        // Verify description is now nullable
+        schema = await pool.withConnection((conn) => adapter.getTableSchema(conn, 'items'));
+        descCol = schema.columns.firstWhere((c) => c.name == 'description');
+        expect(descCol.nullable, isTrue);
+      });
+
+      test('AlterColumn preserves data during table recreation', () async {
+        // Create the items table
+        await runner.migrate([CreateItemsTable()]);
+
+        // Insert some test data
+        await pool.withConnection((conn) async {
+          await conn.execute("INSERT INTO items (name, description) VALUES ('Item 1', 'Description 1')");
+          await conn.execute("INSERT INTO items (name, description) VALUES ('Item 2', 'Description 2')");
+        });
+
+        // Apply the AlterColumn migration
+        await runner.migrate([CreateItemsTable(), MakeDescriptionNullable()]);
+
+        // Verify data is preserved
+        final rows = await pool.withConnection((conn) => conn.query('SELECT * FROM items ORDER BY id'));
+
+        expect(rows.length, equals(2));
+        expect(rows[0]['name'], equals('Item 1'));
+        expect(rows[0]['description'], equals('Description 1'));
+        expect(rows[1]['name'], equals('Item 2'));
+        expect(rows[1]['description'], equals('Description 2'));
+      });
+
+      test('AlterColumn rollback restores original nullability', () async {
+        // Create the items table and apply nullable migration
+        await runner.migrate([CreateItemsTable(), MakeDescriptionNullable()]);
+
+        // Verify description is nullable
+        var schema = await pool.withConnection((conn) => adapter.getTableSchema(conn, 'items'));
+        var descCol = schema.columns.firstWhere((c) => c.name == 'description');
+        expect(descCol.nullable, isTrue);
+
+        // Rollback the nullable migration
+        await runner.rollback([CreateItemsTable(), MakeDescriptionNullable()]);
+
+        // Verify description is NOT NULL again
+        schema = await pool.withConnection((conn) => adapter.getTableSchema(conn, 'items'));
+        descCol = schema.columns.firstWhere((c) => c.name == 'description');
+        expect(descCol.nullable, isFalse);
       });
     });
   });
