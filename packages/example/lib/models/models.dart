@@ -22,7 +22,7 @@ class Choice {
   late int id;
 
   @ForeignKey(Poll)
-  late int pollId;
+  late int? pollId;
 
   @CharField(maxLength: 200)
   late String choiceText;

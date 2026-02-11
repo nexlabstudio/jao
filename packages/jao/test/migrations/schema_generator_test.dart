@@ -951,8 +951,6 @@ void main() {
         });
       });
 
-      // ========== SQLite Type Equivalence Tests ==========
-
       test('does not generate AlterColumn for SQLite TEXT type affinity (timestamp vs text)', () async {
         await pool.withConnection((conn) async {
           // SQLite stores timestamps as TEXT
