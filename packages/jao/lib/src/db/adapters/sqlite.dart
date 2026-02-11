@@ -617,10 +617,8 @@ List<String> generateTableRecreationSql({
   final quotedTable = dialect.quoteIdentifier(tableName);
   final quotedOldTable = dialect.quoteIdentifier(oldTableName);
 
-  // Step 1: Rename the old table
   statements.add('ALTER TABLE $quotedTable RENAME TO ${dialect.quoteIdentifier(oldTableName)}');
 
-  // Step 2: Build the new CREATE TABLE statement with modified column
   final columnDefs = <String>[];
   final columnNames = <String>[];
   final oldColumnNames = <String>[];
@@ -698,16 +696,13 @@ List<String> generateTableRecreationSql({
 
   statements.add('CREATE TABLE $quotedTable (\n  ${columnDefs.join(',\n  ')}\n)');
 
-  // Step 3: Copy data from old table to new table
   statements.add(
     'INSERT INTO $quotedTable (${columnNames.join(', ')}) '
     'SELECT ${oldColumnNames.join(', ')} FROM $quotedOldTable',
   );
 
-  // Step 4: Drop the old table
   statements.add('DROP TABLE $quotedOldTable');
 
-  // Step 5: Recreate indexes (except auto-created ones)
   for (final index in currentSchema.indexes) {
     // Skip SQLite auto-created indexes
     if (index.name.startsWith('sqlite_autoindex_')) continue;
