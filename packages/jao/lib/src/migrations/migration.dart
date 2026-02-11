@@ -413,10 +413,13 @@ class MigrationRunner {
     await pool.withTransaction((tx) async {
       for (final operation in operations) {
         if (operation is RunDart) {
-          if (direction == MigrationDirection.up) {
-            await operation.forward(tx as DatabaseConnection);
-          } else {
+          if (useAutoReverse) {
+            // When auto-reversing, we need to call the backward function
             await operation.backward?.call(tx as DatabaseConnection);
+          } else {
+            // When direction is up, or when direction is down with explicit down() method,
+            // always call forward (down() sets up forward as the rollback action)
+            await operation.forward(tx as DatabaseConnection);
           }
         } else if (operation is AlterColumn && adapter is SqliteAdapter) {
           final mod = operation.modification;

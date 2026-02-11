@@ -1109,4 +1109,213 @@ void main() {
       expect(MigrationDirection.values, contains(MigrationDirection.down));
     });
   });
+
+  group('RunDart operations', () {
+    late SqliteAdapter adapter;
+    late ConnectionPool pool;
+    late MigrationRunner runner;
+
+    setUp(() async {
+      final config = DatabaseConfig.sqliteMemory();
+      adapter = const SqliteAdapter();
+      pool = await adapter.createPool(config);
+      runner = MigrationRunner(adapter: adapter, pool: pool);
+    });
+
+    tearDown(() async {
+      await pool.close();
+    });
+
+    test('RunDart forward executes during up migration', () async {
+      var forwardCalled = false;
+
+      final migration = _RunDartMigration(
+        migrationName: 'run_dart_forward',
+        forward: (conn) async {
+          forwardCalled = true;
+          await conn.execute('CREATE TABLE dart_test (id INTEGER PRIMARY KEY)');
+        },
+      );
+
+      await runner.migrate([migration]);
+
+      expect(forwardCalled, isTrue);
+      final exists = await pool.withConnection((conn) => adapter.tableExists(conn, 'dart_test'));
+      expect(exists, isTrue);
+    });
+
+    test('RunDart backward executes during rollback', () async {
+      var backwardCalled = false;
+
+      final migration = _RunDartMigration(
+        migrationName: 'run_dart_backward',
+        forward: (conn) async {
+          await conn.execute('CREATE TABLE dart_backward_test (id INTEGER PRIMARY KEY)');
+        },
+        backward: (conn) async {
+          backwardCalled = true;
+          await conn.execute('DROP TABLE dart_backward_test');
+        },
+      );
+
+      // First apply the migration
+      await runner.migrate([migration]);
+
+      // Then rollback
+      await runner.rollback([migration]);
+
+      expect(backwardCalled, isTrue);
+      final exists = await pool.withConnection((conn) => adapter.tableExists(conn, 'dart_backward_test'));
+      expect(exists, isFalse);
+    });
+
+    test('RunDart without backward skips during rollback', () async {
+      final migration = _RunDartMigration(
+        migrationName: 'run_dart_no_backward',
+        forward: (conn) async {
+          await conn.execute('CREATE TABLE no_backward_test (id INTEGER PRIMARY KEY)');
+        },
+        // No backward function
+      );
+
+      // Apply the migration
+      await runner.migrate([migration]);
+
+      // Rollback should not throw even without backward
+      final result = await runner.rollback([migration]);
+      expect(result.rolledBack, contains('run_dart_no_backward'));
+    });
+
+    test('RunDart backward executes during autoReverse rollback', () async {
+      var backwardCalled = false;
+
+      final migration = _AutoReverseMigration(
+        migrationName: 'auto_reverse_run_dart',
+        forward: (conn) async {
+          await conn.execute('CREATE TABLE auto_reverse_test (id INTEGER PRIMARY KEY)');
+        },
+        backward: (conn) async {
+          backwardCalled = true;
+          await conn.execute('DROP TABLE IF EXISTS auto_reverse_test');
+        },
+      );
+
+      // Apply the migration
+      await runner.migrate([migration]);
+
+      // Verify forward ran
+      final existsBefore = await pool.withConnection((conn) => adapter.tableExists(conn, 'auto_reverse_test'));
+      expect(existsBefore, isTrue);
+
+      // Rollback using autoReverse (which calls operation.backward)
+      await runner.rollback([migration]);
+
+      expect(backwardCalled, isTrue);
+    });
+  });
+
+  group('Rollback error handling', () {
+    late SqliteAdapter adapter;
+    late ConnectionPool pool;
+    late MigrationRunner runner;
+
+    setUp(() async {
+      final config = DatabaseConfig.sqliteMemory();
+      adapter = const SqliteAdapter();
+      pool = await adapter.createPool(config);
+      runner = MigrationRunner(adapter: adapter, pool: pool);
+    });
+
+    tearDown(() async {
+      await pool.close();
+    });
+
+    test('rollback catches and reports errors', () async {
+      final migration = _FailingRollbackMigration();
+
+      // First apply the migration
+      await runner.migrate([migration]);
+
+      // Rollback should fail but not throw
+      final result = await runner.rollback([migration]);
+
+      expect(result.errors, isNotEmpty);
+      expect(result.errors.first.migrationName, equals('failing_rollback'));
+      expect(result.errors.first.message, contains('Rollback intentionally failed'));
+    });
+  });
+}
+
+// Helper migration class for RunDart tests
+class _RunDartMigration extends Migration {
+  final String migrationName;
+  final Future<void> Function(DatabaseConnection conn) forward;
+  final Future<void> Function(DatabaseConnection conn)? backward;
+
+  _RunDartMigration({
+    required this.migrationName,
+    required this.forward,
+    this.backward,
+  });
+
+  @override
+  String get name => migrationName;
+
+  @override
+  void up(MigrationBuilder builder) {
+    builder.runDart(forward, backward: backward);
+  }
+
+  @override
+  void down(MigrationBuilder builder) {
+    if (backward != null) {
+      builder.runDart(backward!, backward: forward);
+    }
+  }
+}
+
+// Helper migration class that fails during rollback
+class _FailingRollbackMigration extends Migration {
+  @override
+  String get name => 'failing_rollback';
+
+  @override
+  void up(MigrationBuilder builder) {
+    builder.createTable('failing_rollback_test', (table) {
+      table.id();
+    });
+  }
+
+  @override
+  void down(MigrationBuilder builder) {
+    builder.rawSql('INVALID SQL THAT WILL FAIL -- Rollback intentionally failed');
+  }
+}
+
+class _AutoReverseMigration extends Migration {
+  final String migrationName;
+  final Future<void> Function(DatabaseConnection conn) forward;
+  final Future<void> Function(DatabaseConnection conn)? backward;
+
+  _AutoReverseMigration({
+    required this.migrationName,
+    required this.forward,
+    this.backward,
+  });
+
+  @override
+  String get name => migrationName;
+
+  @override
+  bool get autoReverse => true;
+
+  @override
+  void up(MigrationBuilder builder) {
+    builder.runDart(forward, backward: backward);
+  }
+
+  @override
+  void down(MigrationBuilder builder) {
+    // Not used when autoReverse is true
+  }
 }

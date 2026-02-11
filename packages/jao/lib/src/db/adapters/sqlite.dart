@@ -241,7 +241,7 @@ class SqliteConnection implements DatabaseConnection {
 }
 
 /// SQLite transaction implementation.
-class SqliteTransaction implements Transaction {
+class SqliteTransaction implements Transaction, DatabaseConnection {
   final sqlite.Database _db;
   final String _path;
   bool _isActive = true;
@@ -250,6 +250,34 @@ class SqliteTransaction implements Transaction {
 
   @override
   bool get isActive => _isActive;
+
+  @override
+  bool get isOpen => _isActive;
+
+  @override
+  Future<void> close() async {
+    // Transactions are auto-closed via commit/rollback, no separate close needed
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> query(String sql, [List<Object?>? params]) async {
+    final result = await execute(sql, params);
+    return result.rows;
+  }
+
+  @override
+  Future<T?> scalar<T>(String sql, [List<Object?>? params]) async {
+    final result = await execute(sql, params);
+    if (result.rows.isEmpty) return null;
+    final firstRow = result.rows.first;
+    if (firstRow.isEmpty) return null;
+    return firstRow.values.first as T?;
+  }
+
+  @override
+  Future<Transaction> beginTransaction() async {
+    throw UnsupportedError('Cannot nest transactions in SQLite');
+  }
 
   @override
   Future<QueryResult> execute(String sql, [List<Object?>? params]) async {

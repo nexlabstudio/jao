@@ -1618,6 +1618,55 @@ void main() {
       final createTable = operations[0] as CreateTable;
       expect(createTable.table.columns.any((c) => c.name == 'data'), isTrue);
     });
+
+    test('generates CreateTable with unknown field type (falls back to text)', () {
+      const schema = ModelSchema(
+        className: 'Unknown',
+        tableName: 'unknown_types',
+        fields: [
+          ModelFieldSchema(
+            name: 'id',
+            columnName: 'id',
+            dbType: FieldType.serial,
+            primaryKey: true,
+            autoIncrement: true,
+          ),
+          // array is a less commonly used type that might hit the default case
+          ModelFieldSchema(name: 'tags', columnName: 'tags', dbType: FieldType.array, nullable: true),
+        ],
+      );
+
+      final operations = generator.generateCreateTable(schema);
+
+      expect(operations.length, equals(1));
+      final createTable = operations[0] as CreateTable;
+      expect(createTable.table.columns.any((c) => c.name == 'tags'), isTrue);
+    });
+
+    test('generates CreateTable with smallInt field (uses integer builder)', () {
+      const schema = ModelSchema(
+        className: 'SmallNumbers',
+        tableName: 'small_numbers',
+        fields: [
+          ModelFieldSchema(
+            name: 'id',
+            columnName: 'id',
+            dbType: FieldType.serial,
+            primaryKey: true,
+            autoIncrement: true,
+          ),
+          ModelFieldSchema(name: 'count', columnName: 'count', dbType: FieldType.smallInt),
+        ],
+      );
+
+      final operations = generator.generateCreateTable(schema);
+
+      expect(operations.length, equals(1));
+      final createTable = operations[0] as CreateTable;
+      final countCol = createTable.table.columns.firstWhere((c) => c.name == 'count');
+      // Note: SchemaGenerator uses integer builder for smallInt, bigInt, and integer types
+      expect(countCol.type, equals(FieldType.integer));
+    });
   });
 
   group('generateMigrationFile code generation', () {
@@ -1633,6 +1682,421 @@ void main() {
       final code = generator.generateMigrationFile('DropFkMigration', operations);
 
       expect(code, contains("builder.dropConstraint('posts', 'fk_posts_author')"));
+    });
+  });
+
+  group('_normalizeDbType type affinity tests', () {
+    late SchemaGenerator generator;
+    late SqliteAdapter adapter;
+    late ConnectionPool pool;
+
+    setUpAll(() async {
+      adapter = const SqliteAdapter();
+      final config = DatabaseConfig.sqliteMemory();
+      pool = await adapter.createPool(config);
+      generator = SchemaGenerator(adapter);
+    });
+
+    tearDownAll(() async {
+      await pool.close();
+    });
+
+    test('handles DOUBLE PRECISION type from database', () async {
+      await pool.withConnection((conn) async {
+        await conn.execute('''
+          CREATE TABLE IF NOT EXISTS double_precision_test (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            value DOUBLE PRECISION NOT NULL
+          )
+        ''');
+
+        const schema = ModelSchema(
+          className: 'DoublePrecisionTest',
+          tableName: 'double_precision_test',
+          fields: [
+            ModelFieldSchema(
+              name: 'id',
+              columnName: 'id',
+              dbType: FieldType.serial,
+              primaryKey: true,
+              autoIncrement: true,
+            ),
+            ModelFieldSchema(name: 'value', columnName: 'value', dbType: FieldType.doublePrecision),
+          ],
+        );
+
+        final operations = await generator.generateDiff(conn, [schema]);
+        // SQLite stores DOUBLE PRECISION as REAL, so doublePrecision and real are equivalent
+        expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+      });
+    });
+
+    test('handles DECIMAL/NUMERIC type from database', () async {
+      await pool.withConnection((conn) async {
+        await conn.execute('''
+          CREATE TABLE IF NOT EXISTS decimal_normalize_test (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            amount DECIMAL(10, 2) NOT NULL
+          )
+        ''');
+
+        const schema = ModelSchema(
+          className: 'DecimalNormalizeTest',
+          tableName: 'decimal_normalize_test',
+          fields: [
+            ModelFieldSchema(
+              name: 'id',
+              columnName: 'id',
+              dbType: FieldType.serial,
+              primaryKey: true,
+              autoIncrement: true,
+            ),
+            ModelFieldSchema(name: 'amount', columnName: 'amount', dbType: FieldType.decimal, precision: 10, scale: 2),
+          ],
+        );
+
+        final operations = await generator.generateDiff(conn, [schema]);
+        // SQLite stores DECIMAL as REAL, so they're equivalent
+        expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+      });
+    });
+
+    test('handles CHAR type from database', () async {
+      await pool.withConnection((conn) async {
+        await conn.execute('''
+          CREATE TABLE IF NOT EXISTS char_test (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code CHAR(10) NOT NULL
+          )
+        ''');
+
+        const schema = ModelSchema(
+          className: 'CharTest',
+          tableName: 'char_test',
+          fields: [
+            ModelFieldSchema(
+              name: 'id',
+              columnName: 'id',
+              dbType: FieldType.serial,
+              primaryKey: true,
+              autoIncrement: true,
+            ),
+            ModelFieldSchema(name: 'code', columnName: 'code', dbType: FieldType.char),
+          ],
+        );
+
+        final operations = await generator.generateDiff(conn, [schema]);
+        // SQLite stores CHAR as TEXT, so they're equivalent
+        expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+      });
+    });
+
+    test('handles BLOB type from database', () async {
+      await pool.withConnection((conn) async {
+        await conn.execute('''
+          CREATE TABLE IF NOT EXISTS blob_normalize_test (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            data BLOB
+          )
+        ''');
+
+        const schema = ModelSchema(
+          className: 'BlobNormalizeTest',
+          tableName: 'blob_normalize_test',
+          fields: [
+            ModelFieldSchema(
+              name: 'id',
+              columnName: 'id',
+              dbType: FieldType.serial,
+              primaryKey: true,
+              autoIncrement: true,
+            ),
+            ModelFieldSchema(name: 'data', columnName: 'data', dbType: FieldType.bytea, nullable: true),
+          ],
+        );
+
+        final operations = await generator.generateDiff(conn, [schema]);
+        // SQLite stores BYTEA as BLOB, so they're equivalent
+        expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+      });
+    });
+
+    test('handles SMALLINT type from database', () async {
+      await pool.withConnection((conn) async {
+        await conn.execute('''
+          CREATE TABLE IF NOT EXISTS smallint_test (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            num SMALLINT NOT NULL
+          )
+        ''');
+
+        const schema = ModelSchema(
+          className: 'SmallIntTest',
+          tableName: 'smallint_test',
+          fields: [
+            ModelFieldSchema(
+              name: 'id',
+              columnName: 'id',
+              dbType: FieldType.serial,
+              primaryKey: true,
+              autoIncrement: true,
+            ),
+            ModelFieldSchema(name: 'num', columnName: 'num', dbType: FieldType.smallInt),
+          ],
+        );
+
+        final operations = await generator.generateDiff(conn, [schema]);
+        // INTEGER and SMALLINT are equivalent in SQLite
+        expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+      });
+    });
+
+    test('handles TIME type from database', () async {
+      await pool.withConnection((conn) async {
+        await conn.execute('''
+          CREATE TABLE IF NOT EXISTS time_test (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            start_time TIME NOT NULL
+          )
+        ''');
+
+        const schema = ModelSchema(
+          className: 'TimeTest',
+          tableName: 'time_test',
+          fields: [
+            ModelFieldSchema(
+              name: 'id',
+              columnName: 'id',
+              dbType: FieldType.serial,
+              primaryKey: true,
+              autoIncrement: true,
+            ),
+            ModelFieldSchema(name: 'startTime', columnName: 'start_time', dbType: FieldType.time),
+          ],
+        );
+
+        final operations = await generator.generateDiff(conn, [schema]);
+        // TIME is stored as TEXT in SQLite
+        expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+      });
+    });
+
+    test('handles INTERVAL type from database', () async {
+      await pool.withConnection((conn) async {
+        await conn.execute('''
+          CREATE TABLE IF NOT EXISTS interval_test (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            duration INTERVAL
+          )
+        ''');
+
+        const schema = ModelSchema(
+          className: 'IntervalTest',
+          tableName: 'interval_test',
+          fields: [
+            ModelFieldSchema(
+              name: 'id',
+              columnName: 'id',
+              dbType: FieldType.serial,
+              primaryKey: true,
+              autoIncrement: true,
+            ),
+            ModelFieldSchema(name: 'duration', columnName: 'duration', dbType: FieldType.interval, nullable: true),
+          ],
+        );
+
+        final operations = await generator.generateDiff(conn, [schema]);
+        // INTERVAL is stored as TEXT in SQLite
+        expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+      });
+    });
+
+    test('handles UUID type from database', () async {
+      await pool.withConnection((conn) async {
+        await conn.execute('''
+          CREATE TABLE IF NOT EXISTS uuid_normalize_test (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            external_id UUID NOT NULL
+          )
+        ''');
+
+        const schema = ModelSchema(
+          className: 'UuidNormalizeTest',
+          tableName: 'uuid_normalize_test',
+          fields: [
+            ModelFieldSchema(
+              name: 'id',
+              columnName: 'id',
+              dbType: FieldType.serial,
+              primaryKey: true,
+              autoIncrement: true,
+            ),
+            ModelFieldSchema(name: 'externalId', columnName: 'external_id', dbType: FieldType.uuid),
+          ],
+        );
+
+        final operations = await generator.generateDiff(conn, [schema]);
+        // UUID is stored as TEXT in SQLite
+        expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+      });
+    });
+
+    test('handles JSON type from database', () async {
+      await pool.withConnection((conn) async {
+        await conn.execute('''
+          CREATE TABLE IF NOT EXISTS json_normalize_test (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            metadata JSON
+          )
+        ''');
+
+        const schema = ModelSchema(
+          className: 'JsonNormalizeTest',
+          tableName: 'json_normalize_test',
+          fields: [
+            ModelFieldSchema(
+              name: 'id',
+              columnName: 'id',
+              dbType: FieldType.serial,
+              primaryKey: true,
+              autoIncrement: true,
+            ),
+            ModelFieldSchema(name: 'metadata', columnName: 'metadata', dbType: FieldType.json, nullable: true),
+          ],
+        );
+
+        final operations = await generator.generateDiff(conn, [schema]);
+        // JSON is stored as TEXT in SQLite
+        expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+      });
+    });
+
+    test('handles JSONB type from database', () async {
+      await pool.withConnection((conn) async {
+        await conn.execute('''
+          CREATE TABLE IF NOT EXISTS jsonb_normalize_test (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            data JSONB
+          )
+        ''');
+
+        const schema = ModelSchema(
+          className: 'JsonbNormalizeTest',
+          tableName: 'jsonb_normalize_test',
+          fields: [
+            ModelFieldSchema(
+              name: 'id',
+              columnName: 'id',
+              dbType: FieldType.serial,
+              primaryKey: true,
+              autoIncrement: true,
+            ),
+            ModelFieldSchema(name: 'data', columnName: 'data', dbType: FieldType.jsonb, nullable: true),
+          ],
+        );
+
+        final operations = await generator.generateDiff(conn, [schema]);
+        // JSONB is stored as TEXT in SQLite
+        expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
+      });
+    });
+
+    test('returns false when types are not equivalent in SQLite', () async {
+      await pool.withConnection((conn) async {
+        // Create a table with INTEGER column
+        await conn.execute('''
+          CREATE TABLE IF NOT EXISTS not_equiv_test (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            data INTEGER NOT NULL
+          )
+        ''');
+
+        // Model expects TEXT type (not equivalent to INTEGER in SQLite)
+        const schema = ModelSchema(
+          className: 'NotEquivTest',
+          tableName: 'not_equiv_test',
+          fields: [
+            ModelFieldSchema(
+              name: 'id',
+              columnName: 'id',
+              dbType: FieldType.serial,
+              primaryKey: true,
+              autoIncrement: true,
+            ),
+            ModelFieldSchema(name: 'data', columnName: 'data', dbType: FieldType.text),
+          ],
+        );
+
+        final operations = await generator.generateDiff(conn, [schema]);
+        // TEXT and INTEGER are NOT equivalent in SQLite - should generate AlterColumn
+        expect(operations.whereType<AlterColumn>().isNotEmpty, isTrue);
+      });
+    });
+  });
+
+  group('generateMigrationFile _columnToCode coverage', () {
+    late SchemaGenerator generator;
+
+    setUp(() {
+      generator = SchemaGenerator(const SqliteAdapter());
+    });
+
+    test('generates code for boolean column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'flags',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'is_active', type: FieldType.boolean, defaultValue: 'true'),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateFlagsTable', operations);
+
+      expect(code, contains("table.boolean('is_active'"));
+    });
+
+    test('generates code for integer column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'counts',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'count', type: FieldType.integer, nullable: true),
+              const ColumnDefinition(name: 'total', type: FieldType.integer, defaultValue: '0'),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateCountsTable', operations);
+
+      expect(code, contains("table.integer('count'"));
+      expect(code, contains("table.integer('total'"));
+    });
+
+    test('generates comment for unsupported column type', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'misc',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              // Use a type that doesn't have explicit handling in _columnToCode
+              const ColumnDefinition(name: 'data', type: FieldType.bytea),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateMiscTable', operations);
+
+      // Should contain a comment for unhandled type
+      expect(code, contains('// data: FieldType.bytea'));
     });
   });
 }
