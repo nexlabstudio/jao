@@ -7,8 +7,7 @@ class User {
 
   User({this.id, required this.name});
 
-  static User fromRow(Map<String, dynamic> row) =>
-      User(id: row['id'] as int?, name: row['name'] as String);
+  static User fromRow(Map<String, dynamic> row) => User(id: row['id'] as int?, name: row['name'] as String);
 
   static Map<String, dynamic> toRow(User u) => {
         if (u.id != null) 'id': u.id,
@@ -133,8 +132,7 @@ void main() {
       expect(await orderExecutor.count(const QueryConfig()), equals(0));
     });
 
-    test('uncommitted changes are visible within the same transaction',
-        () async {
+    test('uncommitted changes are visible within the same transaction', () async {
       await Jao.instance.transaction((tx) async {
         final user = await tx.on<User>().create({'name': 'Alice'});
         await tx.on<Order>().create({'user_id': user.id, 'total': 99});
@@ -200,8 +198,7 @@ void main() {
       expect(await orderExecutor.count(const QueryConfig()), equals(0));
     });
 
-    test('propagates error to outer transaction when exception is not caught',
-        () async {
+    test('propagates error to outer transaction when exception is not caught', () async {
       try {
         await Jao.instance.transaction((tx) async {
           await tx.on<User>().create({'name': 'Alice'});
@@ -218,8 +215,7 @@ void main() {
       expect(await orderExecutor.count(const QueryConfig()), equals(0));
     });
 
-    test('multiple sequential savepoints each roll back independently',
-        () async {
+    test('multiple sequential savepoints each roll back independently', () async {
       await Jao.instance.transaction((tx) async {
         final user = await tx.on<User>().create({'name': 'Alice'});
 
@@ -244,8 +240,7 @@ void main() {
       expect(orders[0].total, equals(10));
     });
 
-    test('nested savepoints: inner rollback does not affect outer savepoint',
-        () async {
+    test('nested savepoints: inner rollback does not affect outer savepoint', () async {
       await Jao.instance.transaction((tx) async {
         final user = await tx.on<User>().create({'name': 'Alice'});
 
@@ -283,8 +278,7 @@ void main() {
       expect(await orderExecutor.count(const QueryConfig()), equals(1));
     });
 
-    test('optional name parameter does not affect rollback behaviour',
-        () async {
+    test('optional name parameter does not affect rollback behaviour', () async {
       await Jao.instance.transaction((tx) async {
         final user = await tx.on<User>().create({'name': 'Alice'});
 
