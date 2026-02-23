@@ -244,6 +244,22 @@ class PostgresTransaction implements Transaction {
     _isActive = false;
   }
 
+  @override
+  Future<void> savepoint(String name) async {
+    await _ensureStarted();
+    await _conn.execute('SAVEPOINT $name');
+  }
+
+  @override
+  Future<void> rollbackToSavepoint(String name) async {
+    await _conn.execute('ROLLBACK TO SAVEPOINT $name');
+  }
+
+  @override
+  Future<void> releaseSavepoint(String name) async {
+    await _conn.execute('RELEASE SAVEPOINT $name');
+  }
+
   String _convertSqlToNamed(String sql, int paramCount) {
     var result = sql;
     for (var i = paramCount; i >= 1; i--) {

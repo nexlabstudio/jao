@@ -187,6 +187,15 @@ abstract class Transaction {
   /// Rollback the transaction
   Future<void> rollback();
 
+  /// Create a savepoint with the given name
+  Future<void> savepoint(String name);
+
+  /// Rollback to a previously created savepoint
+  Future<void> rollbackToSavepoint(String name);
+
+  /// Release (remove) a savepoint
+  Future<void> releaseSavepoint(String name);
+
   /// Whether the transaction is still active
   bool get isActive;
 }

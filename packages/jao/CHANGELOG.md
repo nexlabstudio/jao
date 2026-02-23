@@ -1,6 +1,16 @@
-## [Unreleased] - 2026-02-09
+## [Unreleased] - 2026-02-23
 
 ### Added
+
+- Multi-model transaction support via `Jao.instance.transaction()`:
+  - New `JaoTransaction` class that holds a shared `Transaction` and vends typed `TransactionExecutor<T>` instances for any registered model
+  - New `Jao.transaction<R>()` method — acquires one connection, wraps it in one atomic transaction, and exposes all registered models via `tx.on<T>()`
+  - All `tx.on<T>()` calls within a single `transaction()` block share the same underlying DB connection and commit/roll back together
+  - Existing single-model `executor.transaction()` API is unchanged (no breaking change)
+- Savepoint support:
+  - `Transaction` interface gains `savepoint(name)`, `rollbackToSavepoint(name)`, and `releaseSavepoint(name)`
+  - Implemented across all three adapters (PostgreSQL, SQLite, MySQL)
+  - `JaoTransaction.savepoint()` — runs a sub-operation inside a savepoint; if it throws, only that sub-operation is rolled back and the outer transaction remains alive
 
 - `EnumField` support in migration schema generator:
   - `fieldDefToDbType` now handles `EnumField` annotation

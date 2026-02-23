@@ -232,6 +232,21 @@ class MySqlTransaction implements Transaction {
     await _conn.query('ROLLBACK');
     _isActive = false;
   }
+
+  @override
+  Future<void> savepoint(String name) async {
+    await _conn.query('SAVEPOINT $name');
+  }
+
+  @override
+  Future<void> rollbackToSavepoint(String name) async {
+    await _conn.query('ROLLBACK TO SAVEPOINT $name');
+  }
+
+  @override
+  Future<void> releaseSavepoint(String name) async {
+    await _conn.query('RELEASE SAVEPOINT $name');
+  }
 }
 
 /// MySQL connection pool implementation.
