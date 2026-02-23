@@ -1,3 +1,7 @@
+## [0.3.0] - 2026-02-23
+
+- Bump `jao` dependency to `^0.3.0`
+
 ## [0.2.0] - 2025-12-31
 
 - Version bump to align with jao and jao_generator packages
