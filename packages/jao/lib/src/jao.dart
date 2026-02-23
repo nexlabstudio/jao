@@ -26,12 +26,40 @@ class ModelRegistration<T> {
   });
 }
 
+class JaoTransaction {
+  final Transaction _transaction;
+  final SqlCompiler _compiler;
+  final Map<Type, ModelRegistration> _registrations;
+
+  JaoTransaction({
+    required Transaction transaction,
+    required SqlCompiler compiler,
+    required Map<Type, ModelRegistration> registrations,
+  })  : _transaction = transaction,
+        _compiler = compiler,
+        _registrations = registrations;
+
+  TransactionExecutor<T> on<T>() {
+    final reg = _registrations[T] as ModelRegistration<T>?;
+    if (reg == null) throw StateError('Model $T is not registered');
+    return TransactionExecutor<T>(
+      transaction: _transaction,
+      compiler: _compiler,
+      tableName: reg.tableName,
+      pkField: reg.pkField,
+      fromRow: reg.fromRow,
+      toRow: reg.toRow,
+    );
+  }
+}
+
 class Jao {
   static Jao? _instance;
 
   static Jao get instance => switch (_instance) {
         final i? => i,
-        null => throw StateError('Jao not initialized. Call Jao.configure() first.'),
+        null =>
+          throw StateError('Jao not initialized. Call Jao.configure() first.'),
       };
 
   static bool get isInitialized => _instance != null;
@@ -43,7 +71,9 @@ class Jao {
 
   Jao._({required this.pool, required this.compiler});
 
-  static Future<Jao> configure({required DatabaseAdapter adapter, required DatabaseConfig config}) async {
+  static Future<Jao> configure(
+      {required DatabaseAdapter adapter,
+      required DatabaseConfig config}) async {
     if (_instance case final existing?) return existing;
     final pool = await adapter.createPool(config);
     final instance = Jao._(pool: pool, compiler: SqlCompiler(adapter.dialect));
@@ -58,6 +88,14 @@ class Jao {
 
   static void registerModel<T>(ModelRegistration<T> registration) {
     _registrations[T] = registration;
+  }
+
+  Future<R> transaction<R>(Future<R> Function(JaoTransaction tx) fn) {
+    return pool.withTransaction((tx) async {
+      final jaoTx = JaoTransaction(
+          transaction: tx, compiler: compiler, registrations: _registrations);
+      return fn(jaoTx);
+    });
   }
 
   ModelExecutor<T>? executor<T>() {

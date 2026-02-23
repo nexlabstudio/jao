@@ -117,6 +117,37 @@ await executor.transaction((tx) async {
 TransactionExecutor does not support streaming, raw queries, or aggregates. Use these operations outside transactions or use the low-level pool API.
 </Warning>
 
+### Multi-Model Transactions
+
+The single-model `executor.transaction()` only covers one model type. To atomically operate across **multiple models**, use `Jao.instance.transaction()`:
+
+```dart
+await Jao.instance.transaction((tx) async {
+  final user = await tx.on<User>().create({
+    'name': 'Alice',
+    'email': 'alice@example.com',
+  });
+
+  final order = await tx.on<Order>().create({
+    'userId': user.id,
+    'total': 99.99,
+  });
+
+  await tx.on<Payment>().create({
+    'orderId': order.id,
+    'status': 'pending',
+  });
+}); // all three commit together, or all roll back
+```
+
+All `tx.on<T>()` calls within the block share the same underlying database connection and transaction. If any operation throws, every change made in the block is rolled back atomically.
+
+`tx.on<T>()` returns a `TransactionExecutor<T>` that supports the same operations as single-model transactions (`create`, `bulkCreate`, `query`, `update`, `delete`).
+
+<Info>
+`Jao.instance.transaction()` is the recommended approach whenever you need to write to more than one table atomically. The single-model `executor.transaction()` remains available and is unchanged.
+</Info>
+
 ## Connection Pool
 
 JAO manages database connections via a connection pool.
