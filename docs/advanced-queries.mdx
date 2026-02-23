@@ -148,6 +148,34 @@ All `tx.on<T>()` calls within the block share the same underlying database conne
 `Jao.instance.transaction()` is the recommended approach whenever you need to write to more than one table atomically. The single-model `executor.transaction()` remains available and is unchanged.
 </Info>
 
+### Savepoints
+
+Use `tx.savepoint()` when a sub-operation might fail but you do not want to abort the entire transaction. If the block throws, only the work inside it is rolled back — the outer transaction remains alive.
+
+```dart
+await Jao.instance.transaction((tx) async {
+  final user = await tx.on<User>().create({'name': 'Alice'});
+
+  try {
+    await tx.savepoint((tx) async {
+      // negative total may violate a CHECK constraint
+      await tx.on<Order>().create({'userId': user.id, 'total': -1});
+    });
+  } catch (e) {
+    // order was rolled back, but Alice's creation is still alive
+  }
+
+  await tx.on<Payment>().create({'status': 'pending'});
+  // commits with Alice and the payment — order was never created
+});
+```
+
+Without `try/catch`, an exception inside `savepoint()` propagates and rolls back the entire outer transaction as well. Savepoints only protect the outer transaction when the exception is caught.
+
+<Warning>
+Do not use `Future.wait` inside a transaction or savepoint. All operations share a single database connection — concurrent writes on the same connection produce undefined behaviour.
+</Warning>
+
 ## Connection Pool
 
 JAO manages database connections via a connection pool.

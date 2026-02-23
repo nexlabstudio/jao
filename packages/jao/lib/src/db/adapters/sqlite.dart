@@ -332,6 +332,21 @@ class SqliteTransaction implements Transaction, DatabaseConnection {
     _isActive = false;
   }
 
+  @override
+  Future<void> savepoint(String name) async {
+    _db.execute('SAVEPOINT $name');
+  }
+
+  @override
+  Future<void> rollbackToSavepoint(String name) async {
+    _db.execute('ROLLBACK TO SAVEPOINT $name');
+  }
+
+  @override
+  Future<void> releaseSavepoint(String name) async {
+    _db.execute('RELEASE SAVEPOINT $name');
+  }
+
   String _convertPlaceholders(String sql) {
     var result = sql;
     result = result.replaceAllMapped(RegExp(r'\$(\d+)'), (match) => '?');

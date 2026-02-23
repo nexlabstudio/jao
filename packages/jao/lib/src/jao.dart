@@ -30,6 +30,7 @@ class JaoTransaction {
   final Transaction _transaction;
   final SqlCompiler _compiler;
   final Map<Type, ModelRegistration> _registrations;
+  int _savepointCounter = 0;
 
   JaoTransaction({
     required Transaction transaction,
@@ -50,6 +51,28 @@ class JaoTransaction {
       fromRow: reg.fromRow,
       toRow: reg.toRow,
     );
+  }
+
+  /// Runs [fn] inside a savepoint.
+  ///
+  /// If [fn] throws, only the work done inside this block is rolled back —
+  /// the outer transaction remains alive. Use this when a sub-operation
+  /// might fail but you do not want to abort the entire transaction.
+  ///
+  /// An optional [name] can be provided for easier identification in database
+  /// logs (e.g. `name: 'create_order'`). If omitted, an auto-generated name
+  /// is used.
+  Future<R> savepoint<R>(Future<R> Function(JaoTransaction tx) fn, {String? name}) async {
+    final spName = name ?? 'sp_${_savepointCounter++}';
+    await _transaction.savepoint(spName);
+    try {
+      final result = await fn(this);
+      await _transaction.releaseSavepoint(spName);
+      return result;
+    } catch (e) {
+      await _transaction.rollbackToSavepoint(spName);
+      rethrow;
+    }
   }
 }
 
