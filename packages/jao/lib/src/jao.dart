@@ -58,8 +58,7 @@ class Jao {
 
   static Jao get instance => switch (_instance) {
         final i? => i,
-        null =>
-          throw StateError('Jao not initialized. Call Jao.configure() first.'),
+        null => throw StateError('Jao not initialized. Call Jao.configure() first.'),
       };
 
   static bool get isInitialized => _instance != null;
@@ -71,9 +70,7 @@ class Jao {
 
   Jao._({required this.pool, required this.compiler});
 
-  static Future<Jao> configure(
-      {required DatabaseAdapter adapter,
-      required DatabaseConfig config}) async {
+  static Future<Jao> configure({required DatabaseAdapter adapter, required DatabaseConfig config}) async {
     if (_instance case final existing?) return existing;
     final pool = await adapter.createPool(config);
     final instance = Jao._(pool: pool, compiler: SqlCompiler(adapter.dialect));
@@ -92,8 +89,7 @@ class Jao {
 
   Future<R> transaction<R>(Future<R> Function(JaoTransaction tx) fn) {
     return pool.withTransaction((tx) async {
-      final jaoTx = JaoTransaction(
-          transaction: tx, compiler: compiler, registrations: _registrations);
+      final jaoTx = JaoTransaction(transaction: tx, compiler: compiler, registrations: _registrations);
       return fn(jaoTx);
     });
   }
