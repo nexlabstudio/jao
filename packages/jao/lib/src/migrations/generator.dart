@@ -140,6 +140,11 @@ class SchemaGenerator {
       return;
     }
 
+    if (field.primaryKey && field.dbType == FieldType.uuid) {
+      builder.uuid(field.columnName);
+      return;
+    }
+
     switch (field.dbType) {
       case FieldType.varchar:
         builder.string(
@@ -156,19 +161,22 @@ class SchemaGenerator {
       case FieldType.integer:
       case FieldType.smallInt:
       case FieldType.bigInt:
-        if (field.foreignKey != null) {
+        if (field.foreignKey case final fk?) {
           builder.foreignKey(
             field.columnName,
-            field.foreignKey!.referencedTable,
-            referencedColumn: field.foreignKey!.referencedColumn,
-            onDelete: field.foreignKey!.onDelete,
+            fk.referencedTable,
+            referencedColumn: fk.referencedColumn,
+            onDelete: fk.onDelete,
             nullable: field.nullable,
           );
         } else {
           builder.integer(
             field.columnName,
             nullable: field.nullable,
-            defaultValue: field.defaultValue != null ? int.tryParse(field.defaultValue!) : null,
+            defaultValue: switch (field.defaultValue) {
+              final value? => int.tryParse(value),
+              _ => null,
+            },
           );
         }
 
@@ -176,13 +184,19 @@ class SchemaGenerator {
         builder.float(
           field.columnName,
           nullable: field.nullable,
-          defaultValue: field.defaultValue != null ? double.tryParse(field.defaultValue!) : null,
+          defaultValue: switch (field.defaultValue) {
+            final value? => double.tryParse(value),
+            _ => null,
+          },
         );
       case FieldType.doublePrecision:
         builder.doublePrecision(
           field.columnName,
           nullable: field.nullable,
-          defaultValue: field.defaultValue != null ? double.tryParse(field.defaultValue!) : null,
+          defaultValue: switch (field.defaultValue) {
+            final value? => double.tryParse(value),
+            _ => null,
+          },
         );
 
       case FieldType.decimal:
@@ -198,7 +212,10 @@ class SchemaGenerator {
         builder.boolean(
           field.columnName,
           nullable: field.nullable,
-          defaultValue: field.defaultValue != null ? field.defaultValue!.toLowerCase() == 'true' : null,
+          defaultValue: switch (field.defaultValue) {
+            final value? => value.toLowerCase() == 'true',
+            _ => null,
+          },
         );
 
       case FieldType.date:
@@ -224,7 +241,6 @@ class SchemaGenerator {
         builder.binary(field.columnName, nullable: field.nullable);
 
       default:
-        // Fallback to text
         builder.text(field.columnName, nullable: field.nullable);
     }
   }

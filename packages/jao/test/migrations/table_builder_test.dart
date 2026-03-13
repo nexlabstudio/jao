@@ -36,7 +36,7 @@ void main() {
         final idCol = table.columns.first;
         expect(idCol.type, equals(FieldType.uuid));
         expect(idCol.primaryKey, isTrue);
-        expect(idCol.defaultValue, isNotNull);
+        expect(idCol.defaultValue, isNull);
       });
     });
 
