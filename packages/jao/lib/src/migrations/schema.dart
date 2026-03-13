@@ -23,7 +23,7 @@ class TableBuilder {
     return this;
   }
 
-  // === Primary Key Columns ===
+  // Primary Key Columns
 
   /// Auto-incrementing integer primary key
   TableBuilder id([String name = 'id']) {
@@ -39,7 +39,7 @@ class TableBuilder {
     return this;
   }
 
-  /// UUID primary key
+  /// UUID primary key (UUID is generated in Dart by the executor)
   TableBuilder uuid([String name = 'id']) {
     _columns.add(
       ColumnDefinition(
@@ -47,14 +47,13 @@ class TableBuilder {
         type: FieldType.uuid,
         nullable: false,
         primaryKey: true,
-        defaultValue: 'gen_random_uuid()', // PostgreSQL
       ),
     );
     _primaryKey = name;
     return this;
   }
 
-  // === String Columns ===
+  // String Columns
 
   /// VARCHAR column
   TableBuilder string(String name, {int length = 255, bool nullable = false, String? defaultValue}) {
@@ -90,7 +89,7 @@ class TableBuilder {
     return this;
   }
 
-  // === Numeric Columns ===
+  // Numeric Columns
 
   /// INTEGER column
   TableBuilder integer(String name, {bool nullable = false, int? defaultValue}) {
@@ -157,7 +156,7 @@ class TableBuilder {
     return this;
   }
 
-  // === Boolean ===
+  // Boolean
 
   /// BOOLEAN column
   TableBuilder boolean(String name, {bool nullable = false, bool? defaultValue}) {
@@ -167,7 +166,7 @@ class TableBuilder {
     return this;
   }
 
-  // === Date/Time Columns ===
+  // Date/Time Columns
 
   /// DATE column
   TableBuilder date(String name, {bool nullable = false, String? defaultValue}) {
@@ -224,7 +223,7 @@ class TableBuilder {
     return this;
   }
 
-  // === Special Types ===
+  // Special Types
 
   /// BYTEA/BLOB column
   TableBuilder binary(String name, {bool nullable = false}) {
@@ -250,7 +249,7 @@ class TableBuilder {
     return this;
   }
 
-  // === Enum ===
+  // Enum
 
   /// Enum column (stored as string)
   TableBuilder enumString(String name, List<String> values, {bool nullable = false, String? defaultValue}) {
@@ -268,7 +267,7 @@ class TableBuilder {
     return this;
   }
 
-  // === Foreign Keys ===
+  // Foreign Keys
 
   /// Foreign key reference to another table
   TableBuilder foreignKey(
@@ -320,7 +319,7 @@ class TableBuilder {
     return this;
   }
 
-  // === Indexes ===
+  // Indexes
 
   /// Create an index on one or more columns
   TableBuilder index(List<String> columns, {String? name, bool unique = false}) {
@@ -340,7 +339,7 @@ class TableBuilder {
     return index([column], unique: true);
   }
 
-  // === Soft Delete ===
+  // Soft Delete
 
   /// Add soft delete columns (is_deleted, deleted_at)
   TableBuilder softDeletes() {
@@ -349,7 +348,7 @@ class TableBuilder {
     return this;
   }
 
-  // === Build ===
+  // Build
 
   /// Build the table definition
   TableDefinition build() {
@@ -444,7 +443,7 @@ class TableDefinition {
   });
 }
 
-// === Column Modification Builder ===
+// Column Modification Builder
 
 /// Builder for modifying an existing column.
 class ColumnModifier {

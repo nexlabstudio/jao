@@ -269,6 +269,49 @@ void main() {
         expect(createTable.table.columns.length, equals(12));
       });
 
+      test('generates CreateTable with UuidPrimaryKey', () {
+        const schema = ModelSchema(
+          className: 'Merchant',
+          tableName: 'merchants',
+          fields: [
+            ModelFieldSchema(
+              name: 'id',
+              columnName: 'id',
+              dbType: FieldType.uuid,
+              primaryKey: true,
+            ),
+            ModelFieldSchema(name: 'name', columnName: 'name', dbType: FieldType.varchar, maxLength: 100),
+            ModelFieldSchema(
+                name: 'email', columnName: 'email', dbType: FieldType.varchar, maxLength: 254, unique: true),
+            ModelFieldSchema(
+              name: 'createdAt',
+              columnName: 'created_at',
+              dbType: FieldType.timestampTz,
+              defaultValue: 'CURRENT_TIMESTAMP',
+            ),
+          ],
+        );
+
+        final operations = generator.generateCreateTable(schema);
+
+        expect(operations.length, equals(1));
+        final createTable = operations[0] as CreateTable;
+        final table = createTable.table;
+
+        // The id column should exist
+        final idColumn = table.columns.where((c) => c.name == 'id').firstOrNull;
+        expect(idColumn, isNotNull, reason: 'UUID primary key column should be created');
+
+        // The id column should be a UUID type
+        expect(idColumn!.type, equals(FieldType.uuid));
+
+        // The id column should be marked as primary key
+        expect(idColumn.primaryKey, isTrue, reason: 'UUID column should be marked as primary key');
+
+        // The table should have the id as its primary key
+        expect(table.primaryKey, equals('id'), reason: 'Table primary key should be set to id');
+      });
+
       test('generates CreateTable with bigId primary key', () {
         const schema = ModelSchema(
           className: 'BigModel',
