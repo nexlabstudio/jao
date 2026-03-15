@@ -2122,14 +2122,13 @@ void main() {
       expect(code, contains("table.integer('total'"));
     });
 
-    test('generates comment for unsupported column type', () {
+    test('generates binary column for bytea type', () {
       final operations = [
         CreateTable(
           TableDefinition(
             name: 'misc',
             columns: [
               const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
-              // Use a type that doesn't have explicit handling in _columnToCode
               const ColumnDefinition(name: 'data', type: FieldType.bytea),
             ],
           ),
@@ -2138,8 +2137,394 @@ void main() {
 
       final code = generator.generateMigrationFile('CreateMiscTable', operations);
 
-      // Should contain a comment for unhandled type
-      expect(code, contains('// data: FieldType.bytea'));
+      expect(code, contains("table.binary('data'"));
+    });
+
+    test('generates code for serial primary key column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.id('id')"));
+    });
+
+    test('generates code for bigSerial primary key column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.bigSerial, primaryKey: true),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.bigId('id')"));
+    });
+
+    test('generates code for varchar column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'name', type: FieldType.varchar, length: 100, nullable: false),
+              const ColumnDefinition(name: 'title', type: FieldType.varchar, nullable: true),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.string('name', length: 100)"));
+      expect(code, contains("table.string('title', length: 255, nullable: true)"));
+    });
+
+    test('generates code for char column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'code', type: FieldType.char, length: 3, nullable: false),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.char('code', length: 3)"));
+    });
+
+    test('generates code for text column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'bio', type: FieldType.text, nullable: true),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.text('bio', nullable: true)"));
+    });
+
+    test('generates code for smallInt column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'priority', type: FieldType.smallInt, nullable: false),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.smallInteger('priority')"));
+    });
+
+    test('generates code for bigInt column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'big_count', type: FieldType.bigInt, nullable: true),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.bigInteger('big_count', nullable: true)"));
+    });
+
+    test('generates code for real/float column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'score', type: FieldType.real, nullable: false),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.float('score')"));
+    });
+
+    test('generates code for doublePrecision column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'latitude', type: FieldType.doublePrecision, nullable: false),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.doublePrecision('latitude')"));
+    });
+
+    test('generates code for decimal column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'price', type: FieldType.decimal, precision: 8, scale: 2, nullable: false),
+              const ColumnDefinition(name: 'rate', type: FieldType.decimal, nullable: false),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.decimal('price', precision: 8, scale: 2)"));
+      expect(code, contains("table.decimal('rate', precision: 10, scale: 2)"));
+    });
+
+    test('generates code for date column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'birth_date', type: FieldType.date, nullable: false),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.date('birth_date')"));
+    });
+
+    test('generates code for time column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'start_time', type: FieldType.time, nullable: false),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.time('start_time')"));
+    });
+
+    test('generates code for timestamp column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'logged_at', type: FieldType.timestamp, nullable: false),
+              const ColumnDefinition(
+                  name: 'created_at', type: FieldType.timestamp, nullable: false, defaultValue: 'CURRENT_TIMESTAMP'),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.timestamp('logged_at')"));
+      expect(code, contains("table.timestamp('created_at'"));
+      expect(code, contains('useCurrent: true'));
+    });
+
+    test('generates code for timestampTz column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'updated_at', type: FieldType.timestampTz, nullable: false),
+              const ColumnDefinition(
+                  name: 'created_at', type: FieldType.timestampTz, nullable: false, defaultValue: 'CURRENT_TIMESTAMP'),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.timestampTz('updated_at')"));
+      expect(code, contains("table.timestampTz('created_at'"));
+      expect(code, contains('useCurrent: true'));
+    });
+
+    test('generates code for uuid primary key column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.uuid, primaryKey: true),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.uuid('id')"));
+    });
+
+    test('generates code for uuid non-primary-key column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'external_id', type: FieldType.uuid, nullable: true),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.uuidColumn('external_id', nullable: true)"));
+    });
+
+    test('generates code for json column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'metadata', type: FieldType.json, nullable: true),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.json('metadata', nullable: true)"));
+    });
+
+    test('generates code for jsonb column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'data', type: FieldType.jsonb, nullable: true),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.jsonb('data', nullable: true)"));
+    });
+
+    test('generates code for blob column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'content', type: FieldType.blob, nullable: false),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.binary('content')"));
+    });
+
+    test('generates code for interval column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'duration', type: FieldType.interval, nullable: false),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.text('duration')"));
+    });
+
+    test('generates code for array column', () {
+      final operations = [
+        CreateTable(
+          TableDefinition(
+            name: 'items',
+            columns: [
+              const ColumnDefinition(name: 'id', type: FieldType.serial, primaryKey: true),
+              const ColumnDefinition(name: 'tags', type: FieldType.array, nullable: false),
+            ],
+          ),
+        ),
+      ];
+
+      final code = generator.generateMigrationFile('CreateItemsTable', operations);
+
+      expect(code, contains("table.text('tags')"));
     });
   });
 }
