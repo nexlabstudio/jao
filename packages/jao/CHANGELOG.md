@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+## [0.3.1] - 2026-03-15
+
+### Fixed
+
+- UUID primary key columns not being created in migrations ([#33](https://github.com/nexlabstudio/jao/issues/33))
+  - `@UuidPrimaryKey()` fields were skipped by `_addFieldToBuilder` because they have `primaryKey: true` but `autoIncrement: false`
+  - Added explicit handling for UUID PKs via `builder.uuid()`
+- Migration code generator (`_columnToCode`) now explicitly handles all `FieldType` variants instead of falling through to a default comment
+  - Previously unhandled types (uuid, char, smallInt, bigInt, real, doublePrecision, decimal, date, time, timestamp, json, jsonb, bytea, blob, interval, array) were silently output as comments
+
 ## [0.3.0] - 2026-02-23
 
 ### Added
