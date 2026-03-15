@@ -492,17 +492,52 @@ class SchemaGenerator {
         return "${indent}table.bigId('${col.name}');";
       case FieldType.varchar:
         return "${indent}table.string('${col.name}', length: ${col.length ?? 255}$nullable$defaultVal);";
+      case FieldType.char:
+        return "${indent}table.char('${col.name}', length: ${col.length ?? 1}$nullable$defaultVal);";
       case FieldType.text:
         return "${indent}table.text('${col.name}'$nullable$defaultVal);";
+      case FieldType.smallInt:
+        return "${indent}table.smallInteger('${col.name}'$nullable$defaultVal);";
       case FieldType.integer:
         return "${indent}table.integer('${col.name}'$nullable$defaultVal);";
+      case FieldType.bigInt:
+        return "${indent}table.bigInteger('${col.name}'$nullable$defaultVal);";
+      case FieldType.real:
+        return "${indent}table.float('${col.name}'$nullable$defaultVal);";
+      case FieldType.doublePrecision:
+        return "${indent}table.doublePrecision('${col.name}'$nullable$defaultVal);";
+      case FieldType.decimal:
+        final precision = col.precision ?? 10;
+        final scale = col.scale ?? 2;
+        return "${indent}table.decimal('${col.name}', precision: $precision, scale: $scale$nullable$defaultVal);";
       case FieldType.boolean:
         return "${indent}table.boolean('${col.name}'$nullable$defaultVal);";
+      case FieldType.date:
+        return "${indent}table.date('${col.name}'$nullable$defaultVal);";
+      case FieldType.time:
+        return "${indent}table.time('${col.name}'$nullable$defaultVal);";
+      case FieldType.timestamp:
+        final useCurrent = col.defaultValue == 'CURRENT_TIMESTAMP' ? ', useCurrent: true' : '';
+        return "${indent}table.timestamp('${col.name}'$nullable$useCurrent);";
       case FieldType.timestampTz:
         final useCurrent = col.defaultValue == 'CURRENT_TIMESTAMP' ? ', useCurrent: true' : '';
         return "${indent}table.timestampTz('${col.name}'$nullable$useCurrent);";
-      default:
-        return "$indent// ${col.name}: ${col.type}";
+      case FieldType.interval:
+        return "${indent}table.text('${col.name}'$nullable$defaultVal);";
+      case FieldType.uuid:
+        if (col.primaryKey) {
+          return "${indent}table.uuid('${col.name}');";
+        }
+        return "${indent}table.uuidColumn('${col.name}'$nullable$defaultVal);";
+      case FieldType.json:
+        return "${indent}table.json('${col.name}'$nullable$defaultVal);";
+      case FieldType.jsonb:
+        return "${indent}table.jsonb('${col.name}'$nullable$defaultVal);";
+      case FieldType.bytea:
+      case FieldType.blob:
+        return "${indent}table.binary('${col.name}'$nullable);";
+      case FieldType.array:
+        return "${indent}table.text('${col.name}'$nullable$defaultVal);";
     }
   }
 

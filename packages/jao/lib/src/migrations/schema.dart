@@ -207,14 +207,10 @@ class TableBuilder {
   }
 
   /// Add created_at timestamp
-  TableBuilder createdAt() {
-    return timestampTz('created_at', useCurrent: true);
-  }
+  TableBuilder createdAt() => timestampTz('created_at', useCurrent: true);
 
   /// Add updated_at timestamp
-  TableBuilder updatedAt() {
-    return timestampTz('updated_at', useCurrent: true);
-  }
+  TableBuilder updatedAt() => timestampTz('updated_at', useCurrent: true);
 
   /// Add both created_at and updated_at
   TableBuilder timestamps() {
