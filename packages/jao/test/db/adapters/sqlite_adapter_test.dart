@@ -964,6 +964,148 @@ void main() {
     });
   });
 
+  group('generateTableRecreationSql addForeignKey', () {
+    test('adds new foreign key constraint to recreated table', () {
+      final schema = TableSchema(
+        name: 'posts',
+        columns: [
+          const ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          const ColumnSchema(name: 'title', type: 'TEXT', nullable: false),
+          const ColumnSchema(name: 'author_id', type: 'INTEGER', nullable: false),
+        ],
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'posts',
+        currentSchema: schema,
+        columnName: 'author_id',
+        addForeignKey: const ForeignKeyDefinition(
+          column: 'author_id',
+          referencedTable: 'users',
+          referencedColumn: 'id',
+          onDelete: OnDeleteAction.cascade,
+        ),
+      );
+
+      expect(statements.length, equals(4));
+      expect(statements[0], contains('RENAME TO'));
+      final createTable = statements[1];
+      expect(createTable, contains('FOREIGN KEY ("author_id") REFERENCES "users"("id") ON DELETE CASCADE'));
+      expect(statements[2], contains('INSERT INTO'));
+      expect(statements[3], contains('DROP TABLE'));
+    });
+
+    test('preserves existing foreign keys when adding a new one', () {
+      final schema = TableSchema(
+        name: 'comments',
+        columns: [
+          const ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          const ColumnSchema(name: 'post_id', type: 'INTEGER', nullable: false),
+          const ColumnSchema(name: 'user_id', type: 'INTEGER', nullable: false),
+        ],
+        constraints: [
+          const ConstraintSchema(
+            name: 'fk_comments_post_id',
+            type: ConstraintType.foreignKey,
+            columns: ['post_id'],
+            referencedTable: 'posts',
+            referencedColumns: ['id'],
+            onDelete: 'CASCADE',
+          ),
+        ],
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'comments',
+        currentSchema: schema,
+        columnName: 'user_id',
+        addForeignKey: const ForeignKeyDefinition(
+          column: 'user_id',
+          referencedTable: 'users',
+          referencedColumn: 'id',
+          onDelete: OnDeleteAction.cascade,
+        ),
+      );
+
+      final createTable = statements[1];
+      expect(createTable, contains('FOREIGN KEY ("post_id") REFERENCES "posts"("id") ON DELETE CASCADE'));
+      expect(createTable, contains('FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE'));
+    });
+  });
+
+  group('generateTableRecreationSql dropConstraintName', () {
+    test('excludes named constraint from recreated table', () {
+      final schema = TableSchema(
+        name: 'posts',
+        columns: [
+          const ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          const ColumnSchema(name: 'title', type: 'TEXT', nullable: false),
+          const ColumnSchema(name: 'author_id', type: 'INTEGER', nullable: false),
+        ],
+        constraints: [
+          const ConstraintSchema(
+            name: 'fk_posts_author_id',
+            type: ConstraintType.foreignKey,
+            columns: ['author_id'],
+            referencedTable: 'users',
+            referencedColumns: ['id'],
+            onDelete: 'CASCADE',
+          ),
+        ],
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'posts',
+        currentSchema: schema,
+        columnName: 'author_id',
+        dropConstraintName: 'fk_posts_author_id',
+      );
+
+      final createTable = statements[1];
+      expect(createTable, isNot(contains('FOREIGN KEY')));
+    });
+
+    test('preserves other foreign keys when dropping one', () {
+      final schema = TableSchema(
+        name: 'comments',
+        columns: [
+          const ColumnSchema(name: 'id', type: 'INTEGER', nullable: false, isPrimaryKey: true),
+          const ColumnSchema(name: 'post_id', type: 'INTEGER', nullable: false),
+          const ColumnSchema(name: 'user_id', type: 'INTEGER', nullable: false),
+        ],
+        constraints: [
+          const ConstraintSchema(
+            name: 'fk_comments_post_id',
+            type: ConstraintType.foreignKey,
+            columns: ['post_id'],
+            referencedTable: 'posts',
+            referencedColumns: ['id'],
+            onDelete: 'CASCADE',
+          ),
+          const ConstraintSchema(
+            name: 'fk_comments_user_id',
+            type: ConstraintType.foreignKey,
+            columns: ['user_id'],
+            referencedTable: 'users',
+            referencedColumns: ['id'],
+            onDelete: 'CASCADE',
+          ),
+        ],
+      );
+
+      final statements = generateTableRecreationSql(
+        tableName: 'comments',
+        currentSchema: schema,
+        columnName: 'post_id',
+        dropConstraintName: 'fk_comments_post_id',
+      );
+
+      final createTable = statements[1];
+      expect(createTable, isNot(contains('FOREIGN KEY ("post_id")')));
+      expect(createTable, contains('FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE'));
+    });
+  });
+
   group('File-based SQLite database operations', () {
     const adapter = SqliteAdapter();
     late String testDbPath;
