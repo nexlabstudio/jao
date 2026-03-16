@@ -17,7 +17,7 @@ dart pub global activate jao_cli
 
 ```yaml
 dev_dependencies:
-  jao_cli: ^0.2.0
+  jao_cli: ^0.3.0
 ```
 
 ## Quick Start

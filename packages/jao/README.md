@@ -18,11 +18,11 @@
 
 ```yaml
 dependencies:
-  jao: ^0.2.0
+  jao: ^0.3.0
 
 dev_dependencies:
   build_runner: ^2.4.0
-  jao_generator: ^0.2.0
+  jao_generator: ^0.3.0
 ```
 
 ## Quick Start

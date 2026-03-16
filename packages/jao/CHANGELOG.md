@@ -1,5 +1,16 @@
 ## [Unreleased]
 
+## [0.3.2] - 2026-03-16
+
+### Fixed
+
+- Migration diff now detects changes to existing columns beyond just nullability and type:
+  - Default value added, changed, or removed — generates `SET DEFAULT` or `DROP DEFAULT`
+  - Column length (`maxLength`) changes for varchar/char columns
+  - Decimal `precision`/`scale` changes (when the database reports them)
+  - Missing unique constraints — generates `CREATE UNIQUE INDEX`
+  - Missing foreign key constraints — generates `ADD CONSTRAINT ... FOREIGN KEY`
+
 ## [0.3.1] - 2026-03-15
 
 ### Fixed
