@@ -51,6 +51,11 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
             relation: fieldAnnotation.relation,
             isEnum: fieldAnnotation.isEnum,
             storeEnumAsInt: fieldAnnotation.storeEnumAsInt,
+            maxLength: fieldAnnotation.maxLength,
+            unique: fieldAnnotation.unique,
+            precision: fieldAnnotation.precision,
+            scale: fieldAnnotation.scale,
+            onDelete: fieldAnnotation.onDelete,
           ),
         );
       } else {
@@ -95,32 +100,36 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
       final typeName = type.getDisplayString();
       final baseTypeName = typeName.contains('<') ? typeName.substring(0, typeName.indexOf('<')) : typeName;
       final defaultValue = _extractDefaultValue(value.getField('defaultValue'));
+      final unique = value.getField('unique')?.toBoolValue() ?? false;
 
       switch (baseTypeName) {
         case 'CharField':
+          final maxLength = value.getField('maxLength')?.toIntValue();
           return _FieldAnnotationInfo('String', 'StringFieldRef', 'varchar', annotation.toSource(),
-              defaultValue: defaultValue);
+              defaultValue: defaultValue, unique: unique, maxLength: maxLength);
         case 'TextField':
           return _FieldAnnotationInfo('String', 'StringFieldRef', 'text', annotation.toSource(),
-              defaultValue: defaultValue);
+              defaultValue: defaultValue, unique: unique);
         case 'EmailField':
+          final maxLength = value.getField('maxLength')?.toIntValue();
           return _FieldAnnotationInfo('String', 'StringFieldRef', 'varchar', annotation.toSource(),
-              defaultValue: defaultValue);
+              defaultValue: defaultValue, unique: unique, maxLength: maxLength);
         case 'UrlField':
+          final maxLength = value.getField('maxLength')?.toIntValue();
           return _FieldAnnotationInfo('String', 'StringFieldRef', 'varchar', annotation.toSource(),
-              defaultValue: defaultValue);
+              defaultValue: defaultValue, unique: unique, maxLength: maxLength);
         case 'IntegerField':
           return _FieldAnnotationInfo('int', 'IntFieldRef', 'integer', annotation.toSource(),
-              defaultValue: defaultValue);
+              defaultValue: defaultValue, unique: unique);
         case 'SmallIntegerField':
           return _FieldAnnotationInfo('int', 'IntFieldRef', 'smallInt', annotation.toSource(),
-              defaultValue: defaultValue);
+              defaultValue: defaultValue, unique: unique);
         case 'BigIntegerField':
           return _FieldAnnotationInfo('int', 'IntFieldRef', 'bigInt', annotation.toSource(),
-              defaultValue: defaultValue);
+              defaultValue: defaultValue, unique: unique);
         case 'PositiveIntegerField':
           return _FieldAnnotationInfo('int', 'IntFieldRef', 'integer', annotation.toSource(),
-              defaultValue: defaultValue);
+              defaultValue: defaultValue, unique: unique);
         case 'AutoField':
           return _FieldAnnotationInfo(
             'int',
@@ -141,16 +150,27 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
           );
         case 'FloatField':
           return _FieldAnnotationInfo('double', 'DoubleFieldRef', 'real', annotation.toSource(),
-              defaultValue: defaultValue);
+              defaultValue: defaultValue, unique: unique);
         case 'DecimalField':
+          final maxDigits = value.getField('maxDigits')?.toIntValue();
+          final decimalPlaces = value.getField('decimalPlaces')?.toIntValue();
           return _FieldAnnotationInfo('double', 'DoubleFieldRef', 'decimal', annotation.toSource(),
-              defaultValue: defaultValue);
+              defaultValue: defaultValue, unique: unique, precision: maxDigits, scale: decimalPlaces);
         case 'BooleanField':
           return _FieldAnnotationInfo('bool', 'BoolFieldRef', 'boolean', annotation.toSource(),
               defaultValue: defaultValue);
         case 'DateField':
-          return _FieldAnnotationInfo('DateTime', 'DateTimeFieldRef', 'date', annotation.toSource(),
-              defaultValue: defaultValue);
+          final dateAutoNowAdd = value.getField('autoNowAdd')?.toBoolValue() ?? false;
+          final dateAutoNow = value.getField('autoNow')?.toBoolValue() ?? false;
+          return _FieldAnnotationInfo(
+            'DateTime',
+            'DateTimeFieldRef',
+            'date',
+            annotation.toSource(),
+            autoNowAdd: dateAutoNowAdd,
+            autoNow: dateAutoNow,
+            defaultValue: defaultValue,
+          );
         case 'DateTimeField':
           final autoNowAdd = value.getField('autoNowAdd')?.toBoolValue() ?? false;
           final autoNow = value.getField('autoNow')?.toBoolValue() ?? false;
@@ -187,11 +207,20 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
             _ => _RelationType.foreignKey,
           };
           final (pkType, pkFieldRef, pkDbType) = _resolvePkType(relatedDartType);
+          final onDeleteField = value.getField('onDelete');
+          String? onDeleteValue;
+          if (onDeleteField case final onDeleteField? when !onDeleteField.isNull) {
+            final enumIndex = onDeleteField.getField('index')?.toIntValue();
+            if (enumIndex case final enumIndex? when enumIndex >= 0) {
+              onDeleteValue = const ['cascade', 'restrict', 'setNull', 'setDefault', 'noAction'][enumIndex];
+            }
+          }
           return _FieldAnnotationInfo(
             pkType,
             pkFieldRef,
             pkDbType,
             annotation.toSource(),
+            onDelete: onDeleteValue,
             relation: relatedModel != null && relatedTable != null
                 ? _RelationInfo(
                     relatedModel: relatedModel,
@@ -210,6 +239,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
             annotation.toSource(),
             autoGenerateUuid: autoGenerate,
             defaultValue: defaultValue,
+            unique: unique,
           );
         case 'UuidPrimaryKey':
           return _FieldAnnotationInfo(
@@ -236,6 +266,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
             storeAsInt ? 'integer' : 'varchar',
             annotation.toSource(),
             defaultValue: defaultValue,
+            unique: unique,
             isEnum: true,
             storeEnumAsInt: storeAsInt,
           );
@@ -448,10 +479,27 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
       buffer.writeln('        autoIncrement: ${field.autoIncrement},');
       buffer.writeln('        autoNowAdd: ${field.autoNowAdd},');
       buffer.writeln('        autoNow: ${field.autoNow},');
+      if (field.unique) {
+        buffer.writeln('        unique: true,');
+      }
+      if (field.maxLength case final maxLength?) {
+        buffer.writeln('        maxLength: $maxLength,');
+      }
+      if (field.precision case final precision?) {
+        buffer.writeln('        precision: $precision,');
+      }
+      if (field.scale case final scale?) {
+        buffer.writeln('        scale: $scale,');
+      }
+      if (field.defaultValue case final defaultValue?) {
+        buffer.writeln("        defaultValue: $defaultValue,");
+      }
       if (field.relation case final relation?) {
+        final onDelete = field.onDelete ?? 'cascade';
         buffer.writeln('        foreignKey: ForeignKeyInfo(');
         buffer.writeln("          referencedTable: '${relation.relatedTable}',");
         buffer.writeln("          referencedColumn: '${relation.relatedColumn}',");
+        buffer.writeln('          onDelete: OnDeleteAction.$onDelete,');
         buffer.writeln('        ),');
       }
       buffer.writeln('      ),');
@@ -637,6 +685,11 @@ class _FieldInfo {
   final _RelationInfo? relation;
   final bool isEnum;
   final bool storeEnumAsInt;
+  final int? maxLength;
+  final bool unique;
+  final int? precision;
+  final int? scale;
+  final String? onDelete;
 
   _FieldInfo({
     required this.name,
@@ -654,6 +707,11 @@ class _FieldInfo {
     this.relation,
     this.isEnum = false,
     this.storeEnumAsInt = false,
+    this.maxLength,
+    this.unique = false,
+    this.precision,
+    this.scale,
+    this.onDelete,
   });
 }
 
@@ -687,6 +745,11 @@ class _FieldAnnotationInfo {
   final _RelationInfo? relation;
   final bool isEnum;
   final bool storeEnumAsInt;
+  final int? maxLength;
+  final bool unique;
+  final int? precision;
+  final int? scale;
+  final String? onDelete;
 
   _FieldAnnotationInfo(
     this.type,
@@ -702,5 +765,10 @@ class _FieldAnnotationInfo {
     this.relation,
     this.isEnum = false,
     this.storeEnumAsInt = false,
+    this.maxLength,
+    this.unique = false,
+    this.precision,
+    this.scale,
+    this.onDelete,
   });
 }
