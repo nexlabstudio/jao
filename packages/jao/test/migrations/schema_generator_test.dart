@@ -108,10 +108,10 @@ void main() {
         name: 'isActive',
         columnName: 'is_active',
         dbType: FieldType.boolean,
-        defaultValue: 'true',
+        defaultValue: true,
       );
 
-      expect(field.defaultValue, equals('true'));
+      expect(field.defaultValue, equals(true));
     });
 
     test('stores varchar maxLength', () {
@@ -247,7 +247,7 @@ void main() {
               name: 'isActive',
               columnName: 'is_active',
               dbType: FieldType.boolean,
-              defaultValue: 'true',
+              defaultValue: true,
             ),
             ModelFieldSchema(name: 'birthDate', columnName: 'birth_date', dbType: FieldType.date),
             ModelFieldSchema(
@@ -1189,7 +1189,7 @@ void main() {
                 name: 'status',
                 columnName: 'status',
                 dbType: FieldType.text,
-                defaultValue: "'active'",
+                defaultValue: 'active',
               ),
             ],
           );
@@ -1198,7 +1198,7 @@ void main() {
 
           final alterOps = operations.whereType<AlterColumn>().toList();
           expect(alterOps.isNotEmpty, isTrue, reason: 'Should detect missing default value');
-          expect(alterOps.any((op) => op.modification.defaultValue == "'active'"), isTrue);
+          expect(alterOps.any((op) => op.modification.defaultValue == 'active'), isTrue);
         });
       });
 
@@ -1428,7 +1428,7 @@ void main() {
                 name: 'priority',
                 columnName: 'priority',
                 dbType: FieldType.integer,
-                defaultValue: '5',
+                defaultValue: 5,
               ),
             ],
           );
@@ -1465,7 +1465,7 @@ void main() {
                 name: 'active',
                 columnName: 'active',
                 dbType: FieldType.integer,
-                defaultValue: '0',
+                defaultValue: 0,
               ),
             ],
           );
@@ -1938,7 +1938,7 @@ void main() {
             columnName: 'value',
             dbType: FieldType.doublePrecision,
             nullable: true,
-            defaultValue: '3.14159',
+            defaultValue: 3.14159,
           ),
         ],
       );

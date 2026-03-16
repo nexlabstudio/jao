@@ -37,7 +37,7 @@ class ModelFieldSchema {
   final bool index;
   final bool primaryKey;
   final bool autoIncrement;
-  final String? defaultValue;
+  final Object? defaultValue;
   final int? maxLength;
   final int? precision;
   final int? scale;
@@ -151,12 +151,22 @@ class SchemaGenerator {
           field.columnName,
           length: field.maxLength ?? 255,
           nullable: field.nullable,
-          defaultValue: field.defaultValue,
+          defaultValue: switch (field.defaultValue) {
+            final String v => v,
+            _ => null,
+          },
         );
         if (field.unique) builder.unique(field.columnName);
 
       case FieldType.text:
-        builder.text(field.columnName, nullable: field.nullable, defaultValue: field.defaultValue);
+        builder.text(
+          field.columnName,
+          nullable: field.nullable,
+          defaultValue: switch (field.defaultValue) {
+            final String v => v,
+            _ => null,
+          },
+        );
 
       case FieldType.integer:
       case FieldType.smallInt:
@@ -174,7 +184,7 @@ class SchemaGenerator {
             field.columnName,
             nullable: field.nullable,
             defaultValue: switch (field.defaultValue) {
-              final value? => int.tryParse(value),
+              final int v => v,
               _ => null,
             },
           );
@@ -185,7 +195,7 @@ class SchemaGenerator {
           field.columnName,
           nullable: field.nullable,
           defaultValue: switch (field.defaultValue) {
-            final value? => double.tryParse(value),
+            final double v => v,
             _ => null,
           },
         );
@@ -194,7 +204,7 @@ class SchemaGenerator {
           field.columnName,
           nullable: field.nullable,
           defaultValue: switch (field.defaultValue) {
-            final value? => double.tryParse(value),
+            final double v => v,
             _ => null,
           },
         );
@@ -205,7 +215,10 @@ class SchemaGenerator {
           precision: field.precision ?? 10,
           scale: field.scale ?? 2,
           nullable: field.nullable,
-          defaultValue: field.defaultValue,
+          defaultValue: switch (field.defaultValue) {
+            final String v => v,
+            _ => null,
+          },
         );
 
       case FieldType.boolean:
@@ -213,13 +226,20 @@ class SchemaGenerator {
           field.columnName,
           nullable: field.nullable,
           defaultValue: switch (field.defaultValue) {
-            final value? => value.toLowerCase() == 'true',
+            final bool v => v,
             _ => null,
           },
         );
 
       case FieldType.date:
-        builder.date(field.columnName, nullable: field.nullable, defaultValue: field.defaultValue);
+        builder.date(
+          field.columnName,
+          nullable: field.nullable,
+          defaultValue: switch (field.defaultValue) {
+            final String v => v,
+            _ => null,
+          },
+        );
 
       case FieldType.timestamp:
       case FieldType.timestampTz:
@@ -230,11 +250,25 @@ class SchemaGenerator {
         );
 
       case FieldType.uuid:
-        builder.uuidColumn(field.columnName, nullable: field.nullable, defaultValue: field.defaultValue);
+        builder.uuidColumn(
+          field.columnName,
+          nullable: field.nullable,
+          defaultValue: switch (field.defaultValue) {
+            final String v => v,
+            _ => null,
+          },
+        );
 
       case FieldType.json:
       case FieldType.jsonb:
-        builder.jsonb(field.columnName, nullable: field.nullable, defaultValue: field.defaultValue);
+        builder.jsonb(
+          field.columnName,
+          nullable: field.nullable,
+          defaultValue: switch (field.defaultValue) {
+            final String v => v,
+            _ => null,
+          },
+        );
 
       case FieldType.bytea:
       case FieldType.blob:
@@ -289,7 +323,7 @@ class SchemaGenerator {
               name: field.columnName,
               type: field.dbType,
               nullable: field.nullable,
-              defaultValue: field.defaultValue,
+              defaultValue: field.defaultValue?.toString(),
               length: field.maxLength,
               precision: field.precision,
               scale: field.scale,
@@ -366,7 +400,7 @@ class SchemaGenerator {
                 ColumnModification(
                   table: model.tableName,
                   column: field.columnName,
-                  defaultValue: defaultValue,
+                  defaultValue: defaultValue.toString(),
                 ),
               ),
             );
@@ -734,12 +768,11 @@ class SchemaGenerator {
   ///
   /// Used to avoid false positives when comparing serial vs integer for PKs.
   /// Compare default values, normalizing DB-reported values against model values.
-  bool _defaultValuesDiffer(String? modelDefault, String? dbDefault) {
+  bool _defaultValuesDiffer(Object? modelDefault, String? dbDefault) {
     if (modelDefault == null && dbDefault == null) return false;
     if (modelDefault == null || dbDefault == null) return true;
 
-    // Normalize: DB may wrap strings in quotes, append type casts, etc.
-    final normalizedModel = _normalizeDefaultValue(modelDefault);
+    final normalizedModel = _normalizeDefaultValue(modelDefault.toString());
     final normalizedDb = _normalizeDefaultValue(dbDefault);
     return normalizedModel != normalizedDb;
   }
