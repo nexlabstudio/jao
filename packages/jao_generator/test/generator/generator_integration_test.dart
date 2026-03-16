@@ -754,11 +754,11 @@ class Book {
         outputs: {
           'pkg|lib/models.jao.dart': decodedMatches(
             allOf([
-              // Verify schema includes ForeignKeyInfo for FK fields
+
               contains('foreignKey: ForeignKeyInfo('),
               contains("referencedTable: 'user'"),
               contains("referencedColumn: 'id'"),
-              // Verify nullable is true for nullable FK
+
               contains('nullable: true'),
             ]),
           ),
@@ -844,6 +844,34 @@ class FileData {
       );
     });
 
+    test('Generator emits unique and maxLength for EmailField', () async {
+      await testBuilder(
+        builder,
+        {
+          'jao|lib/jao.dart': _jaoStub,
+          'pkg|lib/user.dart': '''
+import 'package:jao/jao.dart';
+
+@Model()
+class User {
+  @AutoField()
+  late int id;
+  @EmailField(unique: true)
+  late String email;
+}
+''',
+        },
+        outputs: {
+          'pkg|lib/user.jao.dart': decodedMatches(
+            allOf([
+              contains('unique: true'),
+              contains('maxLength: 254'),
+            ]),
+          ),
+        },
+      );
+    });
+
     test('Generator handles fields with defaultValue', () async {
       await testBuilder(
         builder,
@@ -903,13 +931,13 @@ class Task {
         outputs: {
           'pkg|lib/task.jao.dart': decodedMatches(
             allOf([
-              // Field ref should be StringFieldRef for string-based enum
+
               contains("final status = const StringFieldRef('status')"),
-              // fromRow should use values.byName
+
               contains("TaskStatus.values.byName(row['status'] as String)"),
-              // toRow should use .name
+
               contains("'status': model.status.name"),
-              // Schema should use varchar
+
               contains("dbType: FieldType.varchar"),
             ]),
           ),
@@ -939,13 +967,13 @@ class Issue {
         outputs: {
           'pkg|lib/priority.jao.dart': decodedMatches(
             allOf([
-              // Field ref should be IntFieldRef for int-based enum
+
               contains("final priority = const IntFieldRef('priority')"),
-              // fromRow should use values[index]
+
               contains("Priority.values[row['priority'] as int]"),
-              // toRow should use .index
+
               contains("'priority': model.priority.index"),
-              // Schema should use integer
+
               contains("dbType: FieldType.integer"),
             ]),
           ),
@@ -974,12 +1002,12 @@ class Order {
         outputs: {
           'pkg|lib/order.jao.dart': decodedMatches(
             allOf([
-              // fromRow should handle null - check key parts
+
               contains("row['shipping_method'] != null"),
               contains("ShippingMethod.values.byName(row['shipping_method'] as String)"),
-              // toRow should use ?.name
+
               contains("model.shippingMethod?.name"),
-              // Schema should mark nullable
+
               contains("nullable: true"),
             ]),
           ),
@@ -1008,12 +1036,12 @@ class Ticket {
         outputs: {
           'pkg|lib/ticket.jao.dart': decodedMatches(
             allOf([
-              // fromRow should handle null - check key parts
+
               contains("row['severity'] != null"),
               contains("Severity.values[row['severity'] as int]"),
-              // toRow should use ?.index
+
               contains("model.severity?.index"),
-              // Schema should mark nullable
+
               contains("nullable: true"),
             ]),
           ),
@@ -1041,17 +1069,17 @@ class BigAutoField {
 
 class CharField {
   final int maxLength;
+  final bool unique;
   final Object? defaultValue;
-  const CharField({this.maxLength = 255, this.defaultValue});
+  const CharField({this.maxLength = 255, this.unique = false, this.defaultValue});
 }
 
 class TextField {
   const TextField();
 }
 
-class EmailField {
-  final int maxLength;
-  const EmailField({this.maxLength = 254});
+class EmailField extends CharField {
+  const EmailField({super.maxLength = 254, super.unique});
 }
 
 class UrlField {

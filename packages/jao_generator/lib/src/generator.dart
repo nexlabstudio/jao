@@ -1,3 +1,4 @@
+import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
@@ -69,6 +70,21 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     return fields;
   }
 
+  /// Get a field value from a DartObject, traversing the superclass chain.
+  /// `DartObject.getField()` only returns directly declared fields,
+  /// so for inherited fields (e.g., `unique` on `EmailField` which inherits from `Field`)
+  /// we need to walk up via the `(super)` synthetic field.
+  DartObject? _getInheritedField(DartObject? obj, String fieldName) {
+    if (obj == null || obj.isNull) return null;
+    final direct = obj.getField(fieldName);
+    if (direct case final direct? when !direct.isNull) return direct;
+    final superObj = obj.getField('(super)');
+    if (superObj case final superObj? when !superObj.isNull) {
+      return _getInheritedField(superObj, fieldName);
+    }
+    return null;
+  }
+
   String? _extractDefaultValue(dynamic dartObject) {
     if (dartObject == null || dartObject.isNull) return null;
 
@@ -99,23 +115,23 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
 
       final typeName = type.getDisplayString();
       final baseTypeName = typeName.contains('<') ? typeName.substring(0, typeName.indexOf('<')) : typeName;
-      final defaultValue = _extractDefaultValue(value.getField('defaultValue'));
-      final unique = value.getField('unique')?.toBoolValue() ?? false;
+      final defaultValue = _extractDefaultValue(_getInheritedField(value, 'defaultValue'));
+      final unique = _getInheritedField(value, 'unique')?.toBoolValue() ?? false;
 
       switch (baseTypeName) {
         case 'CharField':
-          final maxLength = value.getField('maxLength')?.toIntValue();
+          final maxLength = _getInheritedField(value, 'maxLength')?.toIntValue();
           return _FieldAnnotationInfo('String', 'StringFieldRef', 'varchar', annotation.toSource(),
               defaultValue: defaultValue, unique: unique, maxLength: maxLength);
         case 'TextField':
           return _FieldAnnotationInfo('String', 'StringFieldRef', 'text', annotation.toSource(),
               defaultValue: defaultValue, unique: unique);
         case 'EmailField':
-          final maxLength = value.getField('maxLength')?.toIntValue();
+          final maxLength = _getInheritedField(value, 'maxLength')?.toIntValue();
           return _FieldAnnotationInfo('String', 'StringFieldRef', 'varchar', annotation.toSource(),
               defaultValue: defaultValue, unique: unique, maxLength: maxLength);
         case 'UrlField':
-          final maxLength = value.getField('maxLength')?.toIntValue();
+          final maxLength = _getInheritedField(value, 'maxLength')?.toIntValue();
           return _FieldAnnotationInfo('String', 'StringFieldRef', 'varchar', annotation.toSource(),
               defaultValue: defaultValue, unique: unique, maxLength: maxLength);
         case 'IntegerField':
@@ -152,16 +168,16 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
           return _FieldAnnotationInfo('double', 'DoubleFieldRef', 'real', annotation.toSource(),
               defaultValue: defaultValue, unique: unique);
         case 'DecimalField':
-          final maxDigits = value.getField('maxDigits')?.toIntValue();
-          final decimalPlaces = value.getField('decimalPlaces')?.toIntValue();
+          final maxDigits = _getInheritedField(value, 'maxDigits')?.toIntValue();
+          final decimalPlaces = _getInheritedField(value, 'decimalPlaces')?.toIntValue();
           return _FieldAnnotationInfo('double', 'DoubleFieldRef', 'decimal', annotation.toSource(),
               defaultValue: defaultValue, unique: unique, precision: maxDigits, scale: decimalPlaces);
         case 'BooleanField':
           return _FieldAnnotationInfo('bool', 'BoolFieldRef', 'boolean', annotation.toSource(),
               defaultValue: defaultValue);
         case 'DateField':
-          final dateAutoNowAdd = value.getField('autoNowAdd')?.toBoolValue() ?? false;
-          final dateAutoNow = value.getField('autoNow')?.toBoolValue() ?? false;
+          final dateAutoNowAdd = _getInheritedField(value, 'autoNowAdd')?.toBoolValue() ?? false;
+          final dateAutoNow = _getInheritedField(value, 'autoNow')?.toBoolValue() ?? false;
           return _FieldAnnotationInfo(
             'DateTime',
             'DateTimeFieldRef',
@@ -172,8 +188,8 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
             defaultValue: defaultValue,
           );
         case 'DateTimeField':
-          final autoNowAdd = value.getField('autoNowAdd')?.toBoolValue() ?? false;
-          final autoNow = value.getField('autoNow')?.toBoolValue() ?? false;
+          final autoNowAdd = _getInheritedField(value, 'autoNowAdd')?.toBoolValue() ?? false;
+          final autoNow = _getInheritedField(value, 'autoNow')?.toBoolValue() ?? false;
           return _FieldAnnotationInfo(
             'DateTime',
             'DateTimeFieldRef',
@@ -189,7 +205,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
         case 'ForeignKey':
         case 'OneToOneField':
         case 'ManyToManyField':
-          final toField = value.getField('to');
+          final toField = _getInheritedField(value, 'to');
           String? relatedModel;
           DartType? relatedDartType;
           if (toField != null) {
@@ -198,7 +214,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
               relatedModel = relatedDartType.getDisplayString();
             }
           }
-          final toColumn = value.getField('toColumn')?.toStringValue() ?? 'id';
+          final toColumn = _getInheritedField(value, 'toColumn')?.toStringValue() ?? 'id';
           final relatedTable = relatedModel != null ? _toSnakeCase(relatedModel) : null;
           final relationType = switch (typeName) {
             'ForeignKey' => _RelationType.foreignKey,
@@ -207,7 +223,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
             _ => _RelationType.foreignKey,
           };
           final (pkType, pkFieldRef, pkDbType) = _resolvePkType(relatedDartType);
-          final onDeleteField = value.getField('onDelete');
+          final onDeleteField = _getInheritedField(value, 'onDelete');
           String? onDeleteValue;
           if (onDeleteField case final onDeleteField? when !onDeleteField.isNull) {
             final enumIndex = onDeleteField.getField('index')?.toIntValue();
@@ -231,7 +247,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
                 : null,
           );
         case 'UuidField':
-          final autoGenerate = value.getField('autoGenerate')?.toBoolValue() ?? false;
+          final autoGenerate = _getInheritedField(value, 'autoGenerate')?.toBoolValue() ?? false;
           return _FieldAnnotationInfo(
             'String',
             'StringFieldRef',
@@ -259,7 +275,7 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
           return _FieldAnnotationInfo('Duration', 'DurationFieldRef', 'time', annotation.toSource(),
               defaultValue: defaultValue);
         case 'EnumField':
-          final storeAsInt = value.getField('storeAsInt')?.toBoolValue() ?? false;
+          final storeAsInt = _getInheritedField(value, 'storeAsInt')?.toBoolValue() ?? false;
           return _FieldAnnotationInfo(
             storeAsInt ? 'int' : 'String',
             storeAsInt ? 'IntFieldRef' : 'StringFieldRef',
