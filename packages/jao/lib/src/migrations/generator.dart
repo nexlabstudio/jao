@@ -357,6 +357,91 @@ class SchemaGenerator {
             );
           }
         }
+
+        // Check for default value changes
+        if (_defaultValuesDiffer(field.defaultValue, dbColumn.defaultValue)) {
+          if (field.defaultValue case final defaultValue?) {
+            operations.add(
+              AlterColumn(
+                ColumnModification(
+                  table: model.tableName,
+                  column: field.columnName,
+                  defaultValue: defaultValue,
+                ),
+              ),
+            );
+          } else {
+            operations.add(
+              AlterColumn(
+                ColumnModification(
+                  table: model.tableName,
+                  column: field.columnName,
+                  dropDefault: true,
+                ),
+              ),
+            );
+          }
+        }
+
+        // Check for maxLength changes (varchar/char columns)
+        if (field.maxLength != null && dbColumn.maxLength != null && field.maxLength != dbColumn.maxLength) {
+          operations.add(
+            AlterColumn(
+              ColumnModification(
+                table: model.tableName,
+                column: field.columnName,
+                type: field.dbType,
+              ),
+            ),
+          );
+        }
+
+        // Check for precision/scale changes (decimal columns)
+        // Only compare when the DB reports values (SQLite doesn't track precision/scale)
+        if (field.precision != null &&
+            field.scale != null &&
+            dbColumn.precision != null &&
+            dbColumn.scale != null &&
+            (field.precision != dbColumn.precision || field.scale != dbColumn.scale)) {
+          operations.add(
+            AlterColumn(
+              ColumnModification(
+                table: model.tableName,
+                column: field.columnName,
+                type: field.dbType,
+              ),
+            ),
+          );
+        }
+
+        // Check for missing unique constraint
+        if (field.unique && !_hasUniqueConstraint(dbSchema, field.columnName)) {
+          operations.add(
+            CreateIndex(
+              model.tableName,
+              IndexDefinition(
+                name: 'idx_${model.tableName}_${field.columnName}_unique',
+                columns: [field.columnName],
+                unique: true,
+              ),
+            ),
+          );
+        }
+
+        // Check for missing foreign key constraint
+        if (field.foreignKey != null && !_hasForeignKeyConstraint(dbSchema, field.columnName)) {
+          operations.add(
+            AddForeignKey(
+              model.tableName,
+              ForeignKeyDefinition(
+                column: field.columnName,
+                referencedTable: field.foreignKey!.referencedTable,
+                referencedColumn: field.foreignKey!.referencedColumn,
+                onDelete: field.foreignKey!.onDelete,
+              ),
+            ),
+          );
+        }
       }
     }
 
@@ -648,6 +733,52 @@ class SchemaGenerator {
   /// Check if a FieldType is an integer-like type.
   ///
   /// Used to avoid false positives when comparing serial vs integer for PKs.
+  /// Compare default values, normalizing DB-reported values against model values.
+  bool _defaultValuesDiffer(String? modelDefault, String? dbDefault) {
+    if (modelDefault == null && dbDefault == null) return false;
+    if (modelDefault == null || dbDefault == null) return true;
+
+    // Normalize: DB may wrap strings in quotes, append type casts, etc.
+    final normalizedModel = _normalizeDefaultValue(modelDefault);
+    final normalizedDb = _normalizeDefaultValue(dbDefault);
+    return normalizedModel != normalizedDb;
+  }
+
+  /// Normalize a default value for comparison.
+  String _normalizeDefaultValue(String value) {
+    var v = value.trim();
+    // Remove Postgres type casts like ::text, ::integer, ::boolean
+    v = v.replaceAll(RegExp(r'::\w+(\[\])?'), '');
+    if (v.startsWith("'") && v.endsWith("'")) {
+      v = v.substring(1, v.length - 1);
+    }
+    return v.toLowerCase();
+  }
+
+  bool _hasUniqueConstraint(TableSchema dbSchema, String columnName) {
+    // Check constraints
+    for (final constraint in dbSchema.constraints) {
+      if (constraint.type == ConstraintType.unique && constraint.columns.contains(columnName)) {
+        return true;
+      }
+    }
+    for (final index in dbSchema.indexes) {
+      if (index.unique && index.columns.contains(columnName)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool _hasForeignKeyConstraint(TableSchema dbSchema, String columnName) {
+    for (final constraint in dbSchema.constraints) {
+      if (constraint.type == ConstraintType.foreignKey && constraint.columns.contains(columnName)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   bool _isIntegerType(FieldType type) {
     return type == FieldType.integer ||
         type == FieldType.smallInt ||

@@ -1164,6 +1164,200 @@ void main() {
           expect(operations.whereType<AlterColumn>().isEmpty, isTrue);
         });
       });
+
+      test('detects missing default value on existing column', () async {
+        await pool.withConnection((conn) async {
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS default_test (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              status TEXT NOT NULL
+            )
+          ''');
+
+          const schema = ModelSchema(
+            className: 'DefaultTest',
+            tableName: 'default_test',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(
+                name: 'status',
+                columnName: 'status',
+                dbType: FieldType.text,
+                defaultValue: "'active'",
+              ),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          final alterOps = operations.whereType<AlterColumn>().toList();
+          expect(alterOps.isNotEmpty, isTrue, reason: 'Should detect missing default value');
+          expect(alterOps.any((op) => op.modification.defaultValue == "'active'"), isTrue);
+        });
+      });
+
+      test('detects missing unique constraint on existing column', () async {
+        await pool.withConnection((conn) async {
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS unique_test (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              email TEXT NOT NULL
+            )
+          ''');
+
+          const schema = ModelSchema(
+            className: 'UniqueTest',
+            tableName: 'unique_test',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(
+                name: 'email',
+                columnName: 'email',
+                dbType: FieldType.text,
+                unique: true,
+              ),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          final indexOps = operations.whereType<CreateIndex>().toList();
+          expect(indexOps.isNotEmpty, isTrue, reason: 'Should detect missing unique constraint');
+          expect(indexOps.any((op) => op.index.unique && op.index.columns.contains('email')), isTrue);
+        });
+      });
+
+      test('does not add unique constraint if already exists', () async {
+        await pool.withConnection((conn) async {
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS unique_exists_test (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              email TEXT NOT NULL UNIQUE
+            )
+          ''');
+
+          const schema = ModelSchema(
+            className: 'UniqueExistsTest',
+            tableName: 'unique_exists_test',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(
+                name: 'email',
+                columnName: 'email',
+                dbType: FieldType.text,
+                unique: true,
+              ),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          final indexOps = operations.whereType<CreateIndex>().toList();
+          expect(indexOps.isEmpty, isTrue, reason: 'Should not add unique constraint if already present');
+        });
+      });
+
+      test('detects missing foreign key constraint on existing column', () async {
+        await pool.withConnection((conn) async {
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS fk_parent (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL
+            )
+          ''');
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS fk_child (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              parent_id INTEGER NOT NULL
+            )
+          ''');
+
+          const schema = ModelSchema(
+            className: 'FkChild',
+            tableName: 'fk_child',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(
+                name: 'parentId',
+                columnName: 'parent_id',
+                dbType: FieldType.integer,
+                foreignKey: ForeignKeyInfo(
+                  referencedTable: 'fk_parent',
+                  referencedColumn: 'id',
+                  onDelete: OnDeleteAction.cascade,
+                ),
+              ),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          final fkOps = operations.whereType<AddForeignKey>().toList();
+          expect(fkOps.isNotEmpty, isTrue, reason: 'Should detect missing foreign key');
+          expect(fkOps.first.foreignKey.referencedTable, equals('fk_parent'));
+          expect(fkOps.first.foreignKey.onDelete, equals(OnDeleteAction.cascade));
+        });
+      });
+
+      test('does not add default value if already matches', () async {
+        await pool.withConnection((conn) async {
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS default_match_test (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              active INTEGER NOT NULL DEFAULT 0
+            )
+          ''');
+
+          const schema = ModelSchema(
+            className: 'DefaultMatchTest',
+            tableName: 'default_match_test',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(
+                name: 'active',
+                columnName: 'active',
+                dbType: FieldType.integer,
+                defaultValue: '0',
+              ),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          final alterOps = operations.whereType<AlterColumn>().where((op) => op.modification.column == 'active');
+          expect(alterOps.isEmpty, isTrue, reason: 'Should not alter column when default value already matches');
+        });
+      });
     });
 
     group('generateMigrationFile()', () {
