@@ -7,6 +7,7 @@ library;
 import 'dart:async';
 import 'dart:io';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
+import '../../migrations/operations.dart' show sqlDefault;
 import '../../migrations/schema.dart' show ForeignKeyDefinition, OnDeleteAction;
 import '../connection.dart';
 
@@ -703,7 +704,7 @@ List<String> generateTableRecreationSql({
         buffer.write(' NOT NULL');
       }
       if (defaultValue != null) {
-        buffer.write(' DEFAULT $defaultValue');
+        buffer.write(' DEFAULT ${sqlDefault(defaultValue)}');
       }
     }
 

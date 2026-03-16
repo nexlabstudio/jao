@@ -24,8 +24,6 @@ abstract class FieldRef<T> {
   /// Get the column reference expression
   ColumnRef get col => ColumnRef(name, table: table ?? '');
 
-  // === Common lookups available on all fields ===
-
   /// Exact match: field = value
   Q eq(T value) => Q(Comparison(col, ComparisonOp.eq, Value(value)));
 
@@ -41,15 +39,11 @@ abstract class FieldRef<T> {
   /// In list: field IN (values)
   Q inList(List<T> values) => Q(Comparison(col, ComparisonOp.inList, Value(values)));
 
-  // === Ordering ===
-
   /// Order ascending
   OrderBy asc() => OrderBy(col, ascending: true);
 
   /// Order descending
   OrderBy desc() => OrderBy(col, ascending: false);
-
-  // === F-expression comparison ===
 
   /// Compare with another field
   Q eqField(FieldRef<T> other) => Q(Comparison(col, ComparisonOp.eq, other.col));
@@ -124,8 +118,6 @@ abstract class NumericFieldRef<T extends num> extends ComparableFieldRef<T> {
         _ => Value(value),
       };
 }
-
-// === Concrete Field Reference Types ===
 
 /// String field reference with text-specific lookups
 @immutable
@@ -204,8 +196,6 @@ class DateTimeFieldRef extends ComparableFieldRef<DateTime> {
 class DurationFieldRef extends ComparableFieldRef<Duration> {
   const DurationFieldRef(super.name, {super.table});
 }
-
-// === Related Field References (for ForeignKey, etc.) ===
 
 /// Reference to a related model for traversing relationships
 @immutable

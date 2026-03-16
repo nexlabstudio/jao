@@ -95,8 +95,6 @@ class Least extends FunctionCall {
   Least(List<Expression> exprs) : super('LEAST', exprs);
 }
 
-// === String Functions ===
-
 /// String length
 @immutable
 class Length extends FunctionCall {
@@ -140,8 +138,6 @@ class Replace extends FunctionCall {
   Replace(Expression expr, String from, String to) : super('REPLACE', [expr, Value(from), Value(to)]);
 }
 
-// === Date/Time Functions ===
-
 /// Current date
 @immutable
 class CurrentDate extends FunctionCall {
@@ -172,8 +168,6 @@ class Extract extends FunctionCall {
 class DateTrunc extends FunctionCall {
   DateTrunc(String precision, Expression expr) : super('DATE_TRUNC', [Value(precision), expr]);
 }
-
-// === Math Functions ===
 
 /// Absolute value
 @immutable

@@ -7,6 +7,19 @@ import 'package:meta/meta.dart';
 import '../db/connection.dart';
 import 'schema.dart';
 
+/// Quote a default value for SQL if needed.
+/// Numbers, booleans, and SQL keywords (CURRENT_TIMESTAMP) are emitted as-is.
+/// Everything else is wrapped in single quotes.
+String sqlDefault(String value) {
+  if (num.tryParse(value) != null) return value;
+  final lower = value.toLowerCase();
+  if (lower == 'true' || lower == 'false') return value;
+  if (lower == 'current_timestamp' || lower == 'null') return value;
+  if (value.startsWith("'") && value.endsWith("'")) return value;
+  final escaped = value.replaceAll("'", "''");
+  return "'$escaped'";
+}
+
 /// Base class for all migration operations.
 @immutable
 abstract class MigrationOperation {
@@ -21,8 +34,6 @@ abstract class MigrationOperation {
   /// Whether this operation is reversible
   bool get isReversible;
 }
-
-// === Table Operations ===
 
 /// Create a new table.
 @immutable
@@ -92,8 +103,8 @@ class CreateTable extends MigrationOperation {
     }
 
     // Default value
-    if (col.defaultValue != null) {
-      buffer.write(' DEFAULT ${col.defaultValue}');
+    if (col.defaultValue case final defaultValue?) {
+      buffer.write(' DEFAULT ${sqlDefault(defaultValue)}');
     }
 
     // Check constraint
@@ -191,8 +202,6 @@ class RenameTable extends MigrationOperation {
   bool get isReversible => true;
 }
 
-// === Column Operations ===
-
 /// Add a column to an existing table.
 @immutable
 class AddColumn extends MigrationOperation {
@@ -219,8 +228,8 @@ class AddColumn extends MigrationOperation {
       buffer.write(' NOT NULL');
     }
 
-    if (column.defaultValue != null) {
-      buffer.write(' DEFAULT ${column.defaultValue}');
+    if (column.defaultValue case final defaultValue?) {
+      buffer.write(' DEFAULT ${sqlDefault(defaultValue)}');
     }
 
     return buffer.toString();
@@ -308,8 +317,8 @@ class AlterColumn extends MigrationOperation {
     }
 
     // Change default
-    if (modification.defaultValue != null) {
-      statements.add('ALTER TABLE $table ALTER COLUMN $column SET DEFAULT ${modification.defaultValue}');
+    if (modification.defaultValue case final defaultValue?) {
+      statements.add('ALTER TABLE $table ALTER COLUMN $column SET DEFAULT ${sqlDefault(defaultValue)}');
     } else if (modification.dropDefault) {
       statements.add('ALTER TABLE $table ALTER COLUMN $column DROP DEFAULT');
     }
@@ -328,8 +337,6 @@ class AlterColumn extends MigrationOperation {
   @override
   bool get isReversible => false;
 }
-
-// === Index Operations ===
 
 /// Create an index.
 @immutable
@@ -385,8 +392,6 @@ class DropIndex extends MigrationOperation {
   bool get isReversible => false;
 }
 
-// === Constraint Operations ===
-
 /// Add a foreign key constraint.
 @immutable
 class AddForeignKey extends MigrationOperation {
@@ -441,8 +446,6 @@ class DropConstraint extends MigrationOperation {
   @override
   bool get isReversible => false;
 }
-
-// === Raw SQL Operations ===
 
 /// Execute raw SQL.
 @immutable
