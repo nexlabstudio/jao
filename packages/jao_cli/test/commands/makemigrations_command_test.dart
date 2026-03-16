@@ -170,6 +170,85 @@ void main() {
       expect(content, contains('class CreateTables'));
     });
 
+    group('generateMigrationName', () {
+      test('returns custom name in PascalCase', () {
+        expect(generateMigrationName('add_users', []), equals('AddUsers'));
+      });
+
+      test('returns EmptyMigration for empty operations', () {
+        expect(generateMigrationName(null, []), equals('EmptyMigration'));
+      });
+
+      test('returns CreateTable name for single CreateTable', () {
+        final ops = [
+          CreateTable(TableDefinition(
+            name: 'users',
+            columns: [const ColumnDefinition(name: 'id', type: FieldType.serial)],
+          )),
+        ];
+        expect(generateMigrationName(null, ops), equals('CreateUsers'));
+      });
+
+      test('returns CreateTables for multiple CreateTable ops', () {
+        final ops = [
+          CreateTable(TableDefinition(
+            name: 'users',
+            columns: [const ColumnDefinition(name: 'id', type: FieldType.serial)],
+          )),
+          CreateTable(TableDefinition(
+            name: 'posts',
+            columns: [const ColumnDefinition(name: 'id', type: FieldType.serial)],
+          )),
+        ];
+        expect(generateMigrationName(null, ops), equals('CreateTables'));
+      });
+
+      test('returns AddColumnToTable for AddColumn', () {
+        const ops = [AddColumn('users', ColumnDefinition(name: 'age', type: FieldType.integer))];
+        expect(generateMigrationName(null, ops), equals('AddAgeToUsers'));
+      });
+
+      test('returns DropColumnFromTable for DropColumn', () {
+        const ops = [DropColumn('users', 'age')];
+        expect(generateMigrationName(null, ops), equals('DropAgeFromUsers'));
+      });
+
+      test('returns AlterColumnOnTable for AlterColumn', () {
+        const ops = [AlterColumn(ColumnModification(table: 'users', column: 'email'))];
+        expect(generateMigrationName(null, ops), equals('AlterEmailOnUsers'));
+      });
+
+      test('returns AddFkOnTable for AddForeignKey', () {
+        const ops = [
+          AddForeignKey(
+              'posts', ForeignKeyDefinition(column: 'user_id', referencedTable: 'users', referencedColumn: 'id')),
+        ];
+        expect(generateMigrationName(null, ops), equals('AddFkOnPosts'));
+      });
+
+      test('returns AddIndexOnTable for CreateIndex', () {
+        final ops = [
+          CreateIndex('users', const IndexDefinition(name: 'idx_users_email', columns: ['email'])),
+        ];
+        expect(generateMigrationName(null, ops), equals('AddIndexOnUsers'));
+      });
+
+      test('returns DropConstraintOnTable for DropConstraint', () {
+        const ops = [DropConstraint('posts', 'fk_posts_user_id')];
+        expect(generateMigrationName(null, ops), equals('DropConstraintOnPosts'));
+      });
+
+      test('returns RenameOldToNew for RenameTable', () {
+        const ops = [RenameTable('users', 'accounts')];
+        expect(generateMigrationName(null, ops), equals('RenameUsersToAccounts'));
+      });
+
+      test('returns RenameColumnOnTable for RenameColumn', () {
+        const ops = [RenameColumn('users', 'name', 'full_name')];
+        expect(generateMigrationName(null, ops), equals('RenameNameOnUsers'));
+      });
+    });
+
     test('Error when no model schemas found', () async {
       cli = JaoCli(
         MigrationRunnerConfig(

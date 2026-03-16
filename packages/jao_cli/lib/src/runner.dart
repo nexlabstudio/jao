@@ -654,26 +654,8 @@ class $className extends Migration {
     return 0;
   }
 
-  String _generateMigrationName(String? customName, List<MigrationOperation> operations) {
-    if (customName != null && customName.isNotEmpty) {
-      return _toPascalCase(customName);
-    }
-    if (operations.isEmpty) return 'EmptyMigration';
-
-    return switch (operations.first) {
-      CreateTable(table: final t) when operations.length == 1 => 'Create${_toPascalCase(t.name)}',
-      CreateTable() when operations.whereType<CreateTable>().length == operations.length => 'CreateTables',
-      AddColumn(column: final c, table: final t) => 'Add${_toPascalCase(c.name)}To${_toPascalCase(t)}',
-      DropColumn(column: final c, table: final t) => 'Drop${_toPascalCase(c)}From${_toPascalCase(t)}',
-      AlterColumn(modification: final m) => 'Alter${_toPascalCase(m.column)}On${_toPascalCase(m.table)}',
-      AddForeignKey(table: final t) => 'AddFkOn${_toPascalCase(t)}',
-      CreateIndex(table: final t) => 'AddIndexOn${_toPascalCase(t)}',
-      DropConstraint(table: final t) => 'DropConstraintOn${_toPascalCase(t)}',
-      RenameTable(oldName: final o, newName: final n) => 'Rename${_toPascalCase(o)}To${_toPascalCase(n)}',
-      RenameColumn(table: final t, oldName: final o) => 'Rename${_toPascalCase(o)}On${_toPascalCase(t)}',
-      _ => 'AutoMigration${_generateTimestamp()}',
-    };
-  }
+  String _generateMigrationName(String? customName, List<MigrationOperation> operations) =>
+      generateMigrationName(customName, operations);
 
   String _describeOperation(MigrationOperation op) => switch (op) {
         CreateTable() => 'Create table "${op.table.name}" with ${op.table.columns.length} columns',
@@ -684,11 +666,6 @@ class $className extends Migration {
         AddForeignKey() => 'Add foreign key "${op.foreignKey.column}" on "${op.table}"',
         _ => op.runtimeType.toString(),
       };
-
-  String _generateTimestamp() {
-    final now = DateTime.now();
-    return '${now.year}${_pad(now.month)}${_pad(now.day)}${_pad(now.hour)}${_pad(now.minute)}${_pad(now.second)}';
-  }
 
   Future<int> _rollback(List<String> args) async {
     final dryRun = args.contains('-n') || args.contains('--dry-run');
@@ -1090,14 +1067,6 @@ class $className extends Migration {
     migrationsFile.writeAsStringSync(content);
   }
 
-  String _pad(int n) => n.toString().padLeft(2, '0');
-  String _toPascalCase(String input) {
-    return input
-        .split(RegExp(r'[_\-\s]+'))
-        .map((word) => word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1))
-        .join('');
-  }
-
   String _toSnakeCase(String input) {
     return input.replaceAllMapped(RegExp(r'[A-Z]'), (match) {
       if (match.group(0) case final g?) return '_${g.toLowerCase()}';
@@ -1105,6 +1074,41 @@ class $className extends Migration {
     }).replaceFirst(RegExp(r'^_'), '');
   }
 }
+
+String generateMigrationName(String? customName, List<MigrationOperation> operations) {
+  if (customName != null && customName.isNotEmpty) {
+    return _toPascalCase(customName);
+  }
+  if (operations.isEmpty) return 'EmptyMigration';
+
+  return switch (operations.first) {
+    CreateTable(table: final t) when operations.length == 1 => 'Create${_toPascalCase(t.name)}',
+    CreateTable() when operations.whereType<CreateTable>().length == operations.length => 'CreateTables',
+    AddColumn(column: final c, table: final t) => 'Add${_toPascalCase(c.name)}To${_toPascalCase(t)}',
+    DropColumn(column: final c, table: final t) => 'Drop${_toPascalCase(c)}From${_toPascalCase(t)}',
+    AlterColumn(modification: final m) => 'Alter${_toPascalCase(m.column)}On${_toPascalCase(m.table)}',
+    AddForeignKey(table: final t) => 'AddFkOn${_toPascalCase(t)}',
+    CreateIndex(table: final t) => 'AddIndexOn${_toPascalCase(t)}',
+    DropConstraint(table: final t) => 'DropConstraintOn${_toPascalCase(t)}',
+    RenameTable(oldName: final o, newName: final n) => 'Rename${_toPascalCase(o)}To${_toPascalCase(n)}',
+    RenameColumn(table: final t, oldName: final o) => 'Rename${_toPascalCase(o)}On${_toPascalCase(t)}',
+    _ => 'AutoMigration${_generateTimestamp()}',
+  };
+}
+
+String _toPascalCase(String input) {
+  return input
+      .split(RegExp(r'[_\-\s]+'))
+      .map((word) => word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1))
+      .join('');
+}
+
+String _generateTimestamp() {
+  final now = DateTime.now();
+  return '${now.year}${_pad(now.month)}${_pad(now.day)}${_pad(now.hour)}${_pad(now.minute)}${_pad(now.second)}';
+}
+
+String _pad(int n) => n.toString().padLeft(2, '0');
 
 class CliOutput {
   final bool verbose;
