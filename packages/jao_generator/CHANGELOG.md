@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+## [0.3.3] - 2026-03-16
+
+### Changed
+
+- `_extractDefaultValue` now returns typed values (`int`, `double`, `bool`, `String`) instead of stringifying all defaults
+- Generated `ModelFieldSchema.defaultValue` emits typed literals (`false`, `0`, `3.14`) instead of quoted strings (`'false'`, `'0'`)
+- Generated `defaultValues` map in `ModelRegistration` emits typed values directly
+
 ## [0.3.2] - 2026-03-16
 
 ### Fixed

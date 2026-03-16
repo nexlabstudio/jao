@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+## [0.3.4] - 2026-03-16
+
+### Changed
+
+- `ModelFieldSchema.defaultValue` type changed from `String?` to `Object?`
+  - Default values now stay typed (`bool`, `int`, `double`, `String`) through the pipeline
+  - `_addFieldToBuilder` uses pattern matching instead of string parsing for default values
+  - `toString()` is applied only at the SQL boundary (`ColumnDefinition`, `ColumnModification`)
+
 ## [0.3.3] - 2026-03-16
 
 ### Fixed
