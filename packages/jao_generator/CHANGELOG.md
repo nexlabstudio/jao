@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+## [0.3.1] - 2026-03-16
+
+### Fixed
+
+- Generated `ModelFieldSchema` now emits `defaultValue`, `maxLength`, `unique`, `precision`, `scale`, and `onDelete` from field annotations
+- Migrations previously lost string lengths, default values, unique constraints, decimal precision/scale, and FK on-delete actions because the code generator did not pass these attributes through
+- `@DateField` now correctly extracts `autoNowAdd` and `autoNow` (was previously ignored)
+
 ## [0.3.0] - 2026-02-23
 
 ### Added
