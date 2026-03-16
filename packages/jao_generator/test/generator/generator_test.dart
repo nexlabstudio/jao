@@ -370,6 +370,140 @@ class User {
       expect(result, contains("static const pkField = 'id'"));
     });
 
+    test('emits maxLength in ModelFieldSchema for CharField', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  @AutoField()
+  late int id;
+  @CharField(maxLength: 100)
+  late String name;
+}
+''');
+
+      expect(result, contains('maxLength: 100'));
+    });
+
+    test('emits maxLength in ModelFieldSchema for EmailField', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  @AutoField()
+  late int id;
+  @EmailField(unique: true)
+  late String email;
+}
+''');
+
+      expect(result, contains('maxLength: 254'));
+      expect(result, contains('unique: true'));
+    });
+
+    test('emits unique constraint in ModelFieldSchema', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  @AutoField()
+  late int id;
+  @CharField(maxLength: 255, unique: true)
+  late String username;
+}
+''');
+
+      expect(result, contains('unique: true'));
+    });
+
+    test('emits defaultValue in ModelFieldSchema for BooleanField', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  @AutoField()
+  late int id;
+  @BooleanField(defaultValue: false)
+  late bool isActive;
+}
+''');
+
+      expect(result, contains('defaultValue: false'));
+    });
+
+    test('emits defaultValue in ModelFieldSchema for CharField', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  @AutoField()
+  late int id;
+  @CharField(maxLength: 20, defaultValue: 'production')
+  late String target;
+}
+''');
+
+      expect(result, contains("defaultValue: 'production'"));
+    });
+
+    test('emits defaultValue in ModelFieldSchema for TextField', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class User {
+  @AutoField()
+  late int id;
+  @TextField(defaultValue: '{}')
+  late String meta;
+}
+''');
+
+      expect(result, contains("defaultValue: '{}'"));
+    });
+
+    test('emits precision and scale in ModelFieldSchema for DecimalField', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class Product {
+  @AutoField()
+  late int id;
+  @DecimalField(maxDigits: 12, decimalPlaces: 4)
+  late double price;
+}
+''');
+
+      expect(result, contains('precision: 12'));
+      expect(result, contains('scale: 4'));
+    });
+
+    test('emits onDelete in ForeignKeyInfo', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class Post {
+  @AutoField()
+  late int id;
+  @ForeignKey(User, onDelete: OnDelete.cascade)
+  late int userId;
+}
+
+class User {}
+''');
+
+      expect(result, contains('onDelete: OnDeleteAction.cascade'));
+    });
+
+    test('emits ForeignKeyInfo with referencedTable and referencedColumn', () async {
+      final result = await _generateForSource(generator, '''
+@Model()
+class Post {
+  @AutoField()
+  late int id;
+  @ForeignKey(User)
+  late int userId;
+}
+
+class User {}
+''');
+
+      expect(result, contains("referencedTable: 'user'"));
+      expect(result, contains("referencedColumn: 'id'"));
+      expect(result, contains('onDelete: OnDeleteAction.cascade'));
+    });
+
     test('skips static fields', () async {
       final result = await _generateForSource(generator, '''
 @Model()
@@ -404,93 +538,138 @@ class BigAutoField {
 
 class CharField {
   final int maxLength;
-  const CharField({this.maxLength = 255});
+  final bool unique;
+  final Object? defaultValue;
+  const CharField({this.maxLength = 255, this.unique = false, this.defaultValue});
 }
 
 class TextField {
-  const TextField();
+  final bool unique;
+  final Object? defaultValue;
+  const TextField({this.unique = false, this.defaultValue});
 }
 
 class EmailField {
   final int maxLength;
-  const EmailField({this.maxLength = 254});
+  final bool unique;
+  final Object? defaultValue;
+  const EmailField({this.maxLength = 254, this.unique = false, this.defaultValue});
 }
 
 class UrlField {
   final int maxLength;
-  const UrlField({this.maxLength = 200});
+  final bool unique;
+  final Object? defaultValue;
+  const UrlField({this.maxLength = 2048, this.unique = false, this.defaultValue});
 }
 
 class IntegerField {
-  const IntegerField();
+  final bool unique;
+  final Object? defaultValue;
+  const IntegerField({this.unique = false, this.defaultValue});
 }
 
 class SmallIntegerField {
-  const SmallIntegerField();
+  final bool unique;
+  final Object? defaultValue;
+  const SmallIntegerField({this.unique = false, this.defaultValue});
 }
 
 class BigIntegerField {
-  const BigIntegerField();
+  final bool unique;
+  final Object? defaultValue;
+  const BigIntegerField({this.unique = false, this.defaultValue});
 }
 
 class PositiveIntegerField {
-  const PositiveIntegerField();
+  final bool unique;
+  final Object? defaultValue;
+  const PositiveIntegerField({this.unique = false, this.defaultValue});
 }
 
 class FloatField {
-  const FloatField();
+  final bool unique;
+  final Object? defaultValue;
+  const FloatField({this.unique = false, this.defaultValue});
 }
 
 class DecimalField {
   final int maxDigits;
   final int decimalPlaces;
-  const DecimalField({this.maxDigits = 10, this.decimalPlaces = 2});
+  final bool unique;
+  final Object? defaultValue;
+  const DecimalField({this.maxDigits = 10, this.decimalPlaces = 2, this.unique = false, this.defaultValue});
 }
 
 class BooleanField {
-  const BooleanField();
+  final Object? defaultValue;
+  const BooleanField({this.defaultValue});
 }
 
 class DateField {
   final bool autoNowAdd;
   final bool autoNow;
-  const DateField({this.autoNowAdd = false, this.autoNow = false});
+  final Object? defaultValue;
+  const DateField({this.autoNowAdd = false, this.autoNow = false, this.defaultValue});
 }
 
 class DateTimeField {
   final bool autoNowAdd;
   final bool autoNow;
-  const DateTimeField({this.autoNowAdd = false, this.autoNow = false});
+  final Object? defaultValue;
+  const DateTimeField({this.autoNowAdd = false, this.autoNow = false, this.defaultValue});
 }
 
 class DurationField {
-  const DurationField();
+  final Object? defaultValue;
+  const DurationField({this.defaultValue});
 }
 
 class TimeField {
-  const TimeField();
+  final Object? defaultValue;
+  const TimeField({this.defaultValue});
 }
 
 class UuidField {
-  const UuidField();
+  final bool autoGenerate;
+  final bool unique;
+  final Object? defaultValue;
+  const UuidField({this.autoGenerate = false, this.unique = false, this.defaultValue});
+}
+
+class UuidPrimaryKey {
+  const UuidPrimaryKey();
 }
 
 class JsonField {
-  const JsonField();
+  final Object? defaultValue;
+  const JsonField({this.defaultValue});
 }
 
 class BinaryField {
   const BinaryField();
 }
 
+enum OnDelete { cascade, protect, setNull, setDefault, doNothing }
+
 class ForeignKey {
   final Type to;
-  const ForeignKey(this.to);
+  final OnDelete onDelete;
+  final bool unique;
+  const ForeignKey(this.to, {this.onDelete = OnDelete.cascade, this.unique = false});
 }
 
 class OneToOneField {
   final Type to;
-  const OneToOneField(this.to);
+  final OnDelete onDelete;
+  const OneToOneField(this.to, {this.onDelete = OnDelete.cascade});
+}
+
+class EnumField<T> {
+  final bool storeAsInt;
+  final bool unique;
+  final Object? defaultValue;
+  const EnumField({this.storeAsInt = false, this.unique = false, this.defaultValue});
 }
 ''';
 
