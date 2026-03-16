@@ -754,11 +754,9 @@ class Book {
         outputs: {
           'pkg|lib/models.jao.dart': decodedMatches(
             allOf([
-
               contains('foreignKey: ForeignKeyInfo('),
               contains("referencedTable: 'user'"),
               contains("referencedColumn: 'id'"),
-
               contains('nullable: true'),
             ]),
           ),
@@ -931,13 +929,9 @@ class Task {
         outputs: {
           'pkg|lib/task.jao.dart': decodedMatches(
             allOf([
-
               contains("final status = const StringFieldRef('status')"),
-
               contains("TaskStatus.values.byName(row['status'] as String)"),
-
               contains("'status': model.status.name"),
-
               contains("dbType: FieldType.varchar"),
             ]),
           ),
@@ -967,13 +961,9 @@ class Issue {
         outputs: {
           'pkg|lib/priority.jao.dart': decodedMatches(
             allOf([
-
               contains("final priority = const IntFieldRef('priority')"),
-
               contains("Priority.values[row['priority'] as int]"),
-
               contains("'priority': model.priority.index"),
-
               contains("dbType: FieldType.integer"),
             ]),
           ),
@@ -1002,12 +992,9 @@ class Order {
         outputs: {
           'pkg|lib/order.jao.dart': decodedMatches(
             allOf([
-
               contains("row['shipping_method'] != null"),
               contains("ShippingMethod.values.byName(row['shipping_method'] as String)"),
-
               contains("model.shippingMethod?.name"),
-
               contains("nullable: true"),
             ]),
           ),
@@ -1036,12 +1023,9 @@ class Ticket {
         outputs: {
           'pkg|lib/ticket.jao.dart': decodedMatches(
             allOf([
-
               contains("row['severity'] != null"),
               contains("Severity.values[row['severity'] as int]"),
-
               contains("model.severity?.index"),
-
               contains("nullable: true"),
             ]),
           ),
