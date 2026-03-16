@@ -1323,6 +1323,124 @@ void main() {
         });
       });
 
+      test('generates drop default when model removes default value', () async {
+        await pool.withConnection((conn) async {
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS drop_default_test (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              status TEXT NOT NULL DEFAULT 'pending'
+            )
+          ''');
+
+          const schema = ModelSchema(
+            className: 'DropDefaultTest',
+            tableName: 'drop_default_test',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(
+                name: 'status',
+                columnName: 'status',
+                dbType: FieldType.text,
+                // no defaultValue — model removed it
+              ),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          final alterOps = operations.whereType<AlterColumn>().toList();
+          expect(alterOps.isNotEmpty, isTrue, reason: 'Should detect removed default value');
+          expect(alterOps.any((op) => op.modification.dropDefault), isTrue, reason: 'Should generate DROP DEFAULT');
+        });
+      });
+
+      test('does not add foreign key if already exists', () async {
+        await pool.withConnection((conn) async {
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS fk_exists_parent (
+              id INTEGER PRIMARY KEY AUTOINCREMENT
+            )
+          ''');
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS fk_exists_child (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              parent_id INTEGER NOT NULL REFERENCES fk_exists_parent(id)
+            )
+          ''');
+
+          const schema = ModelSchema(
+            className: 'FkExistsChild',
+            tableName: 'fk_exists_child',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(
+                name: 'parentId',
+                columnName: 'parent_id',
+                dbType: FieldType.integer,
+                foreignKey: ForeignKeyInfo(
+                  referencedTable: 'fk_exists_parent',
+                  referencedColumn: 'id',
+                ),
+              ),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          final fkOps = operations.whereType<AddForeignKey>().toList();
+          expect(fkOps.isEmpty, isTrue, reason: 'Should not add FK if already present');
+        });
+      });
+
+      test('detects changed default value on existing column', () async {
+        await pool.withConnection((conn) async {
+          await conn.execute('''
+            CREATE TABLE IF NOT EXISTS changed_default_test (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              priority INTEGER NOT NULL DEFAULT 0
+            )
+          ''');
+
+          const schema = ModelSchema(
+            className: 'ChangedDefaultTest',
+            tableName: 'changed_default_test',
+            fields: [
+              ModelFieldSchema(
+                name: 'id',
+                columnName: 'id',
+                dbType: FieldType.serial,
+                primaryKey: true,
+                autoIncrement: true,
+              ),
+              ModelFieldSchema(
+                name: 'priority',
+                columnName: 'priority',
+                dbType: FieldType.integer,
+                defaultValue: '5',
+              ),
+            ],
+          );
+
+          final operations = await generator.generateDiff(conn, [schema]);
+
+          final alterOps = operations.whereType<AlterColumn>().toList();
+          expect(alterOps.isNotEmpty, isTrue, reason: 'Should detect changed default value');
+          expect(alterOps.any((op) => op.modification.defaultValue == '5'), isTrue);
+        });
+      });
+
       test('does not add default value if already matches', () async {
         await pool.withConnection((conn) async {
           await conn.execute('''
