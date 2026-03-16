@@ -660,23 +660,19 @@ class $className extends Migration {
     }
     if (operations.isEmpty) return 'EmptyMigration';
 
-    final firstOp = operations.first;
-    if (firstOp is CreateTable) {
-      if (operations.length == 1) {
-        return 'Create${_toPascalCase(firstOp.table.name)}';
-      } else {
-        final tableCount = operations.whereType<CreateTable>().length;
-        if (tableCount == operations.length) {
-          return 'CreateTables';
-        }
-      }
-    } else if (firstOp is AddColumn) {
-      return 'Add${_toPascalCase(firstOp.column.name)}To${_toPascalCase(firstOp.table)}';
-    } else if (firstOp is DropColumn) {
-      return 'Drop${_toPascalCase(firstOp.column)}From${_toPascalCase(firstOp.table)}';
-    }
-
-    return 'AutoMigration';
+    return switch (operations.first) {
+      CreateTable(table: final t) when operations.length == 1 => 'Create${_toPascalCase(t.name)}',
+      CreateTable() when operations.whereType<CreateTable>().length == operations.length => 'CreateTables',
+      AddColumn(column: final c, table: final t) => 'Add${_toPascalCase(c.name)}To${_toPascalCase(t)}',
+      DropColumn(column: final c, table: final t) => 'Drop${_toPascalCase(c)}From${_toPascalCase(t)}',
+      AlterColumn(modification: final m) => 'Alter${_toPascalCase(m.column)}On${_toPascalCase(m.table)}',
+      AddForeignKey(table: final t) => 'AddFkOn${_toPascalCase(t)}',
+      CreateIndex(table: final t) => 'AddIndexOn${_toPascalCase(t)}',
+      DropConstraint(table: final t) => 'DropConstraintOn${_toPascalCase(t)}',
+      RenameTable(oldName: final o, newName: final n) => 'Rename${_toPascalCase(o)}To${_toPascalCase(n)}',
+      RenameColumn(table: final t, oldName: final o) => 'Rename${_toPascalCase(o)}On${_toPascalCase(t)}',
+      _ => 'AutoMigration${_generateTimestamp()}',
+    };
   }
 
   String _describeOperation(MigrationOperation op) => switch (op) {
