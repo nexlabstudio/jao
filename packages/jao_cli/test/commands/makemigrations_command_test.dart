@@ -114,6 +114,62 @@ void main() {
       expect(fileName, contains('short_name'));
     });
 
+    test('Names migration CreateUsers for single CreateTable', () async {
+      final path = '${tempDir.path}/migrations';
+
+      await cli.run(['makemigrations', '-p=$path']);
+
+      final files = Directory(path).listSync();
+      final content = File(files.first.path).readAsStringSync();
+      expect(content, contains('class CreateUsers'));
+    });
+
+    test('Names migration CreateUsers for single table model', () async {
+      final path = '${tempDir.path}/migrations';
+
+      await cli.run(['makemigrations', '-p=$path']);
+
+      final files = Directory(path).listSync();
+      final fileName = files.first.path.split('/').last;
+      expect(fileName, contains('create_users'));
+    });
+
+    test('Names migration CreateTables for multiple table models', () async {
+      final multiModels = [
+        ...models,
+        const ModelSchema(
+          className: 'Post',
+          tableName: 'posts',
+          fields: [
+            ModelFieldSchema(
+              name: 'id',
+              columnName: 'id',
+              dbType: FieldType.serial,
+              primaryKey: true,
+              autoIncrement: true,
+            ),
+            ModelFieldSchema(name: 'title', columnName: 'title', dbType: FieldType.varchar, maxLength: 200),
+          ],
+        ),
+      ];
+
+      cli = JaoCli(
+        MigrationRunnerConfig(
+          database: DatabaseConfig.sqlite(':memory:'),
+          adapter: const SqliteAdapter(),
+          migrations: [],
+          modelSchemas: multiModels,
+        ),
+      );
+
+      final path = '${tempDir.path}/migrations';
+      await cli.run(['makemigrations', '-p=$path']);
+
+      final files = Directory(path).listSync();
+      final content = File(files.first.path).readAsStringSync();
+      expect(content, contains('class CreateTables'));
+    });
+
     test('Error when no model schemas found', () async {
       cli = JaoCli(
         MigrationRunnerConfig(
