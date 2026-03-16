@@ -421,6 +421,37 @@ class MigrationRunner {
             // always call forward (down() sets up forward as the rollback action)
             await operation.forward(tx as DatabaseConnection);
           }
+        } else if (operation is DropConstraint && adapter is SqliteAdapter) {
+          final currentSchema = sqliteSchemas[operation.table]!;
+
+          // Find the FK column from the constraint name
+          final fkConstraint = currentSchema.constraints.where((c) => c.name == operation.constraintName).firstOrNull;
+
+          if (fkConstraint case final fkConstraint? when fkConstraint.type == ConstraintType.foreignKey) {
+            final statements = generateTableRecreationSql(
+              tableName: operation.table,
+              currentSchema: currentSchema,
+              columnName: fkConstraint.columns.first,
+              dropConstraintName: operation.constraintName,
+            );
+
+            for (final statement in statements) {
+              await tx.execute(statement);
+            }
+          }
+        } else if (operation is AddForeignKey && adapter is SqliteAdapter) {
+          final currentSchema = sqliteSchemas[operation.table]!;
+
+          final statements = generateTableRecreationSql(
+            tableName: operation.table,
+            currentSchema: currentSchema,
+            columnName: operation.foreignKey.column,
+            addForeignKey: operation.foreignKey,
+          );
+
+          for (final statement in statements) {
+            await tx.execute(statement);
+          }
         } else if (operation is AlterColumn && adapter is SqliteAdapter) {
           final mod = operation.modification;
           final currentSchema = sqliteSchemas[mod.table]!;

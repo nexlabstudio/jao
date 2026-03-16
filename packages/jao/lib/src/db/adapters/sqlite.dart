@@ -7,6 +7,7 @@ library;
 import 'dart:async';
 import 'dart:io';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
+import '../../migrations/schema.dart' show ForeignKeyDefinition, OnDeleteAction;
 import '../connection.dart';
 
 /// SQLite SQL dialect.
@@ -653,6 +654,8 @@ List<String> generateTableRecreationSql({
   String? newDefault,
   bool dropDefault = false,
   String? renameTo,
+  ForeignKeyDefinition? addForeignKey,
+  String? dropConstraintName,
 }) {
   const dialect = SqliteDialect();
   final statements = <String>[];
@@ -717,6 +720,7 @@ List<String> generateTableRecreationSql({
   // Add foreign key constraints
   for (final constraint in currentSchema.constraints) {
     if (constraint.type == ConstraintType.foreignKey) {
+      if (dropConstraintName != null && constraint.name == dropConstraintName) continue;
       final fkColumn = constraint.columns.first;
       // If the FK column was renamed, use the new name
       final effectiveFkColumn = fkColumn == columnName && renameTo != null ? renameTo : fkColumn;
@@ -735,6 +739,24 @@ List<String> generateTableRecreationSql({
 
       columnDefs.add(fkBuffer.toString());
     }
+  }
+
+  if (addForeignKey case final fk?) {
+    final fkBuffer = StringBuffer();
+    fkBuffer.write('FOREIGN KEY (${dialect.quoteIdentifier(fk.column)}) ');
+    fkBuffer.write('REFERENCES ${dialect.quoteIdentifier(fk.referencedTable)}');
+    fkBuffer.write('(${dialect.quoteIdentifier(fk.referencedColumn)})');
+    final onDelete = switch (fk.onDelete) {
+      OnDeleteAction.cascade => 'CASCADE',
+      OnDeleteAction.restrict => 'RESTRICT',
+      OnDeleteAction.setNull => 'SET NULL',
+      OnDeleteAction.setDefault => 'SET DEFAULT',
+      OnDeleteAction.noAction => null,
+    };
+    if (onDelete != null) {
+      fkBuffer.write(' ON DELETE $onDelete');
+    }
+    columnDefs.add(fkBuffer.toString());
   }
 
   statements.add('CREATE TABLE $quotedTable (\n  ${columnDefs.join(',\n  ')}\n)');
