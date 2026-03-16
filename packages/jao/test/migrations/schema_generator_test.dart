@@ -1559,6 +1559,81 @@ void main() {
         expect(content, contains("builder.dropIndex('idx_users_email')"));
       });
 
+      test('generates reverse for AlterColumn nullability change', () {
+        const operations = [
+          AlterColumn(ColumnModification(table: 'users', column: 'name', nullable: true)),
+        ];
+
+        final content = generator.generateMigrationFile('MakeNameNullable', operations);
+
+        expect(content, contains('col.notNullable()'));
+      });
+
+      test('generates reverse for AlterColumn type change with previousType', () {
+        const operations = [
+          AlterColumn(ColumnModification(
+            table: 'users',
+            column: 'age',
+            type: FieldType.bigInt,
+            previousType: FieldType.integer,
+          )),
+        ];
+
+        final content = generator.generateMigrationFile('ChangeAgeType', operations);
+
+        expect(content, contains('col.type(FieldType.integer)'));
+      });
+
+      test('generates reverse for AlterColumn default value change with previousDefault', () {
+        const operations = [
+          AlterColumn(ColumnModification(
+            table: 'users',
+            column: 'status',
+            defaultValue: 'active',
+            previousDefault: 'pending',
+          )),
+        ];
+
+        final content = generator.generateMigrationFile('ChangeStatusDefault', operations);
+
+        expect(content, contains("col.defaultValue('pending')"));
+      });
+
+      test('generates reverse for AlterColumn drop default with previousDefault', () {
+        const operations = [
+          AlterColumn(ColumnModification(
+            table: 'users',
+            column: 'status',
+            dropDefault: true,
+            previousDefault: 'active',
+          )),
+        ];
+
+        final content = generator.generateMigrationFile('DropStatusDefault', operations);
+
+        expect(content, contains("col.defaultValue('active')"));
+      });
+
+      test('generates reverse for AlterColumn rename', () {
+        const operations = [
+          AlterColumn(ColumnModification(table: 'users', column: 'name', rename: 'full_name')),
+        ];
+
+        final content = generator.generateMigrationFile('RenameName', operations);
+
+        expect(content, contains("builder.renameColumn('users', 'full_name', 'name')"));
+      });
+
+      test('generates comment when AlterColumn has no previous state', () {
+        const operations = [
+          AlterColumn(ColumnModification(table: 'users', column: 'age', type: FieldType.bigInt)),
+        ];
+
+        final content = generator.generateMigrationFile('ChangeAge', operations);
+
+        expect(content, contains('Cannot auto-reverse AlterColumn'));
+      });
+
       test('converts PascalCase to snake_case for migration name', () {
         final content = generator.generateMigrationFile('CreateUserRolesTable', []);
 
