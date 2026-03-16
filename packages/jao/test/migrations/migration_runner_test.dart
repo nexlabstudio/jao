@@ -206,6 +206,92 @@ class MakeDescriptionNullable extends Migration {
   }
 }
 
+class CreateAuthorsTable extends Migration {
+  @override
+  String get name => '030_create_authors';
+
+  @override
+  void up(MigrationBuilder builder) {
+    builder.createTable('authors', (table) {
+      table.id();
+      table.string('name');
+    });
+  }
+
+  @override
+  void down(MigrationBuilder builder) {
+    builder.dropTable('authors');
+  }
+}
+
+class CreateBooksTable extends Migration {
+  @override
+  String get name => '031_create_books';
+
+  @override
+  void up(MigrationBuilder builder) {
+    builder.createTable('books', (table) {
+      table.id();
+      table.string('title');
+      table.integer('author_id');
+    });
+  }
+
+  @override
+  void down(MigrationBuilder builder) {
+    builder.dropTable('books');
+  }
+}
+
+class AddBookAuthorFk extends Migration {
+  @override
+  String get name => '032_add_book_author_fk';
+
+  @override
+  void up(MigrationBuilder builder) {
+    builder.addForeignKey('books', 'author_id', 'authors', referencedColumn: 'id');
+  }
+
+  @override
+  void down(MigrationBuilder builder) {
+    builder.dropConstraint('books', 'fk_books_author_id');
+  }
+}
+
+class CreateBooksWithFkTable extends Migration {
+  @override
+  String get name => '033_create_books_with_fk';
+
+  @override
+  void up(MigrationBuilder builder) {
+    builder.createTable('books_with_fk', (table) {
+      table.id();
+      table.string('title');
+      table.foreignKey('author_id', 'authors');
+    });
+  }
+
+  @override
+  void down(MigrationBuilder builder) {
+    builder.dropTable('books_with_fk');
+  }
+}
+
+class DropBookAuthorFk extends Migration {
+  @override
+  String get name => '034_drop_book_author_fk';
+
+  @override
+  void up(MigrationBuilder builder) {
+    builder.dropConstraint('books_with_fk', 'fk_books_with_fk_author_id');
+  }
+
+  @override
+  void down(MigrationBuilder builder) {
+    builder.addForeignKey('books_with_fk', 'author_id', 'authors', referencedColumn: 'id');
+  }
+}
+
 void main() {
   group('MigrationBuilder', () {
     group('createTable()', () {
@@ -1037,6 +1123,72 @@ void main() {
         schema = await pool.withConnection((conn) => adapter.getTableSchema(conn, 'items'));
         descCol = schema.columns.firstWhere((c) => c.name == 'description');
         expect(descCol.nullable, isFalse);
+      });
+    });
+
+    group('SQLite table recreation (AddForeignKey)', () {
+      test('AddForeignKey adds FK via table recreation', () async {
+        await runner.migrate([CreateAuthorsTable(), CreateBooksTable(), AddBookAuthorFk()]);
+
+        final tableSql = await pool.withConnection((conn) async {
+          final result = await conn.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='books'");
+          return result.first['sql'] as String;
+        });
+
+        expect(tableSql, contains('FOREIGN KEY'));
+        expect(tableSql, contains('"authors"'));
+      });
+
+      test('AddForeignKey preserves data during table recreation', () async {
+        await runner.migrate([CreateAuthorsTable(), CreateBooksTable()]);
+
+        await pool.withConnection((conn) async {
+          await conn.execute("INSERT INTO authors (name) VALUES ('Author 1')");
+          await conn.execute("INSERT INTO books (title, author_id) VALUES ('Book 1', 1)");
+          await conn.execute("INSERT INTO books (title, author_id) VALUES ('Book 2', 1)");
+        });
+
+        await runner.migrate([CreateAuthorsTable(), CreateBooksTable(), AddBookAuthorFk()]);
+
+        final rows = await pool.withConnection((conn) => conn.query('SELECT * FROM books ORDER BY id'));
+        expect(rows.length, equals(2));
+        expect(rows[0]['title'], equals('Book 1'));
+        expect(rows[1]['title'], equals('Book 2'));
+      });
+    });
+
+    group('SQLite table recreation (DropConstraint)', () {
+      test('DropConstraint removes FK via table recreation', () async {
+        await runner.migrate([CreateAuthorsTable(), CreateBooksWithFkTable()]);
+
+        var tableSql = await pool.withConnection((conn) async {
+          final result = await conn.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='books_with_fk'");
+          return result.first['sql'] as String;
+        });
+        expect(tableSql, contains('FOREIGN KEY'), reason: 'FK should exist before drop');
+
+        await runner.migrate([CreateAuthorsTable(), CreateBooksWithFkTable(), DropBookAuthorFk()]);
+
+        tableSql = await pool.withConnection((conn) async {
+          final result = await conn.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='books_with_fk'");
+          return result.first['sql'] as String;
+        });
+        expect(tableSql, isNot(contains('FOREIGN KEY')), reason: 'FK should be removed after migration');
+      });
+
+      test('DropConstraint preserves data during table recreation', () async {
+        await runner.migrate([CreateAuthorsTable(), CreateBooksWithFkTable()]);
+
+        await pool.withConnection((conn) async {
+          await conn.execute("INSERT INTO authors (name) VALUES ('Author 1')");
+          await conn.execute("INSERT INTO books_with_fk (title, author_id) VALUES ('Book 1', 1)");
+        });
+
+        await runner.migrate([CreateAuthorsTable(), CreateBooksWithFkTable(), DropBookAuthorFk()]);
+
+        final rows = await pool.withConnection((conn) => conn.query('SELECT * FROM books_with_fk ORDER BY id'));
+        expect(rows.length, equals(1));
+        expect(rows[0]['title'], equals('Book 1'));
       });
     });
   });
