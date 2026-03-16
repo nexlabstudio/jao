@@ -85,22 +85,13 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
     return null;
   }
 
-  String? _extractDefaultValue(dynamic dartObject) {
+  Object? _extractDefaultValue(dynamic dartObject) {
     if (dartObject == null || dartObject.isNull) return null;
 
-    if (dartObject.toIntValue() case final intVal?) {
-      return intVal.toString();
-    }
-    if (dartObject.toDoubleValue() case final doubleVal?) {
-      return doubleVal.toString();
-    }
-    if (dartObject.toBoolValue() case final boolVal?) {
-      return boolVal.toString();
-    }
-    if (dartObject.toStringValue() case final stringVal?) {
-      final escaped = stringVal.replaceAll("'", "\\'");
-      return "'$escaped'";
-    }
+    if (dartObject.toIntValue() case final intVal?) return intVal;
+    if (dartObject.toDoubleValue() case final doubleVal?) return doubleVal;
+    if (dartObject.toBoolValue() case final boolVal?) return boolVal;
+    if (dartObject.toStringValue() case final stringVal?) return stringVal;
 
     return null;
   }
@@ -444,7 +435,11 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
       buffer.writeln('        defaultValues: {');
       for (final f in fieldsWithDefaults) {
         final columnName = _toSnakeCase(f.name);
-        buffer.writeln("          '$columnName': ${f.defaultValue},");
+        final emittedValue = switch (f.defaultValue) {
+          final String v => "'$v'",
+          final v => '$v',
+        };
+        buffer.writeln("          '$columnName': $emittedValue,");
       }
       buffer.writeln('        },');
     }
@@ -508,7 +503,11 @@ class JaoGenerator extends GeneratorForAnnotation<Model> {
         buffer.writeln('        scale: $scale,');
       }
       if (field.defaultValue case final defaultValue?) {
-        buffer.writeln("        defaultValue: $defaultValue,");
+        final emittedValue = switch (defaultValue) {
+          final String v => "'$v'",
+          _ => '$defaultValue',
+        };
+        buffer.writeln("        defaultValue: $emittedValue,");
       }
       if (field.relation case final relation?) {
         final onDelete = field.onDelete ?? 'cascade';
@@ -697,7 +696,7 @@ class _FieldInfo {
   final bool autoNowAdd;
   final bool autoNow;
   final bool autoGenerateUuid;
-  final String? defaultValue;
+  final Object? defaultValue;
   final _RelationInfo? relation;
   final bool isEnum;
   final bool storeEnumAsInt;
@@ -757,7 +756,7 @@ class _FieldAnnotationInfo {
   final bool autoNowAdd;
   final bool autoNow;
   final bool autoGenerateUuid;
-  final String? defaultValue;
+  final Object? defaultValue;
   final _RelationInfo? relation;
   final bool isEnum;
   final bool storeEnumAsInt;

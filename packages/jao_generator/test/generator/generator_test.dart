@@ -424,7 +424,7 @@ class User {
 }
 ''');
 
-      expect(result, contains('defaultValue: false'));
+      expect(result, contains("defaultValue: false"));
     });
 
     test('emits defaultValue in ModelFieldSchema for CharField', () async {
