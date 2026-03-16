@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+## [0.3.3] - 2026-03-16
+
+### Fixed
+
+- `AddForeignKey` and `DropConstraint` operations now work on SQLite via table recreation
+  - SQLite does not support `ALTER TABLE ... ADD CONSTRAINT` or `DROP CONSTRAINT`
+  - Both operations now use the existing `generateTableRecreationSql` approach (rename, recreate, copy data, drop old)
+- Schema pre-fetch for SQLite table recreation now includes `AddForeignKey` and `DropConstraint` operations (previously only `AlterColumn` was pre-fetched)
+
 ## [0.3.2] - 2026-03-16
 
 ### Fixed

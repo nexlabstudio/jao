@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+## [0.3.2] - 2026-03-16
+
+### Fixed
+
+- Annotation fields inherited via superclass chain (e.g., `unique` and `maxLength` on `EmailField` which extends `CharField` which extends `Field`) are now correctly resolved
+  - `DartObject.getField()` only returns directly declared fields — added `_getInheritedField()` to walk the `(super)` chain
+  - Applied to all annotation field reads: `unique`, `maxLength`, `defaultValue`, `autoNowAdd`, `autoNow`, `autoGenerate`, `maxDigits`, `decimalPlaces`, `storeAsInt`, `onDelete`, `to`, `toColumn`
+
 ## [0.3.1] - 2026-03-16
 
 ### Fixed

@@ -1,6 +1,6 @@
 name: jao
 description: A Django-inspired ORM for Dart. Type-safe queries, lazy QuerySets, PostgreSQL/SQLite/MySQL support. Perfect for Dart Frog, Shelf, and dart applications.
-version: 0.3.2
+version: 0.3.3
 homepage: https://jao.nexlab.studio/
 repository: https://github.com/nexlabstudio/jao
 issue_tracker: https://github.com/nexlabstudio/jao/issues
