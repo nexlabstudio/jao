@@ -39,7 +39,7 @@ Always include `part 'filename.g.dart';` to enable code generation. The generate
 
 ## Generated Code
 
-After running `dart run build_runner build`, JAO generates:
+After running `dart run build_runner clean && dart run build_runner build --delete-conflicting-outputs`, JAO generates:
 
 - **`Users`** — Manager class for database operations
 - **`Users.$`** — Field accessor for type-safe queries
@@ -365,7 +365,7 @@ class Tag {
 ## Best Practices
 
 <Warning>
-Always run `dart run build_runner build` after modifying models to regenerate the query classes.
+Always run `dart run build_runner clean && dart run build_runner build --delete-conflicting-outputs` after modifying models to regenerate the query classes.
 </Warning>
 
 1. **Use meaningful names** — Model names should be singular nouns (Author, not Authors)

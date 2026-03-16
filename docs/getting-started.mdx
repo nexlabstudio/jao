@@ -114,7 +114,7 @@ class Post {
 Run the build runner to generate the query classes:
 
 ```bash
-dart run build_runner build
+dart run build_runner clean && dart run build_runner build --delete-conflicting-outputs
 ```
 
 This generates a `models.g.dart` file with:
