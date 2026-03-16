@@ -400,11 +400,14 @@ class MigrationRunner {
     if (adapter is SqliteAdapter) {
       await pool.withConnection((conn) async {
         for (final operation in operations) {
-          if (operation is AlterColumn) {
-            final tableName = operation.modification.table;
-            if (!sqliteSchemas.containsKey(tableName)) {
-              sqliteSchemas[tableName] = await adapter.getTableSchema(conn, tableName);
-            }
+          final tableName = switch (operation) {
+            AlterColumn op => op.modification.table,
+            AddForeignKey op => op.table,
+            DropConstraint op => op.table,
+            _ => null,
+          };
+          if (tableName case final tableName? when !sqliteSchemas.containsKey(tableName)) {
+            sqliteSchemas[tableName] = await adapter.getTableSchema(conn, tableName);
           }
         }
       });
