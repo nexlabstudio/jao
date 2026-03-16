@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+## [0.3.6] - 2026-03-16
+
+### Fixed
+
+- String default values in SQL are now properly quoted (`DEFAULT '{}'` instead of `DEFAULT {}`)
+  - Added `sqlDefault()` helper that wraps non-numeric, non-boolean, non-keyword values in SQL single quotes
+  - Escapes embedded single quotes using SQL standard `''` doubling
+  - Applied at all SQL emission points: `CreateTable`, `AddColumn`, `AlterColumn`, and SQLite table recreation
+
 ## [0.3.5] - 2026-03-16
 
 ### Added
