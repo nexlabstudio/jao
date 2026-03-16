@@ -311,8 +311,6 @@ class EnumField<T extends Enum> extends Field {
   });
 }
 
-// === Primary Key ===
-
 /// Auto-incrementing primary key
 @immutable
 class AutoField extends Field {
@@ -330,8 +328,6 @@ class BigAutoField extends Field {
 class UuidPrimaryKey extends UuidField {
   const UuidPrimaryKey({super.column}) : super(autoGenerate: true, nullable: false, unique: true);
 }
-
-// === Relationships ===
 
 /// Foreign key relationship
 @immutable
