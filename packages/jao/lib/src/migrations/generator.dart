@@ -386,6 +386,7 @@ class SchemaGenerator {
                   table: model.tableName,
                   column: field.columnName,
                   type: field.dbType,
+                  previousType: normalizedDbType,
                 ),
               ),
             );
@@ -401,6 +402,7 @@ class SchemaGenerator {
                   table: model.tableName,
                   column: field.columnName,
                   defaultValue: defaultValue.toString(),
+                  previousDefault: dbColumn.defaultValue,
                 ),
               ),
             );
@@ -411,6 +413,7 @@ class SchemaGenerator {
                   table: model.tableName,
                   column: field.columnName,
                   dropDefault: true,
+                  previousDefault: dbColumn.defaultValue,
                 ),
               ),
             );
@@ -676,12 +679,23 @@ class SchemaGenerator {
         return "${indent}builder.renameColumn('${op.table}', '${op.newName}', '${op.oldName}');";
       case AlterColumn():
         final mod = op.modification;
+        if (mod.rename != null) {
+          return "${indent}builder.renameColumn('${mod.table}', '${mod.rename}', '${mod.column}');";
+        }
         if (mod.nullable case final nullable?) {
-          final reverseNullable = !nullable;
-          final reverseMethod = reverseNullable ? 'col.nullable()' : 'col.notNullable()';
+          final reverseMethod = nullable ? 'col.notNullable()' : 'col.nullable()';
           return "${indent}builder.alterColumn('${mod.table}', '${mod.column}', (col) {\n$indent  $reverseMethod;\n$indent});";
         }
-        return '$indent// TODO: Manual reversal needed for AlterColumn';
+        if (mod.previousType case final previousType? when mod.type != null) {
+          return "${indent}builder.alterColumn('${mod.table}', '${mod.column}', (col) {\n$indent  col.type(FieldType.${previousType.name});\n$indent});";
+        }
+        if (mod.defaultValue != null && mod.previousDefault != null) {
+          return "${indent}builder.alterColumn('${mod.table}', '${mod.column}', (col) {\n$indent  col.defaultValue('${mod.previousDefault}');\n$indent});";
+        }
+        if (mod.dropDefault && mod.previousDefault != null) {
+          return "${indent}builder.alterColumn('${mod.table}', '${mod.column}', (col) {\n$indent  col.defaultValue('${mod.previousDefault}');\n$indent});";
+        }
+        return '$indent// Cannot auto-reverse AlterColumn: original state unknown';
       case CreateIndex():
         return "${indent}builder.dropIndex('${op.index.name}');";
       case DropIndex():

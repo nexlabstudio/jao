@@ -512,6 +512,8 @@ class ColumnModification {
   final String? defaultValue;
   final String? rename;
   final bool dropDefault;
+  final FieldType? previousType;
+  final String? previousDefault;
 
   const ColumnModification({
     required this.table,
@@ -521,5 +523,7 @@ class ColumnModification {
     this.defaultValue,
     this.rename,
     this.dropDefault = false,
+    this.previousType,
+    this.previousDefault,
   });
 }
