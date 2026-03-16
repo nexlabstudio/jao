@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+## [0.3.5] - 2026-03-16
+
+### Added
+
+- `ColumnModification` now stores `previousType` and `previousDefault` for reversible migrations
+  - The diff engine captures the DB column's current state when creating `AlterColumn` operations
+  - Reverse code generator produces correct `down()` methods for type changes, default value changes, and default drops
+  - Rename, nullability, type, and default value `AlterColumn` operations are all now reversible
+
 ## [0.3.4] - 2026-03-16
 
 ### Changed

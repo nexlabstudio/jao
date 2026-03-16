@@ -1,3 +1,20 @@
+## [0.3.1] - 2026-03-16
+
+### Fixed
+
+- Migration naming now generates descriptive names for all operation types instead of defaulting to `AutoMigration`
+  - `AlterColumn` → `AlterColumnOnTable`
+  - `AddForeignKey` → `AddFkOnTable`
+  - `CreateIndex` → `AddIndexOnTable`
+  - `DropConstraint` → `DropConstraintOnTable`
+  - `RenameTable` → `RenameOldToNew`
+  - `RenameColumn` → `RenameColumnOnTable`
+  - Fallback now appends a timestamp to avoid collisions
+
+### Changed
+
+- Extracted `generateMigrationName` as a top-level function for testability
+
 ## [0.3.0] - 2026-02-23
 
 - Bump `jao` dependency to `^0.3.0`
