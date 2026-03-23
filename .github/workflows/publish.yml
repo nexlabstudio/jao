@@ -170,7 +170,7 @@ jobs:
         run: dart compile exe packages/jao_cli/bin/jao.dart -o ${{ matrix.artifact }}${{ matrix.extension }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}${{ matrix.extension }}
